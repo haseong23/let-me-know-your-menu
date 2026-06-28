@@ -7,10 +7,15 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <title>오늘은 제가 섬기겠습니다 ☕</title>
-<meta name="description" content="셀 음료 섬김, 링크 하나로 깔끔하게 — 누가 어떤 메뉴를 원하는지·마시지 않는 분·총 몇 잔 자동 정리" />
+<meta name="description" content="오늘 음료로 섬기고 싶은 마음을 쉽게 — 셀 음료 메뉴를 카톡 없이 링크 하나로 모아요." />
 <meta property="og:type" content="website" />
+<meta property="og:url" content="https://haseong23.github.io/let-me-know-your-menu/" />
 <meta property="og:title" content="오늘은 제가 섬기겠습니다 ☕" />
-<meta property="og:description" content="셀 음료 섬김, 링크 하나로 깔끔하게 — 누가 어떤 메뉴를 원하는지·마시지 않는 분·총 몇 잔 자동 정리" />
+<meta property="og:description" content="은혜받은 마음으로 건네는 한 잔. 셀 음료 메뉴, 카톡 없이 링크 하나로 깔끔하게." />
+<meta property="og:image" content="https://haseong23.github.io/let-me-know-your-menu/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="theme-color" content="#6f4e37" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -106,7 +111,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.15";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.16";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -761,7 +766,7 @@ function renderBottom(inHostView){
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
   bind("claim",()=>{ if(CAFE_LIST.length<=1) doClaim((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
   bind("unclaim",async()=>{ if(confirm("오늘 섬김을 취소할까요?\n(다른 분이 다시 섬기기로 하면 지금까지 받은 주문은 그대로 유지됩니다)")){ if(await safeWrite(Sync.unclaim())) render(); }});
-  bind("close",async()=>{ if(confirm("주문을 마감할까요? 이후 수정 불가합니다.")){ if(await safeWrite(Sync.close())) render(); }});
+  bind("close",async()=>{ if(confirm("주문을 마감할까요?\n마감 후에도 '마감 취소'를 누르면 다시 열어 수정할 수 있어요.")){ if(await safeWrite(Sync.close())) render(); }});
   bind("reopen",async()=>{ if(await safeWrite(Sync.reopen())) render(); });
   bind("hostView",()=>renderHostView());
 }
