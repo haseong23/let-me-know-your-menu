@@ -7,10 +7,10 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 <title>오늘은 제가 섬기겠습니다 ☕</title>
-<meta name="description" content="셀 단체 음료 주문, 링크 하나로 깔끔하게 — 누가 뭘·안 마시는 사람·총 몇 잔 자동 정리" />
+<meta name="description" content="셀 음료 섬김, 링크 하나로 깔끔하게 — 누가 어떤 메뉴를 원하는지·마시지 않는 분·총 몇 잔 자동 정리" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="오늘은 제가 섬기겠습니다 ☕" />
-<meta property="og:description" content="셀 단체 음료 주문, 링크 하나로 깔끔하게 — 누가 뭘·안 마시는 사람·총 몇 잔 자동 정리" />
+<meta property="og:description" content="셀 음료 섬김, 링크 하나로 깔끔하게 — 누가 어떤 메뉴를 원하는지·마시지 않는 분·총 몇 잔 자동 정리" />
 <meta name="theme-color" content="#6f4e37" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -106,7 +106,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.9";   // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.12";  // 배포 확인용 — 푸터/콘솔에 표시
 const CONFIG = {
   SUPABASE_URL: "",
   SUPABASE_ANON_KEY: "",
@@ -224,8 +224,8 @@ const CODE_CELLS = {
   demo: {
     id: "demo",
     roomId: "demo",
-    name: "데모 셀",
-    members: ["김철수", "박민준", "이영희", "정도윤", "최서연", "한지우"],
+    name: "사랑셀",
+    members: ["김요셉", "이다니엘", "박사무엘", "최에스더", "정하은", "한사랑"],
     homeCafeId: "gil",
   },
 };
@@ -261,7 +261,7 @@ async function loadCafeMenus(cafeId){
     return CAFEMENU_CACHE[cafeId];
   }catch(e){ CAFEMENU_CACHE[cafeId]=[]; return []; }
 }
-// 주문 이력 집계 (셀 단위): #1 개인화 정렬용 H_byMemberId, #2 멤버 최애용 H_topName
+// 주문 이력 집계 (셀 단위): #1 개인화 정렬용 H_byMemberId, #2 셀원 선호 메뉴용 H_topName
 let HIST_ROOM="", H_byMemberId={}, H_topName={};
 async function loadHist(){
   if(!SHARED){ H_byMemberId={}; H_topName={}; HIST_ROOM=ROOM; return; }
@@ -402,7 +402,7 @@ const SupabaseSync = () => {
       await reload();
       return !!data;
     },
-    async unclaim(){ // 주문은 보존 — 다른 사람이 다시 쏘면 그대로 유지
+    async unclaim(){ // 주문은 보존 — 다른 분이 다시 섬기기로 하면 그대로 유지
       const {error}=await client.rpc("set_room_state",{p_room:ROOM,p_date:date(),p_state:"idle"}); if(error) throw error;
       await reload();
     },
@@ -494,13 +494,13 @@ function renderPickMe(){
     <div class="card" style="padding:8px 18px">${list}</div>
     <p class="muted center" style="margin:8px 0 4px">이름을 누르면 아래에서 <b>한 번 더 확인</b>해요.</p>
     <div class="label">내 이름이 목록에 없나요?</div>
-    <div style="display:flex;gap:8px"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력" style="flex:1"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
+    <div style="display:flex;gap:8px"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력" style="flex:1;min-width:0"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
   document.getElementById("addMeBtn").onclick=async()=>{
     const nm=document.getElementById("addMeName").value.trim().slice(0,40); if(!nm){ toast("이름을 입력해주세요"); return; }
     if(MEMBERS.some(m=>m.id===nm)){ pickSel=nm; renderPickMe(); toast("이미 있는 이름이라 선택했어요"); return; }
     const arr=[...MEMBERS.map(m=>m.name), nm];
-    if(await saveMembers(arr)){ setMe(nm); toast(nm+"님으로 시작!"); render(); }
+    if(await saveMembers(arr)){ setMe(nm); toast(nm+"님, 반가워요 🙏"); render(); }
   };
   if(sel){
     const bar=document.createElement("div"); bar.className="bottombar";
@@ -508,16 +508,16 @@ function renderPickMe(){
       ${selOrder?`<div class="banner-warn" style="margin:0;text-align:center">⚠️ '${esc(sel.name)}'님은 이미 ${selOrder.type==="skip"?"'안 마심'":"주문"}이 있어요. 본인이 맞는지 꼭 확인!</div>`:''}
       <button class="btn btn-brand" id="confirmMe">🙋 '${esc(sel.name)}' 님으로 시작하기</button></div>`;
     $app.appendChild(bar);
-    document.getElementById("confirmMe").onclick=()=>{ const id=pickSel; pickSel=null; setMe(id); toast(memberById(id).name+"님으로 설정"); render(); };
+    document.getElementById("confirmMe").onclick=()=>{ const id=pickSel; pickSel=null; setMe(id); toast(memberById(id).name+"님으로 시작할게요"); render(); };
   }
 }
 
 function renderIdle(){
   view().innerHTML=`
     <div class="card banner"><div class="emoji">🫧</div>
-      <h2>오늘은 아직 아무도<br>커피를 안 쐈어요</h2>
-      <p>오늘 한턱 쏘실 분, 아래 버튼을 눌러주세요</p></div>
-    <p class="muted center">버튼을 누르면 <b>${esc(meName())}</b>님이 오늘의 쏘는 사람으로 확정되고,<br>멤버들에게 주문이 열립니다.</p>`;
+      <h2>오늘은 아직<br>섬기기로 하신 분이 없어요</h2>
+      <p>오늘 음료로 섬겨주실 분은 아래 버튼을 눌러주세요</p></div>
+    <p class="muted center">버튼을 누르면 <b>${esc(meName())}</b>님이 오늘 섬기는 분으로 확정되고,<br>셀원들에게 주문이 열립니다.</p>`;
 }
 
 let forceGrid=false;
@@ -537,18 +537,18 @@ function renderOpen(){
   }
   const isSkip = myOrder && myOrder.type==="skip";
   const showGrid = !myOrder || isSkip || forceGrid;
-  // 다른 사람 주문 ("나도" 버튼)
+  // 다른 분 주문 ("나도" 버튼)
   const others=MEMBERS.filter(m=>m.id!==ME && ORDERS[m.id] && ORDERS[m.id].type==="drink");
   let othersHtml="";
   if(others.length){
-    othersHtml=`<div class="label">다른 사람 주문 · [나도] 누르면 같은 걸로</div>
+    othersHtml=`<div class="label">다른 분 주문 · [나도] 누르면 같은 걸로</div>
       <div class="card" style="padding:6px 14px">${others.map(m=>{ const o=ORDERS[m.id], d=orderDisplay(o);
         return `<div class="person"><div class="avatar">${esc(initials(m.name))}</div>
           <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}</div></div>
           <button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button></div>`;}).join("")}</div>`;
   }
   const gridHtml = showGrid ? `
-      <div class="label">${myOrder?'메뉴 다시 고르기':'자주 마시는 메뉴'}</div>
+      <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
       ${ isSkip ? "" : `<div style="height:8px"></div><button class="btn btn-ghost" id="skipBtn">오늘은 안 마실게요 🙅</button>` }` : "";
   const changeLink = (myOrder && myOrder.type==="drink" && !forceGrid)
@@ -556,18 +556,18 @@ function renderOpen(){
 
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
-      <h2><span class="host-name">${esc(host?host.name:"?")}</span>님이 쏩니다!</h2>
-      <p>${myOrder?'메뉴가 접수됐어요':'드시고 싶은 메뉴를 골라주세요'}</p></div>
+      <h2><span class="host-name">${esc(host?host.name:"?")}</span>님이 섬깁니다!</h2>
+      <p>${myOrder?'메뉴 잘 전했어요 🙏':'드시고 싶은 메뉴를 골라주세요'}</p></div>
     ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null); else t.onclick=()=>openOrderSheet(t.dataset.id,null); });
-  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"}))){ toast("안 마심으로 표시했어요"); render(); } };
+  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"}))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } };
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로!"); render(); } });
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } });
 }
 
 function openOrderSheet(menuId, existing){
@@ -600,7 +600,7 @@ function openOrderSheet(menuId, existing){
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(); }; });
     const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v); i>=0?extras.splice(i,1):extras.push(v); note=document.getElementById("note").value; draw(); });
     document.getElementById("confirmOrder").onclick=async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
-      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 완료!"); render(); } };
+      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } };
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
   }
@@ -611,7 +611,7 @@ function openCustomSheet(existing){
   let temp="ICE";
   openSheet(`
     <h3>🥤 직접 입력</h3>
-    <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 사람에게도 보입니다.</p>
+    <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
     <div class="label">메뉴 이름</div>
     <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" />
     <div class="label">온도</div>
@@ -632,7 +632,7 @@ function openCustomSheet(existing){
     bumpFreq("c:"+name);
     // 카페 공식 메뉴로 승격(재사용). 테이블/RPC 없으면 조용히 무시
     if(SHARED){ try{ await Sync.client.rpc("add_cafe_menu",{p_cafe_id:activeCafeId(),p_menu_id:"c:"+name,p_name:name}); delete CAFEMENU_CACHE[activeCafeId()]; await loadCafeMenus(activeCafeId()); applyCafeGlobals(); }catch(e){} }
-    closeSheet(); toast("추가하고 주문 완료!"); render(); };
+    closeSheet(); toast("추가해서 담았어요 🙏"); render(); };
   document.getElementById("cClose").onclick=closeSheet;
   setTimeout(()=>{ const el=document.getElementById("cname"); if(el) el.focus(); },60);
 }
@@ -680,7 +680,7 @@ function renderClosed(){
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">✅</div>
       <h2>오늘 주문 마감</h2>
-      <p><span class="host-name">${esc(host?host.name:"?")}</span>님이 쏩니다 · 총 ${countDrinks()}잔</p></div>
+      <p><span class="host-name">${esc(host?host.name:"?")}</span>님이 섬깁니다 · 총 ${countDrinks()}잔</p></div>
     ${dashboardHtml()}`;
   wireDashboard();
 }
@@ -698,7 +698,7 @@ function dashboardHtml(){
     <div class="stat"><div class="num" style="color:var(--gray)">${skipped.length}</div><div class="lbl">안마심</div></div>
     <div class="stat"><div class="num" style="color:var(--accent)">${pending.length}</div><div class="lbl">미응답</div></div></div>`;
   const tabs=`<div class="tabs" id="dashTabs">
-    <div class="tab ${dashTab==='people'?'on':''}" data-t="people">사람별 / 나눠주기</div>
+    <div class="tab ${dashTab==='people'?'on':''}" data-t="people">셀원별 / 전달하기</div>
     <div class="tab ${dashTab==='cafe'?'on':''}" data-t="cafe">카페 주문서</div></div>`;
   let body;
   if(dashTab==="people"){
@@ -711,7 +711,7 @@ function dashboardHtml(){
       return `<div class="person"><div class="avatar" style="${kind==='pending'?'background:var(--gray)':kind==='skip'?'background:#cbbfae':''}">${esc(initials(m.name))}</div>
         <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
     body=`<div class="card" style="padding:6px 18px">${ordered.map(m=>row(m,"ordered")).join("")}${skipped.map(m=>row(m,"skip")).join("")}${pending.map(m=>row(m,"pending")).join("")}</div>`;
-    if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 재촉 문구 복사</button>`;
+    if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
   } else {
     body=`<div class="card"><div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
       <div class="order-box" id="orderBox">${esc(cafeText())}</div><div style="height:12px"></div>
@@ -723,7 +723,7 @@ function wireDashboard(){
   const t=document.getElementById("dashTabs"); if(t) t.querySelectorAll(".tab").forEach(el=> el.onclick=()=>{ dashTab=el.dataset.t; rerenderDash(); });
   const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요");
   const nd=document.getElementById("nudge"); if(nd) nd.onclick=()=>{ const names=MEMBERS.filter(m=>!ORDERS[m.id]).map(m=>m.name).join(", ");
-    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${memberById(SESSION.hostId).name}님이 쏘십니다~ 링크에서 골라주세요!`,"재촉 문구 복사됨"); };
+    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${memberById(SESSION.hostId).name}님이 오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
 }
 function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else renderHostView(); }
 function countDrinks(){ return MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink").length; }
@@ -740,7 +740,7 @@ function renderHostView(){
   curView="host"; renderHeader();
   const host=memberById(SESSION.hostId);
   view().innerHTML=`<div class="row-between" style="margin-bottom:12px">
-      <div><b style="font-size:17px">주문 현황</b> <span class="muted">· ${esc(host?host.name:"?")}님이 쏨</span></div>
+      <div><b style="font-size:17px">주문 현황</b> <span class="muted">· 섬기는 분: ${esc(host?host.name:"?")}님</span></div>
       <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
   document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
   wireDashboard(); renderBottom(true);
@@ -749,7 +749,7 @@ function renderHostView(){
 /* ---------- 하단 액션바 ---------- */
 function renderBottom(inHostView){
   const amHost=SESSION.hostId===ME; let html="";
-  if(SESSION.state==="idle"){ html=`<button class="btn btn-brand" id="claim">🙋 오늘은 내가 쏠게요</button>`; }
+  if(SESSION.state==="idle"){ html=`<button class="btn btn-brand" id="claim">🙋 오늘은 제가 섬기겠습니다</button>`; }
   else if(SESSION.state==="open"){
     if(amHost){ html=inHostView
         ? `<button class="btn btn-danger btn-sm" id="unclaim">취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`
@@ -758,7 +758,7 @@ function renderBottom(inHostView){
   } else { html = amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`; }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
   bind("claim",()=>{ if(CAFE_LIST.length<=1) doClaim((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
-  bind("unclaim",async()=>{ if(confirm("오늘 '쏘기'를 취소할까요?\n(다른 분이 다시 쏘면 지금까지 받은 주문은 그대로 유지됩니다)")){ if(await safeWrite(Sync.unclaim())) render(); }});
+  bind("unclaim",async()=>{ if(confirm("오늘 섬김을 취소할까요?\n(다른 분이 다시 섬기기로 하면 지금까지 받은 주문은 그대로 유지됩니다)")){ if(await safeWrite(Sync.unclaim())) render(); }});
   bind("close",async()=>{ if(confirm("주문을 마감할까요? 이후 수정 불가합니다.")){ if(await safeWrite(Sync.close())) render(); }});
   bind("reopen",async()=>{ if(await safeWrite(Sync.reopen())) render(); });
   bind("hostView",()=>renderHostView());
@@ -768,19 +768,19 @@ function bind(id,fn){ const el=document.getElementById(id); if(el) el.onclick=fn
 /* ---------- 클레임 시 카페 선택 ---------- */
 async function doClaim(cafeId){
   toast("저장 중…");
-  try{ const ok=await Sync.claim(ME, cafeId); toast(ok ? (meName()+"님이 오늘의 호스트!") : "앗, 방금 다른 분이 먼저 쏘셨어요!"); render(); }
+  try{ const ok=await Sync.claim(ME, cafeId); toast(ok ? (meName()+"님이 오늘 섬기는 분으로 설정됐어요") : "앗, 방금 다른 분이 먼저 섬기기로 하셨어요!"); render(); }
   catch(e){ console.error(e); toast("저장 실패 — 다시 시도해주세요"); render(); }
 }
 function openClaimCafeSheet(){
   let cafeId = (CELL&&CELL.homeCafeId) || "gil";
   function draw(){
     openSheet(`
-      <h3>🙋 오늘은 내가 쏠게요</h3>
+      <h3>🙋 오늘은 제가 섬기겠습니다</h3>
       <p class="muted" style="margin-top:0">어느 카페인가요? <b>고른 카페의 메뉴</b>로 주문을 받아요.</p>
       <div class="chips" id="cafechips">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
       <p class="muted" style="margin-top:8px">${CAFES[cafeId]&&CAFES[cafeId].freeform?'프리셋 메뉴 없이 각자 \'직접 입력\'으로 받아요 (외부 카페용).':'정해진 메뉴판에서 고르고, 없으면 직접 입력도 가능해요.'}</p>
       <div style="height:14px"></div>
-      <button class="btn btn-brand" id="goClaim">🎉 '${esc((CAFES[cafeId]||{}).name||"")}'(으)로 주문 받기</button>
+      <button class="btn btn-brand" id="goClaim">🎉 '${esc((CAFES[cafeId]||{}).name||"")}'(으)로 섬김 시작하기</button>
       <div style="height:8px"></div><button class="btn btn-ghost" id="claimClose">닫기</button>`);
     document.getElementById("cafechips").querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; draw(); });
     document.getElementById("goClaim").onclick=()=>{ closeSheet(); doClaim(cafeId); };
@@ -796,8 +796,8 @@ function openSettings(adv){
     <div class="banner-warn">${SHARED?"✅ 실시간 공유 모드로 연결됨":"⚠️ 이 기기 전용 모드입니다 (공유 안 됨)"}</div>
     <button class="btn btn-soft" id="changeMe">🙋 내 이름 다시 선택  <span style="opacity:.7">(현재: ${esc(meName()||'-')})</span></button>
     <div style="height:8px"></div>
-    <button class="btn btn-soft" id="editMembers">👥 멤버 편집 (추가·수정·삭제)</button>
-    <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 멤버 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>
+    <button class="btn btn-soft" id="editMembers">👥 셀원 편집 (추가·수정·삭제)</button>
+    <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 셀원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>
     <p class="center" style="margin-top:10px"><span class="nav-link" id="advToggle">${adv?'▲ 고급 설정 숨기기':'⚙ 고급 설정 (관리자용)'}</span></p>
     ${adv?`
       <div class="banner-warn">아래는 관리자/개발용입니다. 일반 사용자는 만질 필요 없어요.</div>
@@ -837,7 +837,7 @@ async function loadDbCells(){
   }catch(e){ console.warn("cells 로드 실패",e); }
 }
 function loadLocalCells(){ try{ DB_CELLS=JSON.parse(localStorage.getItem("coffee_local_cells")||"{}")||{}; }catch(e){ DB_CELLS={}; } }
-// 멤버 저장: 링크(id) 아는 사람이 그 셀 하나만 갱신(단건 RPC, 코드검증 없음 #6)
+// 셀원 저장: 링크(id) 아는 사람이 그 셀 하나만 갱신(단건 RPC, 코드검증 없음 #6)
 async function saveMembers(arr){
   if(SHARED){ const {error}=await Sync.client.rpc("set_members",{p_id:CELL.id,p_members:arr}); if(error){ toast("저장 실패: "+(error.message||"")); return false; }
     const fresh=await fetchCell(CELL.id); if(fresh) CELL=fresh;
@@ -886,9 +886,9 @@ function renderCellPicker(){
     </div>
     <div class="card">
       <div class="label" style="margin-top:0">이런 앱이에요</div>
-      <p class="muted" style="margin:0;line-height:1.7">셀(모임)마다 <b>고유 링크</b>가 있고, 셀 리더가 공유해준 그 링크로 입장합니다.<br>본인 이름 선택 → 메뉴 담기 → 끝! <b>누가 뭘 시켰는지·안 마시는 사람·메뉴별 몇 잔인지</b> 등이 자동으로 정리돼요.</p>
+      <p class="muted" style="margin:0;line-height:1.7">셀(모임)마다 <b>고유 링크</b>가 있고, 셀 리더가 공유해준 그 링크로 입장합니다.<br>본인 이름 선택 → 메뉴 담기 → 끝! <b>누가 어떤 메뉴를 원하는지·마시지 않는 분·메뉴별 몇 잔인지</b> 등이 자동으로 정리돼요.</p>
     </div>
-    <p class="center" style="margin-top:16px"><span style="font-size:11px;color:var(--gray)">${APP_VERSION}</span></p>`;
+    <p class="center" style="margin-top:16px"><a href="${esc(location.pathname)}?admin" class="nav-link" style="font-size:12px;color:var(--sub)">관리자</a> <span style="font-size:11px;color:var(--gray)">· ${APP_VERSION}</span></p>`;
 }
 
 function slugify(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,20); }
@@ -901,8 +901,8 @@ function openCreateCellSheet(){
     <h3>➕ 새 셀 만들기</h3>
     <div class="label">셀 이름</div>
     <input type="text" id="newName" maxlength="40" placeholder="예: 청년1부 2셀" />
-    <div class="label">멤버 (쉼표 또는 줄바꿈으로 구분)</div>
-    <textarea id="newMembers" rows="5" placeholder="홍길동, 김철수, 이영희" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)"></textarea>
+    <div class="label">셀원 (쉼표 또는 줄바꿈으로 구분)</div>
+    <textarea id="newMembers" rows="5" placeholder="김요셉, 이다니엘, 박사무엘" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)"></textarea>
     <div class="label">홈 카페 (기본 카페)</div>
     <div class="chips" id="newCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
     <div style="height:16px"></div>
@@ -915,7 +915,7 @@ function openCreateCellSheet(){
     const name=document.getElementById("newName").value.trim();
     const members=[...new Set(document.getElementById("newMembers").value.split(/[\n,]/).map(s=>s.trim().slice(0,40)).filter(Boolean))].slice(0,60);
     if(!name){ toast("셀 이름을 입력해주세요"); return; }
-    if(members.length<1){ toast("멤버를 1명 이상 입력해주세요"); return; }
+    if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
     const id=genCellId(name), cell={id,roomId:id,name,members,homeCafeId:cafeId};
     if(SHARED){
       const {error}=await Sync.client.from("cells").insert({id,room_id:id,name,members,home_cafe:cafeId});
@@ -932,10 +932,10 @@ function showCellCreated(cell){
   const url=`${location.origin}${location.pathname}?cell=${cell.id}`;
   openSheet(`
     <h3>✅ '${esc(cell.name)}' 셀 생성 완료</h3>
-    <div class="label">멤버용 초대 링크 (단톡방에 공유)</div>
+    <div class="label">셀원용 초대 링크</div>
     <div class="order-box" style="word-break:break-all">${esc(url)}</div>
     <button class="btn btn-soft btn-sm" id="copyUrl" style="margin-top:8px">📋 초대 링크 복사</button>
-    <p class="muted" style="margin-top:10px">이 링크를 받은 사람은 <b>주문 + 멤버 편집</b>이 가능합니다. (유추 불가 랜덤 주소)</p>
+    <p class="muted" style="margin-top:10px">이 링크를 받은 분은 <b>주문 + 셀원 편집</b>이 가능합니다. (유추 불가 랜덤 주소)</p>
     <div style="height:12px"></div>
     <button class="btn btn-ghost" id="enterNew">${adminMode?'관리자 목록으로':'닫기'}</button>`);
   document.getElementById("copyUrl").onclick=()=>copyText(url,"초대 링크 복사됨");
@@ -944,21 +944,18 @@ function showCellCreated(cell){
 
 /* ===================== 관리자 페이지 (숨은 경로 ?admin) ===================== */
 async function renderAdmin(){
-  adminMode=true; $bottom.innerHTML="";
-  if(!SHARED){ renderAdminUnavailable(); return; }
+  adminMode=true; curView="admin"; $bottom.innerHTML="";
+  if(!SHARED){   // 운영은 키 내장으로 항상 SHARED — 로컬/미연결 시 안내만(키 붙여넣기 폼 없음)
+    $app.innerHTML=`
+      <header><div class="room-name" style="padding-top:6px">🔒 관리자</div>
+      <div class="date">운영(Supabase 연결) 환경에서만 사용할 수 있어요</div></header>
+      <div class="card"><p class="muted" style="margin:0;line-height:1.7">이 화면은 운영 배포(공유 모드)에서만 동작합니다.</p></div>
+      <p class="muted center" style="margin-top:10px"><a href="${esc(location.pathname)}" style="color:var(--sub)">← 일반 화면으로</a></p>`;
+    return;
+  }
   try{ const { data:{ session } } = await Sync.client.auth.getSession();
     if(session) renderAdminDash(); else renderAdminLogin();
   }catch(e){ renderAdminLogin(); }
-}
-function renderAdminUnavailable(){
-  curView="admin";
-  $app.innerHTML=`
-    <header><div class="room-name" style="padding-top:6px">🔒 관리자</div>
-    <div class="date">운영 공유 설정이 필요합니다</div></header>
-    <div class="card">
-      <p class="muted" style="margin:0;line-height:1.7">관리자 기능은 Supabase가 연결된 운영 환경에서만 사용할 수 있습니다. 공개 페이지에서는 관리자 대시보드를 열지 않습니다.</p>
-    </div>
-    <p class="muted center" style="margin-top:10px"><a href="${esc(location.pathname)}" style="color:var(--sub)">← 일반 화면으로</a></p>`;
 }
 function renderAdminLogin(){
   curView="admin";
@@ -1077,15 +1074,15 @@ function openMenuEditSheet(cafeId, existing){
     if(error){ toast("저장 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; closeSheet(); toast("저장됨"); openCafeMenuAdmin(cafeId); };
 }
 
-// 멤버 편집 (이 셀 링크를 가진 누구나) — set_members RPC
+// 셀원 편집 (이 셀 링크를 가진 누구나) — set_members RPC
 function openMembersSheet(){
   let list=[...MEMBERS.map(m=>m.name)];
   function draw(){
     openSheet(`
-      <h3>👥 ${esc(ROOM_NAME)} 멤버 편집</h3>
+      <h3>👥 ${esc(ROOM_NAME)} 셀원 편집</h3>
       <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. 저장하면 모두에게 반영됩니다.</p>
-      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((n,i)=>`<div class="person"><div class="avatar">${esc(initials(n))}</div><input type="text" class="medit" data-i="${i}" value="${esc(n)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">멤버가 없어요</p>'}</div>
-      <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="멤버 이름 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
+      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((n,i)=>`<div class="person"><div class="avatar">${esc(initials(n))}</div><input type="text" class="medit" data-i="${i}" value="${esc(n)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">셀원이 없어요</p>'}</div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="셀원 이름 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="saveM">저장</button>
       <div style="height:8px"></div><button class="btn btn-ghost" id="closeM">닫기</button>`);
@@ -1094,8 +1091,8 @@ function openMembersSheet(){
     document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push(v); draw(); } };
     document.getElementById("saveM").onclick=async()=>{
       const cleaned=[...new Set(list.map(s=>(s||"").trim().slice(0,40)).filter(Boolean))].slice(0,60);
-      if(!cleaned.length){ toast("멤버를 1명 이상 두세요"); return; }
-      if(await saveMembers(cleaned)){ if(ME && !cleaned.includes(ME)) setMe(null); closeSheet(); toast("멤버 저장됨"); render(); }
+      if(!cleaned.length){ toast("셀원을 1명 이상 두세요"); return; }
+      if(await saveMembers(cleaned)){ if(ME && !cleaned.includes(ME)) setMe(null); closeSheet(); toast("셀원 명단을 저장했어요"); render(); }
     };
     document.getElementById("closeM").onclick=closeSheet;
   }

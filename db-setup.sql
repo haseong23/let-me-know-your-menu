@@ -1,32 +1,11 @@
-# 단체 커피 주문 설정 & 배포 가이드
+-- ============================================================
+-- 오늘은 제가 섬기겠습니다 — DB 전체 설정 스크립트 (한 번에 실행)
+-- Supabase Dashboard > SQL Editor 에 '전체' 붙여넣고 Run 하세요.
+-- 기존 데이터는 보존됩니다(create table if not exists). 재실행 안전(idempotent).
+-- 실행 후 Auth 설정: Authentication > Providers > Email ON,
+--   'Allow new users to sign up' OFF, Users 에서 관리자 계정 1개 생성.
+-- ============================================================
 
-이 저장소는 public 입니다. 실제 셀 명단, 주문 데이터, 운영용 Supabase 프로젝트 정보가 코드, 문서, 스크린샷, Git 히스토리에 남지 않도록 관리합니다.
-
-루트 랜딩 페이지는 의도된 공개 화면입니다. 셀 입장은 `?cell=...` 링크를 받은 사람만 하며, `?cell=demo`는 개인정보가 없는 내장 `ㅇ-ㅇ셀`입니다.
-
-## 보안 원칙
-
-- 실제 셀원 이름은 코드에 넣지 않고 Supabase `cells` 테이블에만 저장합니다.
-- `orders`, `sessions`, `cells`는 익명 사용자의 직접 `SELECT`를 허용하지 않습니다.
-- 앱은 `get_cell`, `get_room_day`, `get_room_history` 같은 RPC를 통해 필요한 방 1개만 조회합니다.
-- Supabase publishable/anon key는 비밀 키는 아니지만, RLS/RPC가 느슨하면 누구나 데이터를 읽는 열쇠가 됩니다.
-- public repo의 `main`에는 운영용 Supabase URL/key를 커밋하지 않습니다. 공유 모드는 보안 SQL 적용 후 별도 배포 설정이나 앱의 고급 설정에서만 사용하세요.
-
-## 1. Supabase 프로젝트 만들기
-
-1. https://supabase.com 에서 새 프로젝트를 만듭니다.
-2. 리전은 가까운 곳을 선택합니다.
-3. **SQL Editor**에서 아래 SQL을 한 번에 실행합니다.
-4. 관리자 화면을 쓸 경우 **Authentication > Providers > Email**을 켜고, **Allow new users to sign up**은 꺼둡니다.
-5. **Authentication > Users > Add user**로 관리자 계정 1개를 직접 만듭니다.
-
-## 2. 보안 SQL
-
-> **한 번에 실행하려면 저장소 루트의 [`db-setup.sql`](db-setup.sql) 전체를 복사해 Supabase SQL Editor에 붙여넣고 Run** 하세요. (아래 SQL + 데모 셀 insert를 하나로 합친 스크립트, 재실행 안전)
-
-아래 SQL은 기존 prototype 정책을 제거하고, private 테이블은 RPC로만 접근하게 만듭니다.
-
-```sql
 begin;
 
 create table if not exists public.cells (
@@ -383,49 +362,12 @@ end $$;
 revoke all on function public.add_cafe_menu(text,text,text) from public;
 grant execute on function public.add_cafe_menu(text,text,text) to anon, authenticated;
 
-commit;
-```
 
-## (선택) 데모 셀 — 가이드/랜딩의 라이브 데모(`?cell=demo`)가 작동하려면 DB에 삽입
-운영(SHARED) 모드에선 `fetchCell`이 DB의 `get_cell`만 조회하므로(코드 폴백 없음), 데모 링크가 동작하려면 `cells`에 `demo` 행이 있어야 합니다. **가짜 데이터만** 사용합니다.
-```sql
+-- ---- 데모 셀: 가이드/랜딩의 ?cell=demo 체험용 (가짜 데이터) ----
 insert into public.cells (id, room_id, name, members, home_cafe)
 values ('demo','demo','사랑셀',
         '["김요셉","이다니엘","박사무엘","최에스더","정하은","한사랑"]'::jsonb,'gil')
 on conflict (id) do update
   set name = excluded.name, members = excluded.members, home_cafe = excluded.home_cafe;
-```
 
-## 3. 앱 연결
-
-public `main` 브랜치에는 운영용 값을 커밋하지 않습니다. 보안 SQL을 적용한 뒤 테스트할 때는 앱 우상단 **고급 설정**에서 Project URL과 publishable key를 넣어 현재 기기에만 저장하세요.
-
-별도 운영 배포에 값을 직접 넣는 경우에도 아래처럼 실제 셀원 명단이나 주문 데이터는 코드에 넣지 않습니다.
-
-```js
-const CONFIG = {
-  SUPABASE_URL: "https://your-project.supabase.co",
-  SUPABASE_ANON_KEY: "your-publishable-key",
-  ROOM_ID: "default",
-  ROOM_NAME: "오늘은 제가 섬기겠습니다",
-};
-```
-
-연결되면 `cells`에 생성한 셀 링크(`?cell=...`)로 입장할 수 있습니다.
-
-## 4. 관리자 화면
-
-관리자 화면은 `?admin` 경로입니다.
-
-- 공유 모드가 켜져 있어야 합니다.
-- Supabase Email 인증으로 로그인해야 셀 생성, 삭제, 메뉴 관리를 할 수 있습니다.
-- 관리자 이메일과 비밀번호는 코드나 문서에 적지 않습니다.
-
-## 5. 기존 프로젝트 긴급 조치
-
-이미 public repo나 GitHub Pages에 운영용 key가 올라간 적이 있다면 아래 순서로 처리합니다.
-
-1. 위 보안 SQL을 실행해서 `orders`, `sessions`, `cells`의 직접 조회를 막습니다.
-2. Supabase Dashboard에서 publishable key를 rotate 합니다.
-3. Git 히스토리에 실명, 주문 데이터, 예전 key가 남아 있으면 히스토리를 정리하고 force push 합니다.
-4. GitHub Pages 캐시가 갱신될 때까지 live HTML에 예전 값이 남아 있지 않은지 확인합니다.
+commit;

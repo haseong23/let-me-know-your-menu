@@ -4,7 +4,7 @@ This repository is public. The landing page contact and signature are intentiona
 
 ## Rules
 
-- Keep `CONFIG.SUPABASE_URL` and `CONFIG.SUPABASE_ANON_KEY` empty on the public `main` branch.
+- The Supabase **publishable/anon** key and project URL MAY be committed in `CONFIG` on public `main` — they are not secrets. This is safe **only while strict RLS is enforced**: no anonymous direct `SELECT` on `orders`/`sessions`/`cells`, all private access through the narrow RPCs in `db-setup.sql`, and signup turned **OFF**. Never commit the **secret / service_role** key.
 - Store real member lists only in Supabase, never in source files, docs, screenshots, or guides.
 - Do not allow anonymous direct `SELECT` on `orders`, `sessions`, or `cells`.
 - Access private app data only through narrow RPC functions that require the room/cell ID.
