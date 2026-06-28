@@ -229,6 +229,41 @@
       font-weight: 900;
     }
 
+    .contact-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .email-plain {
+      color: var(--ink);
+      font-weight: 800;
+      word-break: break-all;
+    }
+
+    .copy-email {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--brand);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      min-height: 36px;
+      padding: 0 12px;
+    }
+
+    .copy-email:focus-visible {
+      outline: 3px solid rgba(31, 118, 103, .22);
+      outline-offset: 2px;
+    }
+
     @media (max-width: 920px) {
       .intro { grid-template-columns: 1fr; }
       .hero-shot { display: none; }
@@ -311,10 +346,44 @@
       <h2>마음에 드셨다면 셀 링크를 요청해주세요</h2>
       <p>사용법을 보시고 마음에 드신다면 관리자에게 셀 이름과 함께 URL을 요청해주세요.</p>
       <p class="sample">"3-3셀 ㅇㅇㅇ입니다. 링크 요청드립니다."</p>
-      <p>위와 같이 <a href="mailto:tempyo42@gmail.com">이메일</a> 주시면 빠르게 답변드리겠습니다.</p>
+      <div class="contact-row">
+        <span>위와 같이 <a href="mailto:tempyo42@gmail.com">이메일</a> 주시면 빠르게 답변드리겠습니다.</span>
+        <span class="email-plain" id="contactEmail">tempyo42@gmail.com</span>
+        <button type="button" class="copy-email" id="copyEmail" data-email="tempyo42@gmail.com">복사하기</button>
+      </div>
     </section>
 
     <p class="note"><strong>팁:</strong> 이미 다른 사람이 주문을 열어둔 상태라면 3단계는 생략되고 바로 메뉴 선택 화면으로 이동합니다.</p>
   </main>
+  <script>
+    const copyButton = document.getElementById("copyEmail");
+    if (copyButton) {
+      copyButton.addEventListener("click", async () => {
+        const email = copyButton.dataset.email || "";
+        let copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(email);
+            copied = true;
+          } catch (e) {}
+        }
+        if (!copied) {
+          const textarea = document.createElement("textarea");
+          textarea.value = email;
+          textarea.setAttribute("readonly", "");
+          textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        const original = "복사하기";
+        copyButton.textContent = copied ? "복사됨" : "다시 시도";
+        window.setTimeout(() => {
+          copyButton.textContent = original;
+        }, 1400);
+      });
+    }
+  </script>
 </body>
 </html>
