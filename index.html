@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.23";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.24";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -855,15 +855,9 @@ function openSettings(){
     <button class="btn btn-soft" id="changeMe">🙋 내 이름 다시 선택  <span style="opacity:.7">(현재: ${esc(meName()||'-')})</span></button>
     <div style="height:8px"></div>
     <button class="btn btn-soft" id="editMembers">👥 셀원 편집 (추가·수정·삭제)</button>
-    <div style="height:8px"></div>
-    <button class="btn btn-ghost" id="resetMe" style="color:var(--red)">🗑️ 이 기기에서 내 이름 선택 초기화</button>
     <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 셀원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>`);
   document.getElementById("changeMe").onclick=()=>{ closeSheet(); renderPickMe(); };
   document.getElementById("editMembers").onclick=()=>{ closeSheet(); openMembersSheet(); };
-  document.getElementById("resetMe").onclick=async()=>{
-    if(!(await askConfirm("이 기기에서 '내 이름 선택'을 지울까요?\n주문·셀 데이터엔 영향이 없고, 다음에 이름을 다시 고르면 돼요.",{ok:"초기화",danger:true}))) return;
-    setMe(null); closeSheet(); toast("내 이름 선택을 초기화했어요"); render();
-  };
 }
 
 /* ---------- 클립보드 ---------- */
