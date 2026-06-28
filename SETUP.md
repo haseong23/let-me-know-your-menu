@@ -390,7 +390,7 @@ commit;
 운영(SHARED) 모드에선 `fetchCell`이 DB의 `get_cell`만 조회하므로(코드 폴백 없음), 데모 링크가 동작하려면 `cells`에 `demo` 행이 있어야 합니다. **가짜 데이터만** 사용합니다.
 ```sql
 insert into public.cells (id, room_id, name, members, home_cafe)
-values ('demo','demo','사랑셀',
+values ('demo','demo','ㅇ-ㅇ셀',
         '["김요셉","이다니엘","박사무엘","최에스더","정하은","한사랑"]'::jsonb,'gil')
 on conflict (id) do update
   set name = excluded.name, members = excluded.members, home_cafe = excluded.home_cafe;

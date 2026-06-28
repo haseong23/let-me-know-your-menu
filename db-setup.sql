@@ -365,7 +365,7 @@ grant execute on function public.add_cafe_menu(text,text,text) to anon, authenti
 
 -- ---- 데모 셀: 가이드/랜딩의 ?cell=demo 체험용 (가짜 데이터) ----
 insert into public.cells (id, room_id, name, members, home_cafe)
-values ('demo','demo','사랑셀',
+values ('demo','demo','ㅇ-ㅇ셀',
         '["김요셉","이다니엘","박사무엘","최에스더","정하은","한사랑"]'::jsonb,'gil')
 on conflict (id) do update
   set name = excluded.name, members = excluded.members, home_cafe = excluded.home_cafe;
