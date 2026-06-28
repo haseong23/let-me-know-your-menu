@@ -888,7 +888,7 @@ function renderCellPicker(){
       <div class="label" style="margin-top:0">이런 앱이에요</div>
       <p class="muted" style="margin:0;line-height:1.7">셀(모임)마다 <b>고유 링크</b>가 있고, 셀 리더가 공유해준 그 링크로 입장합니다.<br>본인 이름 선택 → 메뉴 담기 → 끝! <b>누가 뭘 시켰는지·안 마시는 사람·메뉴별 몇 잔인지</b> 등이 자동으로 정리돼요.</p>
     </div>
-    <p class="center" style="margin-top:16px"><a href="${esc(location.pathname)}?admin" class="nav-link" style="font-size:12px;color:var(--sub)">관리자</a> <span style="font-size:11px;color:var(--gray)">· ${APP_VERSION}</span></p>`;
+    <p class="center" style="margin-top:16px"><span style="font-size:11px;color:var(--gray)">${APP_VERSION}</span></p>`;
 }
 
 function slugify(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,20); }
@@ -945,10 +945,20 @@ function showCellCreated(cell){
 /* ===================== 관리자 페이지 (숨은 경로 ?admin) ===================== */
 async function renderAdmin(){
   adminMode=true; $bottom.innerHTML="";
-  if(!SHARED){ renderAdminDash(); return; } // 로컬모드: 백엔드 없음 → 인증 생략(단일기기 테스트)
+  if(!SHARED){ renderAdminUnavailable(); return; }
   try{ const { data:{ session } } = await Sync.client.auth.getSession();
     if(session) renderAdminDash(); else renderAdminLogin();
   }catch(e){ renderAdminLogin(); }
+}
+function renderAdminUnavailable(){
+  curView="admin";
+  $app.innerHTML=`
+    <header><div class="room-name" style="padding-top:6px">🔒 관리자</div>
+    <div class="date">운영 공유 설정이 필요합니다</div></header>
+    <div class="card">
+      <p class="muted" style="margin:0;line-height:1.7">관리자 기능은 Supabase가 연결된 운영 환경에서만 사용할 수 있습니다. 공개 페이지에서는 관리자 대시보드를 열지 않습니다.</p>
+    </div>
+    <p class="muted center" style="margin-top:10px"><a href="${esc(location.pathname)}" style="color:var(--sub)">← 일반 화면으로</a></p>`;
 }
 function renderAdminLogin(){
   curView="admin";
