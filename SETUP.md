@@ -396,7 +396,7 @@ begin
   on conflict do nothing;
 end $$;
 revoke all on function public.add_cafe_menu(text,text,text) from public;
-grant execute on function public.add_cafe_menu(text,text,text) to anon, authenticated;
+grant execute on function public.add_cafe_menu(text,text,text) to authenticated;  -- anon 제외: 공유 카페 메뉴 오염 방지(관리자만 추가)
 
 commit;
 ```

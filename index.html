@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.19";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.20";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -681,8 +681,8 @@ function openCustomSheet(existing){
     forceGrid=false;
     if(!(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note})))) return;
     bumpFreq("c:"+name);
-    // 카페 공식 메뉴로 승격(재사용). 테이블/RPC 없으면 조용히 무시
-    if(SHARED){ try{ await Sync.client.rpc("add_cafe_menu",{p_cafe_id:activeCafeId(),p_menu_id:"c:"+name,p_name:name}); delete CAFEMENU_CACHE[activeCafeId()]; await loadCafeMenus(activeCafeId()); applyCafeGlobals(); }catch(e){} }
+    // 직접입력 메뉴는 이 셀 주문(menu_name)으로만 저장 — 그날 이 셀 그리드에 표시(customMenusFromOrders).
+    // (공유 카페로의 자동 승격은 익명 오염 방지를 위해 제거; 카페 공식 메뉴 추가는 관리자만)
     closeSheet(); toast("추가해서 담았어요 🙏"); render(); };
   document.getElementById("cClose").onclick=closeSheet;
   setTimeout(()=>{ const el=document.getElementById("cname"); if(el) el.focus(); },60);
