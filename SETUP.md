@@ -166,11 +166,13 @@ revoke all on function public.room_exists(text) from public;
 create or replace function public.room_has_member(p_room text, p_member text)
 returns boolean
 language sql stable security definer set search_path = public as $$
+  -- p_member 는 멤버의 숨은 id. 레거시(문자열 멤버 = id가 곧 이름)도 함께 매칭.
   select exists(
     select 1
-    from public.cells c
+    from public.cells c, jsonb_array_elements(c.members) e
     where c.room_id = p_room
-      and c.members ? p_member
+      and ( (jsonb_typeof(e) = 'object' and e->>'id' = p_member)
+         or (jsonb_typeof(e) = 'string' and e #>> '{}' = p_member) )
   )
 $$;
 revoke all on function public.room_has_member(text,text) from public;
@@ -188,6 +190,7 @@ grant execute on function public.get_cell(text) to anon, authenticated;
 create or replace function public.set_members(p_id text, p_members jsonb)
 returns void
 language plpgsql security definer set search_path = public as $$
+declare norm jsonb;
 begin
   if jsonb_typeof(p_members) <> 'array'
      or jsonb_array_length(p_members) < 1
@@ -195,21 +198,29 @@ begin
     raise exception 'bad members';
   end if;
 
+  -- 각 요소: 문자열(레거시) 또는 {id,name} 객체 허용
   if exists (
-    select 1
-    from jsonb_array_elements_text(p_members) e(name)
-    where length(name) < 1 or length(name) > 40
+    select 1 from jsonb_array_elements(p_members) e
+    where not (
+      (jsonb_typeof(e) = 'string' and length(e #>> '{}') between 1 and 40)
+      or (jsonb_typeof(e) = 'object'
+          and coalesce(e->>'id','') <> '' and length(e->>'id') <= 64
+          and length(coalesce(e->>'name','')) between 1 and 40)
+    )
   ) then
-    raise exception 'bad member name';
+    raise exception 'bad member';
   end if;
 
-  update public.cells
-  set members = p_members
-  where id = p_id;
+  -- 객체로 정규화 저장(문자열 → {id:name, name:name}). 이름은 표시용, id는 불변.
+  select coalesce(jsonb_agg(
+    case when jsonb_typeof(e) = 'string'
+         then jsonb_build_object('id', e #>> '{}', 'name', e #>> '{}')
+         else jsonb_build_object('id', e->>'id', 'name', e->>'name') end
+  ), '[]'::jsonb) into norm
+  from jsonb_array_elements(p_members) e;
 
-  if not found then
-    raise exception 'no cell';
-  end if;
+  update public.cells set members = norm where id = p_id;
+  if not found then raise exception 'no cell'; end if;
 end $$;
 revoke all on function public.set_members(text,jsonb) from public;
 grant execute on function public.set_members(text,jsonb) to anon, authenticated;

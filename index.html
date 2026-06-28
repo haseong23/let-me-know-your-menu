@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.22";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.23";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -252,7 +252,8 @@ let CAFEMENU_CACHE={}; // cafeId -> DB 추가 메뉴(공식) 배열
 function activeCafeId(){ return (SESSION&&SESSION.cafeId) || (CELL&&CELL.homeCafeId) || "gil"; }
 function activeCafe(){ return CAFES[activeCafeId()] || CAFES.gil; }
 function applyCellGlobals(){ ROOM=CELL.roomId; ROOM_NAME=CELL.name;
-  MEMBERS=(CELL.members||[]).map(n=>({id:n,name:n})).sort((a,b)=>a.name.localeCompare(b.name,"ko")); }
+  CELL.members = memObjs(CELL.members);   // 문자열 레거시 → {id,name} 정규화(이후 저장도 객체로 일관)
+  MEMBERS = CELL.members.map(m=>({id:m.id,name:m.name})).sort((a,b)=>a.name.localeCompare(b.name,"ko")); }
 const CAT_ORDER=["coffee","coldbrew","latte","tealatte","tea","icedtea","ade","fruitlatte","blended","handdrip","dessert","extra"];
 const CAT_LABEL={coffee:"커피 · 에스프레소",coldbrew:"콜드브루",latte:"라떼",tealatte:"티 라떼",tea:"티 (차)",icedtea:"아이스티",ade:"에이드",fruitlatte:"과일 라떼",blended:"블렌디드 (스무디 · 쉐이크)",handdrip:"핸드드립",dessert:"아이스크림 · 요거트",extra:"기타"};
 // 메뉴 출처: DB(cafe_menus)에 시드돼 있으면 그걸 source of truth로, 없으면 코드 폴백
@@ -312,6 +313,9 @@ function gridTilesHtml(selId){
     + customMenusFromOrders().map(m=>tileHtml(m,selId)).join("") + addTile;
 }
 function memberById(id){ return MEMBERS.find(m=>m.id===id); }
+// 멤버는 {id(숨은 고유값), name(표시·수정 가능)} 객체. 레거시(문자열)도 안전 처리(문자열→id=name).
+function memObjs(arr){ return (arr||[]).map(m => (m && typeof m==="object") ? {id:m.id, name:m.name} : {id:m, name:m}); }
+function genMemberId(){ return "m_" + rand36(10); }   // 이름과 무관한 숨은 ID — 이름 바꿔도 링크 유지
 function menuById(id){ return MENUS.find(m=>m.id===id); }
 // 사용자가 추가한 메뉴(주문에 담긴 menuName 기준)를 모아 그리드에 노출
 function customMenusFromOrders(){
@@ -549,9 +553,11 @@ function renderPickMe(){
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
   document.getElementById("addMeBtn").onclick=async()=>{
     const nm=document.getElementById("addMeName").value.trim().slice(0,40); if(!nm){ toast("이름을 입력해주세요"); return; }
-    if(MEMBERS.some(m=>m.id===nm)){ pickSel=nm; renderPickMe(); toast("이미 있는 이름이라 선택했어요"); return; }
-    const arr=[...MEMBERS.map(m=>m.name), nm];
-    if(await saveMembers(arr)){ setMe(nm); toast(nm+"님, 반가워요 🙏"); render(); }
+    const exist=MEMBERS.find(m=>m.name===nm);
+    if(exist){ pickSel=exist.id; renderPickMe(); toast("이미 있는 이름이라 선택했어요"); return; }
+    const nid=genMemberId();
+    const arr=[...MEMBERS.map(m=>({id:m.id,name:m.name})), {id:nid,name:nm}];
+    if(await saveMembers(arr)){ setMe(nid); toast(nm+"님, 반가워요 🙏"); render(); }
   };
   if(sel){
     const bar=document.createElement("div"); bar.className="bottombar";
@@ -952,9 +958,10 @@ function openCreateCellSheet(){
   document.getElementById("createClose").onclick=closeSheet;
   document.getElementById("createCell").onclick=async()=>{
     const name=document.getElementById("newName").value.trim();
-    const members=[...new Set(document.getElementById("newMembers").value.split(/[\n,]/).map(s=>s.trim().slice(0,40)).filter(Boolean))].slice(0,60);
+    const memberNames=[...new Set(document.getElementById("newMembers").value.split(/[\n,]/).map(s=>s.trim().slice(0,40)).filter(Boolean))].slice(0,60);
     if(!name){ toast("셀 이름을 입력해주세요"); return; }
-    if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
+    if(memberNames.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
+    const members=memberNames.map(n=>({id:genMemberId(), name:n}));   // 각 셀원에 숨은 ID
     const id=genCellId(name), cell={id,roomId:id,name,members,homeCafeId:cafeId};
     if(SHARED){
       const {error}=await Sync.client.from("cells").insert({id,room_id:id,name,members,home_cafe:cafeId});
@@ -970,32 +977,44 @@ function openCreateCellSheet(){
 // 관리자: 셀 이름·셀원 수정 (authenticated 직접 update — cells_admin_update 정책)
 function openEditCellSheet(cell){
   let cafeId = cell.homeCafeId || "gil";
-  openSheet(`
-    <h3>✏️ '${esc(cell.name)}' 셀 수정</h3>
-    <div class="label">셀 이름</div>
-    <input type="text" id="ecName" maxlength="40" value="${esc(cell.name)}" />
-    <div class="label">셀원 (쉼표 또는 줄바꿈으로 구분)</div>
-    <textarea id="ecMembers" rows="6" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)">${esc((cell.members||[]).join("\n"))}</textarea>
-    <div class="label">홈 카페 (기본 카페)</div>
-    <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
-    <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
-    <div style="height:14px"></div>
-    <button class="btn btn-brand" id="ecSave">저장</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="ecClose">닫기</button>`);
-  const chips=document.getElementById("ecCafe");
-  chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
-  document.getElementById("ecClose").onclick=closeSheet;
-  document.getElementById("ecSave").onclick=async()=>{
-    const name=document.getElementById("ecName").value.trim();
-    const members=[...new Set(document.getElementById("ecMembers").value.split(/[\n,]/).map(s=>s.trim().slice(0,40)).filter(Boolean))].slice(0,60);
-    if(!name){ toast("셀 이름을 입력해주세요"); return; }
-    if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
-    if(!SHARED){ toast("운영(연결) 모드에서만 수정돼요"); return; }
-    const {error}=await Sync.client.from("cells").update({name,members,home_cafe:cafeId}).eq("id",cell.id);
-    if(error){ toast("저장 실패: "+(error.message||"")); return; }
-    if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
-    closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
-  };
+  let nameVal = cell.name;
+  let mlist = memObjs(cell.members).map(m=>({id:m.id, name:m.name}));   // id 보존(이름만 수정)
+  function draw(){
+    openSheet(`
+      <h3>✏️ 셀 수정</h3>
+      <div class="label">셀 이름</div>
+      <input type="text" id="ecName" maxlength="40" value="${esc(nameVal)}" />
+      <div class="label">셀원 (이름을 고쳐도 주문 링크 유지)</div>
+      <div class="card" style="padding:6px 14px">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">셀원이 없어요</p>'}</div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="ecNewM" maxlength="40" placeholder="셀원 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
+      <div class="label">홈 카페 (기본 카페)</div>
+      <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
+      <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
+      <div style="height:14px"></div>
+      <button class="btn btn-brand" id="ecSave">저장</button>
+      <div style="height:8px"></div><button class="btn btn-ghost" id="ecClose">닫기</button>`);
+    document.getElementById("ecName").oninput=e=>{ nameVal=e.target.value; };
+    $sheet.querySelectorAll(".ecm").forEach(inp=> inp.oninput=()=>{ mlist[+inp.dataset.i].name=inp.value; });   // 이름만 갱신(id 보존)
+    $sheet.querySelectorAll(".ecmdel").forEach(b=> b.onclick=()=>{ mlist.splice(+b.dataset.i,1); draw(); });
+    document.getElementById("ecAddM").onclick=()=>{ const el=document.getElementById("ecNewM"), v=el.value.trim(); if(v){ mlist.push({id:genMemberId(), name:v}); draw(); } };
+    const chips=document.getElementById("ecCafe");
+    chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
+    document.getElementById("ecClose").onclick=closeSheet;
+    document.getElementById("ecSave").onclick=async()=>{
+      const name=(nameVal||"").trim();
+      const seen={}, out=[];
+      for(const m of mlist){ const nm=(m.name||"").trim().slice(0,40); if(!nm||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name:nm}); }
+      const members=out.slice(0,60);
+      if(!name){ toast("셀 이름을 입력해주세요"); return; }
+      if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
+      if(!SHARED){ toast("운영(연결) 모드에서만 수정돼요"); return; }
+      const {error}=await Sync.client.from("cells").update({name,members,home_cafe:cafeId}).eq("id",cell.id);
+      if(error){ toast("저장 실패: "+(error.message||"")); return; }
+      if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
+      closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
+    };
+  }
+  draw();
 }
 
 function showCellCreated(cell){
@@ -1148,23 +1167,25 @@ function openMenuEditSheet(cafeId, existing){
 
 // 셀원 편집 (이 셀 링크를 가진 누구나) — set_members RPC
 function openMembersSheet(){
-  let list=[...MEMBERS.map(m=>m.name)];
+  let list = MEMBERS.map(m=>({id:m.id, name:m.name}));   // 객체로 편집 — 이름 바꿔도 숨은 id 유지
   function draw(){
     openSheet(`
       <h3>👥 ${esc(ROOM_NAME)} 셀원 편집</h3>
-      <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. 저장하면 모두에게 반영됩니다.</p>
-      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((n,i)=>`<div class="person"><div class="avatar">${esc(initials(n))}</div><input type="text" class="medit" data-i="${i}" value="${esc(n)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">셀원이 없어요</p>'}</div>
+      <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. <b>이름을 고쳐도 기존 주문은 그대로 따라옵니다.</b></p>
+      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">셀원이 없어요</p>'}</div>
       <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="셀원 이름 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="saveM">저장</button>
       <div style="height:8px"></div><button class="btn btn-ghost" id="closeM">닫기</button>`);
-    $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i]=inp.value; });
+    $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
     $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
-    document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push(v); draw(); } };
+    document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
     document.getElementById("saveM").onclick=async()=>{
-      const cleaned=[...new Set(list.map(s=>(s||"").trim().slice(0,40)).filter(Boolean))].slice(0,60);
-      if(!cleaned.length){ toast("셀원을 1명 이상 두세요"); return; }
-      if(await saveMembers(cleaned)){ if(ME && !cleaned.includes(ME)) setMe(null); closeSheet(); toast("셀원 명단을 저장했어요"); render(); }
+      const seen={}, out=[];
+      for(const m of list){ const name=(m.name||"").trim().slice(0,40); if(!name||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name}); }
+      const final=out.slice(0,60);
+      if(!final.length){ toast("셀원을 1명 이상 두세요"); return; }
+      if(await saveMembers(final)){ if(ME && !final.some(m=>m.id===ME)) setMe(null); closeSheet(); toast("셀원 명단을 저장했어요"); render(); }
     };
     document.getElementById("closeM").onclick=closeSheet;
   }
