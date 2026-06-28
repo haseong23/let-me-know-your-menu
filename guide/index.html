@@ -32,6 +32,39 @@
       padding: 40px 22px 64px;
     }
 
+    .demo-access {
+      display: flex;
+      justify-content: center;
+    }
+
+    .demo-access.top {
+      justify-content: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .demo-access.bottom {
+      margin-top: 28px;
+    }
+
+    .demo-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 900;
+      text-decoration: none;
+      box-shadow: 0 10px 24px rgba(65, 43, 24, .16);
+    }
+
+    .demo-link:focus-visible {
+      outline: 3px solid rgba(31, 118, 103, .24);
+      outline-offset: 2px;
+    }
+
     .intro {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 360px;
@@ -279,6 +312,10 @@
 </head>
 <body>
   <main class="wrap">
+    <div class="demo-access top">
+      <a class="demo-link" href="../?cell=demo">데모 페이지 바로 접속하기</a>
+    </div>
+
     <section class="intro">
       <div>
         <span class="eyebrow">신길교회</span>
@@ -354,6 +391,10 @@
     </section>
 
     <p class="note"><strong>팁:</strong> 이미 다른 사람이 주문을 열어둔 상태라면 3단계는 생략되고 바로 메뉴 선택 화면으로 이동합니다.</p>
+
+    <div class="demo-access bottom">
+      <a class="demo-link" href="../?cell=demo">데모 페이지 바로 접속하기</a>
+    </div>
   </main>
   <script>
     const copyButton = document.getElementById("copyEmail");
