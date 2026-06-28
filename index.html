@@ -106,7 +106,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.13";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.14";  // 배포 확인용 — 푸터/콘솔에 표시
 const CONFIG = {
   SUPABASE_URL: "",
   SUPABASE_ANON_KEY: "",
@@ -928,6 +928,37 @@ function openCreateCellSheet(){
   setTimeout(()=>{ const el=document.getElementById("newName"); if(el) el.focus(); },60);
 }
 
+// 관리자: 셀 이름·셀원 수정 (authenticated 직접 update — cells_admin_update 정책)
+function openEditCellSheet(cell){
+  let cafeId = cell.homeCafeId || "gil";
+  openSheet(`
+    <h3>✏️ '${esc(cell.name)}' 셀 수정</h3>
+    <div class="label">셀 이름</div>
+    <input type="text" id="ecName" maxlength="40" value="${esc(cell.name)}" />
+    <div class="label">셀원 (쉼표 또는 줄바꿈으로 구분)</div>
+    <textarea id="ecMembers" rows="6" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)">${esc((cell.members||[]).join("\n"))}</textarea>
+    <div class="label">홈 카페 (기본 카페)</div>
+    <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
+    <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
+    <div style="height:14px"></div>
+    <button class="btn btn-brand" id="ecSave">저장</button>
+    <div style="height:8px"></div><button class="btn btn-ghost" id="ecClose">닫기</button>`);
+  const chips=document.getElementById("ecCafe");
+  chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
+  document.getElementById("ecClose").onclick=closeSheet;
+  document.getElementById("ecSave").onclick=async()=>{
+    const name=document.getElementById("ecName").value.trim();
+    const members=[...new Set(document.getElementById("ecMembers").value.split(/[\n,]/).map(s=>s.trim().slice(0,40)).filter(Boolean))].slice(0,60);
+    if(!name){ toast("셀 이름을 입력해주세요"); return; }
+    if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
+    if(!SHARED){ toast("운영(연결) 모드에서만 수정돼요"); return; }
+    const {error}=await Sync.client.from("cells").update({name,members,home_cafe:cafeId}).eq("id",cell.id);
+    if(error){ toast("저장 실패: "+(error.message||"")); return; }
+    if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
+    closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
+  };
+}
+
 function showCellCreated(cell){
   const url=`${location.origin}${location.pathname}?cell=${cell.id}`;
   openSheet(`
@@ -990,6 +1021,7 @@ async function renderAdminDash(){
         <div class="order-box" style="margin-top:6px;font-size:12px;word-break:break-all">${esc(url)}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
           <button class="btn btn-soft btn-sm copylink" data-url="${esc(url)}">📋 링크</button>
+          <button class="btn btn-soft btn-sm editcell" data-id="${esc(c.id)}">✏️ 수정</button>
           ${c.builtin?'':`<button class="btn btn-danger btn-sm delcell" data-id="${esc(c.id)}">삭제</button>`}
         </div>
       </div></div>`;
@@ -1009,6 +1041,7 @@ async function renderAdminDash(){
   document.getElementById("admMenu").onclick=()=>openCafeMenuAdmin("gil");
   const lo=document.getElementById("admLogout"); if(lo) lo.onclick=async()=>{ await Sync.client.auth.signOut(); toast("로그아웃됨"); renderAdminLogin(); };
   $app.querySelectorAll(".copylink").forEach(b=> b.onclick=()=>copyText(b.dataset.url,"링크 복사됨"));
+  $app.querySelectorAll(".editcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openEditCellSheet(c); });
   $app.querySelectorAll(".delcell").forEach(b=> b.onclick=async()=>{ if(!confirm("이 셀을 삭제할까요? (지난 주문 데이터는 남지만 링크 접근은 막힘)")) return;
     if(SHARED){ const {error}=await Sync.client.from("cells").delete().eq("id",b.dataset.id); if(error){ toast("삭제 실패: "+(error.message||"")); return; } }
     delete DB_CELLS[b.dataset.id]; if(!SHARED) localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS));

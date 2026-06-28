@@ -111,6 +111,21 @@ create policy cafe_menus_admin_update on public.cafe_menus
 create policy cafe_menus_admin_delete on public.cafe_menus
   for delete to authenticated using (true);
 
+-- 기존(구버전) 함수 먼저 제거: create or replace 는 반환타입/파라미터명 변경을 허용하지 않아
+-- get_cell 등 옛 정의가 있으면 트랜잭션 전체가 롤백됨. 안전하게 drop 후 재생성.
+drop function if exists public.is_valid_app_date(text);
+drop function if exists public.room_exists(text);
+drop function if exists public.room_has_member(text,text);
+drop function if exists public.get_cell(text);
+drop function if exists public.set_members(text,jsonb);
+drop function if exists public.get_room_day(text,text);
+drop function if exists public.get_room_history(text,text);
+drop function if exists public.claim_host(text,text,text,text);
+drop function if exists public.set_room_state(text,text,text);
+drop function if exists public.set_order(text,text,text,text,text,text,text,jsonb,text);
+drop function if exists public.remove_order(text,text,text);
+drop function if exists public.add_cafe_menu(text,text,text);
+
 create or replace function public.is_valid_app_date(p_date text)
 returns boolean
 language sql stable security definer set search_path = public as $$
