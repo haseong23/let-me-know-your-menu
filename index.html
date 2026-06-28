@@ -89,6 +89,11 @@
   .scrim { position: fixed; inset: 0; background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
   .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; }
   .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: 19px; }
+  .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
+  .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
+  .cdialog .cmsg { font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
+  .cdialog .crow { display: flex; gap: 8px; } .cdialog .crow .btn { flex: 1; margin: 0; }
+  .reload { cursor: pointer; user-select: none; opacity: .8; padding: 0 2px; }
   .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; }
   .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; white-space: nowrap; max-width: 90%; text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
@@ -100,6 +105,7 @@
 <div id="app"><div class="loading">불러오는 중…</div></div>
 <div id="bottom"></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="cscrim" id="cscrim"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -111,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.16";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.17";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -353,6 +359,11 @@ let onChange = ()=>{};
 
 const emptySession = ()=>({ state:"idle", hostId:null, closeAt:null, cafeId:null });
 
+// 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시 + 수동 새로고침)
+let lastSyncAt=0;
+function syncAgoText(){ if(!lastSyncAt) return "연결 중"; const s=Math.floor((Date.now()-lastSyncAt)/1000); if(s<5) return "방금"; if(s<60) return s+"초 전"; return Math.floor(s/60)+"분 전"; }
+setInterval(()=>{ try{ const el=document.getElementById("syncAgo"); if(el) el.textContent=syncAgoText(); }catch(e){} }, 10000);
+
 /* ---- 단독(로컬) 모드 ---- */
 const LocalSync = () => {
   const key = ()=> `coffee_local_${ROOM}_${todayKey()}`;
@@ -395,6 +406,7 @@ const SupabaseSync = () => {
     const { data, error } = await client.rpc("get_room_day",{p_room:ROOM,p_date:date()});
     if(error) throw error;
     applyRoomData((data&&data.session)||null, (data&&data.orders)||[]);
+    lastSyncAt=Date.now();
   }
   return {
     shared:true, client,
@@ -428,6 +440,31 @@ const Sync = SHARED ? SupabaseSync() : LocalSync();
 /* ===================== DOM refs ===================== */
 const $app=document.getElementById("app"), $bottom=document.getElementById("bottom");
 const $scrim=document.getElementById("scrim"), $sheet=document.getElementById("sheet"), $toast=document.getElementById("toast");
+const $cscrim=document.getElementById("cscrim");
+// 커스텀 확인창 — 기본 confirm() 대체. 뒤로가기 모델과 통합(뒤로가기=취소). 시트 위에도 안전(상위 레이어).
+let confirmOpen=false, ignorePop=false, confirmResolve=null;
+function askConfirm(message, opts){ opts=opts||{};
+  return new Promise(resolve=>{
+    confirmResolve=resolve;
+    $cscrim.innerHTML=`<div class="cdialog" role="alertdialog" aria-modal="true" aria-label="확인">
+      <div class="cmsg">${esc(message)}</div>
+      <div class="crow">
+        <button class="btn btn-soft" id="cCancel">${esc(opts.cancel||"취소")}</button>
+        <button class="btn ${opts.danger?'btn-danger':'btn-brand'}" id="cOk">${esc(opts.ok||"확인")}</button>
+      </div></div>`;
+    $cscrim.classList.add("show"); confirmOpen=true;
+    try{ history.pushState({c:1},""); }catch(e){}
+    document.getElementById("cOk").onclick=()=>finishConfirm(true);
+    document.getElementById("cCancel").onclick=()=>finishConfirm(false);
+  });
+}
+function finishConfirm(result){ // 버튼으로 닫기: 히스토리 항목 소비(ignorePop)
+  if(!confirmOpen) return; confirmOpen=false; $cscrim.classList.remove("show");
+  const r=confirmResolve; confirmResolve=null;
+  ignorePop=true; try{ history.back(); }catch(e){ ignorePop=false; }
+  if(r) r(result);
+}
+$cscrim.addEventListener("click",e=>{ if(e.target===$cscrim) finishConfirm(false); });
 let toastT;
 function toast(m){ $toast.textContent=m; $toast.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>$toast.classList.remove("show"),1700); }
 // 쓰기 작업 안전 래퍼: 실패 시 토스트, 성공 여부 반환
@@ -443,6 +480,8 @@ function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $scrim.cla
 function closeSheet(){ $scrim.classList.remove("show"); sheetOpen=false; }  // history 항목은 다음 뒤로가기/열기가 소비·재사용
 $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
 window.addEventListener("popstate",()=>{
+  if(ignorePop){ ignorePop=false; return; }   // 버튼으로 확인창 닫을 때의 history.back() 무시
+  if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
   subActive=false;   // 쌓아둔 하위 항목이 (뒤로가기로) 빠졌다
   if(sheetOpen){ $scrim.classList.remove("show"); sheetOpen=false; return; }  // 시트 닫기
   if(curView==="host"){ render(); return; }              // 현황 → 주문
@@ -463,7 +502,7 @@ function render(){
 function view(){ return document.getElementById("view"); }
 
 function renderHeader(){
-  const connHtml = SHARED ? `<span class="dot on"></span>실시간 공유중` : `<span class="dot off"></span>이 기기 전용`;
+  const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span> <span class="reload" id="refreshBtn" role="button" aria-label="새로고침" title="새로고침">↻</span>` : `<span class="dot off"></span>이 기기 전용`;
   $app.innerHTML = `
     <header><div class="h-row">
       <div><div class="room-name">☕ ${esc(ROOM_NAME)}</div>
@@ -476,6 +515,11 @@ function renderHeader(){
     <div id="view"></div>`;
   document.getElementById("meChip").onclick=renderPickMe;
   document.getElementById("gear").onclick=()=>openSettings();
+  const rb=document.getElementById("refreshBtn");
+  if(rb) rb.onclick=async()=>{ rb.style.opacity=".35"; let ok=true;
+    try{ await Sync.reload(); }catch(e){ ok=false; }
+    if(curView==="host") renderHostView(); else render();
+    toast(ok?"최신 상태로 업데이트했어요":"새로고침 실패 — 네트워크 확인"); };
 }
 
 function renderPickMe(){
@@ -765,8 +809,8 @@ function renderBottom(inHostView){
   } else { html = amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`; }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
   bind("claim",()=>{ if(CAFE_LIST.length<=1) doClaim((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
-  bind("unclaim",async()=>{ if(confirm("오늘 섬김을 취소할까요?\n(다른 분이 다시 섬기기로 하면 지금까지 받은 주문은 그대로 유지됩니다)")){ if(await safeWrite(Sync.unclaim())) render(); }});
-  bind("close",async()=>{ if(confirm("주문을 마감할까요?\n마감 후에도 '마감 취소'를 누르면 다시 열어 수정할 수 있어요.")){ if(await safeWrite(Sync.close())) render(); }});
+  bind("unclaim",async()=>{ if(await askConfirm("오늘 섬김을 취소할까요?\n(다른 분이 다시 섬기기로 하면 지금까지 받은 주문은 그대로 유지됩니다)",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim())) render(); }});
+  bind("close",async()=>{ if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'를 누르면 다시 열어 수정할 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close())) render(); }});
   bind("reopen",async()=>{ if(await safeWrite(Sync.reopen())) render(); });
   bind("hostView",()=>renderHostView());
 }
@@ -823,7 +867,7 @@ function openSettings(adv){
     document.getElementById("saveSb").onclick=()=>{ const u=document.getElementById("sbUrl").value.trim(),k=document.getElementById("sbKey").value.trim();
       if(u) localStorage.setItem("sb_url",u); else localStorage.removeItem("sb_url");
       if(k) localStorage.setItem("sb_key",k); else localStorage.removeItem("sb_key"); location.reload(); };
-    document.getElementById("resetLocal").onclick=()=>{ if(confirm("이 기기의 내 이름 선택과 로컬 캐시를 지울까요? (공유 주문 데이터는 그대로)")){
+    document.getElementById("resetLocal").onclick=async()=>{ if(await askConfirm("이 기기의 내 이름 선택과 로컬 캐시를 지울까요?\n(공유 주문 데이터는 그대로예요)",{ok:"초기화",danger:true})){
       Object.keys(localStorage).filter(k=>k.startsWith("coffee_")).forEach(k=>localStorage.removeItem(k)); location.reload(); }};
   }
 }
@@ -1049,7 +1093,7 @@ async function renderAdminDash(){
   const lo=document.getElementById("admLogout"); if(lo) lo.onclick=async()=>{ await Sync.client.auth.signOut(); toast("로그아웃됨"); renderAdminLogin(); };
   $app.querySelectorAll(".copylink").forEach(b=> b.onclick=()=>copyText(b.dataset.url,"링크 복사됨"));
   $app.querySelectorAll(".editcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openEditCellSheet(c); });
-  $app.querySelectorAll(".delcell").forEach(b=> b.onclick=async()=>{ if(!confirm("이 셀을 삭제할까요? (지난 주문 데이터는 남지만 링크 접근은 막힘)")) return;
+  $app.querySelectorAll(".delcell").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 셀을 삭제할까요?\n지난 주문 데이터는 남지만 링크 접근은 막힙니다.",{ok:"삭제",danger:true}))) return;
     if(SHARED){ const {error}=await Sync.client.from("cells").delete().eq("id",b.dataset.id); if(error){ toast("삭제 실패: "+(error.message||"")); return; } }
     delete DB_CELLS[b.dataset.id]; if(!SHARED) localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS));
     toast("삭제됨"); renderAdminDash(); });
@@ -1078,7 +1122,7 @@ async function openCafeMenuAdmin(cafeId){
     <div class="card" style="padding:6px 16px">${rows}</div>`;
   document.getElementById("mback").onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
   const seedBtn=document.getElementById("seed")||document.getElementById("reseed");
-  if(seedBtn) seedBtn.onclick=async()=>{ if(seedBtn.id==="reseed"&&!confirm("코드 기본 76개로 덮어쓸까요?(같은 메뉴는 갱신)")) return;
+  if(seedBtn) seedBtn.onclick=async()=>{ if(seedBtn.id==="reseed"&&!(await askConfirm("코드 기본 76개 메뉴로 덮어쓸까요?\n(같은 메뉴는 갱신됩니다)",{ok:"덮어쓰기",danger:true}))) return;
     const payload=GIL_MENUS.map((m,i)=>({cafe_id:cafeId,menu_id:m.id,name:m.name,emoji:m.emoji,cat:m.cat,temps:m.temps,extras:m.extras,popular:!!m.popular,sort:i}));
     const {error}=await Sync.client.from("cafe_menus").upsert(payload,{onConflict:"cafe_id,menu_id"});
     if(error){ toast("시드 실패: "+(error.message||"")); return; } delete CAFEMENU_CACHE[cafeId]; toast("기본 메뉴 등록됨"); openCafeMenuAdmin(cafeId); };
@@ -1086,7 +1130,7 @@ async function openCafeMenuAdmin(cafeId){
   $app.querySelectorAll(".mpop").forEach(b=> b.onclick=async()=>{ const m=menus.find(x=>x.id===b.dataset.id);
     const {error}=await Sync.client.from("cafe_menus").update({popular:!m.popular}).eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
     if(error){ toast("실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; openCafeMenuAdmin(cafeId); });
-  $app.querySelectorAll(".mdel2").forEach(b=> b.onclick=async()=>{ if(!confirm("이 메뉴를 삭제할까요?")) return;
+  $app.querySelectorAll(".mdel2").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 메뉴를 삭제할까요?",{ok:"삭제",danger:true}))) return;
     const {error}=await Sync.client.from("cafe_menus").delete().eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
     if(error){ toast("삭제 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; toast("삭제됨"); openCafeMenuAdmin(cafeId); });
 }
