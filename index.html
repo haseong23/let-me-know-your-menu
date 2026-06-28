@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.21";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.22";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -337,7 +337,7 @@ function tileHtml(m, selId){ const c=myMenuCount(m.id);
 let ME = null; // 셀별 스코프 — enterCell()에서 loadMe()로 채움
 function meKey(){ return "coffee_me_v3_" + (CELL ? CELL.id : "none"); }
 function loadMe(){ ME = localStorage.getItem(meKey()) || null; }
-function setMe(id){ ME = id; localStorage.setItem(meKey(), id); }
+function setMe(id){ ME = id; try{ if(id) localStorage.setItem(meKey(), id); else localStorage.removeItem(meKey()); }catch(e){} }
 function meName(){ const m=memberById(ME); return m?m.name:null; }
 // 항상 한국시간(KST) 기준 — 기기 타임존/자정 경계로 세션이 갈라지는 문제 방지
 function todayKey(){ return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
@@ -607,7 +607,7 @@ function renderOpen(){
 
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
-      <h2><span class="host-name">${esc(host?host.name:"?")}</span>님이 섬깁니다!</h2>
+      <h2>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
       <p>${myOrder?'메뉴 잘 전했어요 🙏':'드시고 싶은 메뉴를 골라주세요'}</p></div>
     ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
 
@@ -731,7 +731,7 @@ function renderClosed(){
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">✅</div>
       <h2>오늘 주문 마감</h2>
-      <p><span class="host-name">${esc(host?host.name:"?")}</span>님이 섬깁니다 · 총 ${countDrinks()}잔</p></div>
+      <p>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다 · `:``}총 ${countDrinks()}잔</p></div>
     ${dashboardHtml()}`;
   wireDashboard();
 }
@@ -792,7 +792,7 @@ function renderHostView(){
   curView="host"; renderHeader();
   const host=memberById(SESSION.hostId);
   view().innerHTML=`<div class="row-between" style="margin-bottom:12px">
-      <div><b style="font-size:17px">주문 현황</b> <span class="muted">· 섬기는 분: ${esc(host?host.name:"?")}님</span></div>
+      <div><b style="font-size:17px">주문 현황</b> <span class="muted">· 섬기는 분: ${host?esc(host.name)+"님":"—"}</span></div>
       <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
   document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
   wireDashboard(); renderBottom(true);
@@ -842,35 +842,22 @@ function openClaimCafeSheet(){
 }
 
 /* ---------- 설정 ---------- */
-function openSettings(adv){
+function openSettings(){
   openSheet(`
     <h3>⚙️ 설정</h3>
-    <div class="banner-warn">${SHARED?"✅ 실시간 공유 모드로 연결됨":"⚠️ 이 기기 전용 모드입니다 (공유 안 됨)"}</div>
+    <div class="banner-warn">${SHARED?"✅ 공유 모드로 연결됨":"⚠️ 이 기기 전용 모드 (공유 안 됨)"}</div>
     <button class="btn btn-soft" id="changeMe">🙋 내 이름 다시 선택  <span style="opacity:.7">(현재: ${esc(meName()||'-')})</span></button>
     <div style="height:8px"></div>
     <button class="btn btn-soft" id="editMembers">👥 셀원 편집 (추가·수정·삭제)</button>
-    <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 셀원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>
-    <p class="center" style="margin-top:10px"><span class="nav-link" id="advToggle">${adv?'▲ 고급 설정 숨기기':'⚙ 고급 설정 (관리자용)'}</span></p>
-    ${adv?`
-      <div class="banner-warn">아래는 관리자/개발용입니다. 일반 사용자는 만질 필요 없어요.</div>
-      <div class="label">Supabase URL</div><input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" value="${esc(sbUrl)}" />
-      <div class="label">Supabase anon key</div><input type="text" id="sbKey" placeholder="sb_publishable_..." value="${esc(sbKey)}" />
-      <div style="height:12px"></div>
-      <button class="btn btn-brand" id="saveSb">공유 설정 저장 후 새로고침</button>
-      <div style="height:8px"></div>
-      <button class="btn btn-danger" id="resetLocal">이 기기 초기화 (내 이름·로컬 캐시만)</button>
-      <p class="muted center" style="margin-top:8px">※ 공유된 주문 데이터엔 영향 없음. 이 기기의 이름 선택과 단독모드 캐시만 지웁니다.</p>
-    `:""}`);
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost" id="resetMe" style="color:var(--red)">🗑️ 이 기기에서 내 이름 선택 초기화</button>
+    <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 셀원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>`);
   document.getElementById("changeMe").onclick=()=>{ closeSheet(); renderPickMe(); };
   document.getElementById("editMembers").onclick=()=>{ closeSheet(); openMembersSheet(); };
-  document.getElementById("advToggle").onclick=()=>openSettings(!adv);
-  if(adv){
-    document.getElementById("saveSb").onclick=()=>{ const u=document.getElementById("sbUrl").value.trim(),k=document.getElementById("sbKey").value.trim();
-      if(u) localStorage.setItem("sb_url",u); else localStorage.removeItem("sb_url");
-      if(k) localStorage.setItem("sb_key",k); else localStorage.removeItem("sb_key"); location.reload(); };
-    document.getElementById("resetLocal").onclick=async()=>{ if(await askConfirm("이 기기의 내 이름 선택과 로컬 캐시를 지울까요?\n(공유 주문 데이터는 그대로예요)",{ok:"초기화",danger:true})){
-      Object.keys(localStorage).filter(k=>k.startsWith("coffee_")).forEach(k=>localStorage.removeItem(k)); location.reload(); }};
-  }
+  document.getElementById("resetMe").onclick=async()=>{
+    if(!(await askConfirm("이 기기에서 '내 이름 선택'을 지울까요?\n주문·셀 데이터엔 영향이 없고, 다음에 이름을 다시 고르면 돼요.",{ok:"초기화",danger:true}))) return;
+    setMe(null); closeSheet(); toast("내 이름 선택을 초기화했어요"); render();
+  };
 }
 
 /* ---------- 클립보드 ---------- */
