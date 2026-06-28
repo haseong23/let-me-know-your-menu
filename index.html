@@ -123,7 +123,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.26";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.27";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -992,6 +992,7 @@ function openEditCellSheet(cell){
   let cafeId = cell.homeCafeId || "gil";
   let nameVal = cell.name;
   let mlist = memObjs(cell.members).map(m=>({id:m.id, name:m.name}));   // id 보존(이름만 수정)
+  let baseline = JSON.stringify(mlist);   // 동시편집 충돌 감지용
   function draw(){
     openSheet(`
       <h3>✏️ 셀 수정</h3>
@@ -1013,7 +1014,7 @@ function openEditCellSheet(cell){
     const chips=document.getElementById("ecCafe");
     chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
     document.getElementById("ecClose").onclick=closeSheet;
-    document.getElementById("ecSave").onclick=async()=>{
+    document.getElementById("ecSave").onclick=()=>guardWrite(async()=>{
       const name=(nameVal||"").trim();
       const seen={}, out=[];
       for(const m of mlist){ const nm=(m.name||"").trim().slice(0,40); if(!nm||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name:nm}); }
@@ -1021,11 +1022,17 @@ function openEditCellSheet(cell){
       if(!name){ toast("셀 이름을 입력해주세요"); return; }
       if(members.length<1){ toast("셀원을 1명 이상 입력해주세요"); return; }
       if(!SHARED){ toast("운영(연결) 모드에서만 수정돼요"); return; }
+      // 동시편집 충돌 감지: 최신 셀원과 스냅샷이 다르면 덮어쓰지 말고 최신 반영+경고
+      const {data:cur}=await Sync.client.from("cells").select("members").eq("id",cell.id).maybeSingle();
+      if(cur && JSON.stringify(memObjs(cur.members))!==baseline){
+        mlist=memObjs(cur.members).map(m=>({id:m.id,name:m.name})); baseline=JSON.stringify(mlist);
+        toast("이 셀의 셀원이 다른 곳에서 바뀌었어요 — 최신을 불러왔어요. 다시 확인 후 저장해주세요"); draw(); return;
+      }
       const {error}=await Sync.client.from("cells").update({name,members,home_cafe:cafeId}).eq("id",cell.id);
       if(error){ toast("저장 실패: "+(error.message||"")); return; }
       if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
       closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
-    };
+    });
   }
   draw();
 }
@@ -1181,6 +1188,7 @@ function openMenuEditSheet(cafeId, existing){
 // 셀원 편집 (이 셀 링크를 가진 누구나) — set_members RPC
 function openMembersSheet(){
   let list = MEMBERS.map(m=>({id:m.id, name:m.name}));   // 객체로 편집 — 이름 바꿔도 숨은 id 유지
+  let baseline = JSON.stringify(list);                    // 동시편집 충돌 감지용 스냅샷
   function draw(){
     openSheet(`
       <h3>👥 ${esc(ROOM_NAME)} 셀원 편집</h3>
@@ -1193,13 +1201,20 @@ function openMembersSheet(){
     $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
     $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
     document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
-    document.getElementById("saveM").onclick=async()=>{
+    document.getElementById("saveM").onclick=()=>guardWrite(async()=>{
+      // 동시편집 충돌 감지(OCC): 저장 직전 최신 멤버 확인 → 바뀌었으면 덮어쓰지 말고 최신 반영+경고
+      if(SHARED){ const fresh=await fetchCell(CELL.id);
+        if(fresh && JSON.stringify(memObjs(fresh.members))!==baseline){
+          CELL=fresh; applyCellGlobals(); list=MEMBERS.map(m=>({id:m.id,name:m.name})); baseline=JSON.stringify(list);
+          toast("다른 분이 방금 셀원을 바꿨어요 — 최신 목록을 불러왔어요. 다시 확인 후 저장해주세요"); draw(); return;
+        }
+      }
       const seen={}, out=[];
       for(const m of list){ const name=(m.name||"").trim().slice(0,40); if(!name||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name}); }
       const final=out.slice(0,60);
       if(!final.length){ toast("셀원을 1명 이상 두세요"); return; }
       if(await saveMembers(final)){ if(ME && !final.some(m=>m.id===ME)) setMe(null); closeSheet(); toast("셀원 명단을 저장했어요"); render(); }
-    };
+    });
     document.getElementById("closeM").onclick=closeSheet;
   }
   draw();
