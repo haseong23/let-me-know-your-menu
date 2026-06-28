@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.20";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.21";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -774,7 +774,8 @@ function wireDashboard(){
   const t=document.getElementById("dashTabs"); if(t) t.querySelectorAll(".tab").forEach(el=> el.onclick=()=>{ dashTab=el.dataset.t; rerenderDash(); });
   const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요");
   const nd=document.getElementById("nudge"); if(nd) nd.onclick=()=>{ const names=MEMBERS.filter(m=>!ORDERS[m.id]).map(m=>m.name).join(", ");
-    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${memberById(SESSION.hostId).name}님이 오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
+    const h=memberById(SESSION.hostId); const hostClause=h?`${h.name}님이 `:"";   // host가 셀원에서 빠져도 안전
+    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${hostClause}오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
 }
 function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else renderHostView(); }
 function countDrinks(){ return MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink").length; }
