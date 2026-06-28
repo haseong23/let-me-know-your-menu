@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.17";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.18";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1107,8 +1107,8 @@ async function openCafeMenuAdmin(cafeId){
   delete CAFEMENU_CACHE[cafeId]; const menus=await loadCafeMenus(cafeId);
   const sorted=menus.slice().sort((a,b)=>(a.sort-b.sort)||a.name.localeCompare(b.name,"ko"));
   const rows=sorted.map(m=>`<div class="person" data-id="${esc(m.id)}">
-      <div style="font-size:20px;width:26px;text-align:center">${m.emoji||"🥤"}</div>
-      <div style="flex:1;min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(CAT_LABEL[m.cat]||m.cat||"기타")} · ${(m.temps||[]).join("/")||"-"}</div></div>
+      <div style="font-size:20px;width:26px;text-align:center">${esc(m.emoji||"🥤")}</div>
+      <div style="flex:1;min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(CAT_LABEL[m.cat]||m.cat||"기타")} · ${esc((m.temps||[]).join("/")||"-")}</div></div>
       <button class="btn btn-sm ${m.popular?'btn-brand':'btn-soft'} mpop" data-id="${esc(m.id)}" style="flex:none">${m.popular?'⭐인기':'인기'}</button>
       <button class="mdel2" data-id="${esc(m.id)}" style="background:none;border:none;color:var(--red);font-size:18px;flex:none;cursor:pointer">✕</button>
     </div>`).join("") || '<p class="muted">메뉴가 없어요. 아래 "기본 메뉴 불러오기"로 시작하세요.</p>';
