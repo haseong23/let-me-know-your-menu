@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.24";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.25";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -521,7 +521,7 @@ function renderHeader(){
   document.getElementById("gear").onclick=()=>openSettings();
   const rb=document.getElementById("refreshBtn");
   if(rb) rb.onclick=async()=>{ rb.style.opacity=".35"; let ok=true;
-    try{ await Sync.reload(); }catch(e){ ok=false; }
+    try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } await Sync.reload(); }catch(e){ ok=false; }
     if(curView==="host") renderHostView(); else render();
     toast(ok?"최신 상태로 업데이트했어요":"새로고침 실패 — 네트워크 확인"); };
 }
@@ -881,7 +881,12 @@ async function saveMembers(arr){
   if(SHARED){ const {error}=await Sync.client.rpc("set_members",{p_id:CELL.id,p_members:arr}); if(error){ toast("저장 실패: "+(error.message||"")); return false; }
     const fresh=await fetchCell(CELL.id); if(fresh) CELL=fresh;
   } else { CELL.members=arr; DB_CELLS[CELL.id]=CELL; localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS)); }
-  applyCellGlobals(); rememberCell(CELL); return true;
+  applyCellGlobals(); rememberCell(CELL);
+  // 호스트가 명단에서 빠지면 세션이 open으로 잠겨 아무도 마감 못 함 → 자동 해제(idle)
+  if(SESSION && SESSION.state!=="idle" && SESSION.hostId && !memberById(SESSION.hostId)){
+    try{ await Sync.unclaim(); }catch(e){}
+  }
+  return true;
 }
 // 자기 셀만 단건 조회 (열거 불가). SHARED=DB(get_cell) 단건, 로컬=DB_CELLS/CODE 폴백.
 async function fetchCell(id){
@@ -1191,7 +1196,8 @@ function openMembersSheet(){
 document.addEventListener("visibilitychange", async ()=>{
   if(!SHARED || !CELL || adminMode || inPicker) return;
   if(document.hidden){ if(Sync.pause) Sync.pause(); }
-  else { try{ await Sync.resubscribe(); }catch(e){} render(); }
+  else { try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } }catch(e){}   // 멤버(이름변경/추가) 최신화
+         try{ await Sync.resubscribe(); }catch(e){} render(); }
 });
 function onRemote(){ if(inPicker || adminMode) return; if(curView==="host") renderHostView(); else render(); }
 (async function boot(){
