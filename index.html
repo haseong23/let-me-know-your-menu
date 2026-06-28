@@ -106,10 +106,12 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.14";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.15";  // 배포 확인용 — 푸터/콘솔에 표시
+// publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
+// 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://dozlrujvjskwitrgceog.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_xN9o7aWLL-aBXtJF2pVuBA_dIjAdTn2",
   ROOM_ID: "default",
   ROOM_NAME: "오늘은 제가 섬기겠습니다",
 };
