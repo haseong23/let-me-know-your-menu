@@ -99,14 +99,20 @@
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
   .banner-warn { background:#fbecdf; border:1px solid #f0d9c2; color:#8a5a1f; border-radius:12px; padding:10px 14px; font-size:13px; margin-bottom:14px; }
   .loading { text-align:center; padding:80px 20px; color:var(--sub); }
+  .spinner { width:34px; height:34px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--brand); margin:0 auto 14px; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
+  #offline.show { display:block; }
+  .demo-badge { display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
 </style>
 </head>
 <body>
-<div id="app"><div class="loading">불러오는 중…</div></div>
+<div id="app"><div class="loading"><div class="spinner"></div>불러오는 중…</div></div>
 <div id="bottom"></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <div class="cscrim" id="cscrim"></div>
 <div class="toast" id="toast"></div>
+<div id="offline">⚠️ 오프라인 — 변경이 저장되지 않을 수 있어요</div>
 
 <script>
 "use strict";
@@ -117,7 +123,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.25";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.26";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -473,6 +479,12 @@ let toastT;
 function toast(m){ $toast.textContent=m; $toast.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>$toast.classList.remove("show"),1700); }
 // 쓰기 작업 안전 래퍼: 실패 시 토스트, 성공 여부 반환
 async function safeWrite(p, failMsg){ try{ await p; return true; }catch(e){ console.error(e); toast(failMsg||"저장 실패 — 네트워크 확인 후 다시 시도해주세요"); return false; } }
+// 이중 제출 가드: 비동기 쓰기 진행 중 재진입(빠른 더블탭) 차단 → 중복 요청·토스트 방지
+let busyWrite=false;
+async function guardWrite(fn){ if(busyWrite) return; busyWrite=true; try{ return await fn(); } finally{ busyWrite=false; } }
+// 오프라인 표시
+function updateOffline(){ const el=document.getElementById("offline"); if(el) el.classList.toggle("show", !navigator.onLine); }
+window.addEventListener("online", updateOffline); window.addEventListener("offline", updateOffline);
 // 시트 + 뒤로가기 연동: 시트 열 때 history state push → 카톡/브라우저 뒤로가기 시 시트만 닫힘(웹뷰 이탈 방지)
 // ===== 모바일 뒤로가기 =====
 // 하위 상태(시트/현황/이름변경/메뉴관리)에 '들어갈 때만' history 항목 1개를 쌓는다.
@@ -509,7 +521,7 @@ function renderHeader(){
   const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span> <span class="reload" id="refreshBtn" role="button" aria-label="새로고침" title="새로고침">↻</span>` : `<span class="dot off"></span>이 기기 전용`;
   $app.innerHTML = `
     <header><div class="h-row">
-      <div><div class="room-name">☕ ${esc(ROOM_NAME)}</div>
+      <div><div class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}</div>
         <div class="date">${prettyDate()} · ${connHtml}</div></div>
       <div style="display:flex;gap:6px;align-items:center">
         <div class="me-chip" id="meChip" role="button" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
@@ -619,12 +631,12 @@ function renderOpen(){
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null); else t.onclick=()=>openOrderSheet(t.dataset.id,null); });
-  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"}))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } };
+  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"}))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
-  view().querySelectorAll(".sameas").forEach(b=> b.onclick=async()=>{ const src=ORDERS[b.dataset.id];
+  view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } });
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } }));
 }
 
 function openOrderSheet(menuId, existing){
@@ -656,8 +668,8 @@ function openOrderSheet(menuId, existing){
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(); }; });
     const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v); i>=0?extras.splice(i,1):extras.push(v); note=document.getElementById("note").value; draw(); });
-    document.getElementById("confirmOrder").onclick=async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
-      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } };
+    document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
+      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
   }
@@ -825,9 +837,11 @@ function bind(id,fn){ const el=document.getElementById(id); if(el) el.onclick=fn
 
 /* ---------- 클레임 시 카페 선택 ---------- */
 async function doClaim(cafeId){
-  toast("저장 중…");
-  try{ const ok=await Sync.claim(ME, cafeId); toast(ok ? (meName()+"님이 오늘 섬기는 분으로 설정됐어요") : "앗, 방금 다른 분이 먼저 섬기기로 하셨어요!"); render(); }
-  catch(e){ console.error(e); toast("저장 실패 — 다시 시도해주세요"); render(); }
+  await guardWrite(async()=>{   // 이중 클레임 방지
+    toast("저장 중…");
+    try{ const ok=await Sync.claim(ME, cafeId); toast(ok ? (meName()+"님이 오늘 섬기는 분으로 설정됐어요") : "앗, 방금 다른 분이 먼저 섬기기로 하셨어요!"); render(); }
+    catch(e){ console.error(e); toast("저장 실패 — 다시 시도해주세요"); render(); }
+  });
 }
 function openClaimCafeSheet(){
   let cafeId = (CELL&&CELL.homeCafeId) || "gil";
@@ -1202,6 +1216,7 @@ document.addEventListener("visibilitychange", async ()=>{
 function onRemote(){ if(inPicker || adminMode) return; if(curView==="host") renderHostView(); else render(); }
 (async function boot(){
   console.log("[오늘은 제가 섬기겠습니다] build "+APP_VERSION);  // 캐시/배포 확인용
+  updateOffline();   // 오프라인 초기 표시
   // 무한 로딩 방지: 8초 내 첫 렌더 안 되면 재시도 안내
   setTimeout(()=>{ if(document.querySelector("#app > .loading")) $app.innerHTML='<div class="loading">연결이 지연되고 있어요 📡<br><br><button class="btn btn-soft" onclick="location.reload()" style="max-width:200px;margin:0 auto">다시 시도</button></div>'; }, 8000);
   try { await Sync.init(onRemote); }
