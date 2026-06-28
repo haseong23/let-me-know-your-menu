@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오늘은 제가 섬기겠습니다 사용법</title>
+  <style>
+    :root {
+      --paper: #fffaf4;
+      --ink: #211a14;
+      --muted: #6f6253;
+      --line: #eadfD2;
+      --brand: #6f4e37;
+      --brand-2: #1f7667;
+      --soft: #f4ebe0;
+      --white: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 40px 22px 64px;
+    }
+
+    .intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 36px;
+      align-items: center;
+      padding: 26px 0 34px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--brand);
+      background: var(--soft);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 18px 0 14px;
+      font-size: clamp(34px, 5vw, 62px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .summary span {
+      display: inline-flex;
+      align-items: center;
+      height: 36px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--white);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--brand);
+    }
+
+    .hero-shot {
+      display: grid;
+      place-items: center;
+    }
+
+    .phone {
+      width: min(100%, 330px);
+      border: 8px solid #211a14;
+      border-radius: 34px;
+      background: #211a14;
+      box-shadow: 0 18px 42px rgba(65, 43, 24, .18);
+      overflow: hidden;
+    }
+
+    .phone img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 24px;
+      background: var(--paper);
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+      margin-top: 34px;
+    }
+
+    .step {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .step-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 900;
+      font-size: 15px;
+      flex: none;
+    }
+
+    .tag {
+      color: var(--brand-2);
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    h2 {
+      margin: 0 0 6px;
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+
+    .step p {
+      min-height: 50px;
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .mini-phone {
+      width: 100%;
+      border: 6px solid #2b2118;
+      border-radius: 30px;
+      background: #2b2118;
+      overflow: hidden;
+      box-shadow: 0 12px 24px rgba(65, 43, 24, .12);
+    }
+
+    .mini-phone img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 21px;
+      background: var(--paper);
+    }
+
+    .note {
+      margin-top: 32px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f7f0e8;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .note strong { color: var(--ink); }
+
+    .request {
+      margin-top: 28px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--white);
+      box-shadow: 0 10px 28px rgba(65, 43, 24, .08);
+    }
+
+    .request h2 {
+      margin-bottom: 8px;
+      color: var(--brand);
+    }
+
+    .request p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .request .sample {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .request a {
+      color: var(--brand);
+      font-weight: 900;
+    }
+
+    @media (max-width: 920px) {
+      .intro { grid-template-columns: 1fr; }
+      .hero-shot { display: none; }
+      .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 26px 14px 44px; }
+      .steps { grid-template-columns: 1fr; }
+      .step p { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="intro">
+      <div>
+        <span class="eyebrow">시크릿 첫 접속 기준</span>
+        <h1>커피 주문, 이름 고르고 메뉴만 누르면 끝.</h1>
+        <p class="lead">누가 쏘는지, 누가 뭘 마시는지, 안 마시는 사람과 미응답자까지 한 화면에서 정리됩니다. 링크 하나만 공유하면 셀 전체 주문이 모입니다.</p>
+        <div class="summary" aria-label="사용 흐름 요약">
+          <span>이름 선택</span>
+          <span>내가 쏠게요</span>
+          <span>메뉴 선택</span>
+          <span>현황 확인</span>
+        </div>
+      </div>
+      <div class="hero-shot">
+        <div class="phone">
+          <img src="menu-polished/04-menu-open.png" alt="메뉴 선택 화면" />
+        </div>
+      </div>
+    </section>
+
+    <section class="steps" aria-label="사용 방법">
+      <article class="step">
+        <div class="step-top"><span class="num">1</span><span class="tag">처음 접속</span></div>
+        <h2>내 이름 선택</h2>
+        <p>멤버 목록에서 본인 이름을 누릅니다. 이름이 없으면 직접 추가할 수 있습니다.</p>
+        <div class="mini-phone"><img src="menu-polished/01-name-select.png" alt="이름 선택 화면" /></div>
+      </article>
+
+      <article class="step">
+        <div class="step-top"><span class="num">2</span><span class="tag">실수 방지</span></div>
+        <h2>한 번 더 확인</h2>
+        <p>선택한 이름이 맞는지 확인하고 시작합니다. 다른 사람 이름으로 주문하는 일을 줄여줍니다.</p>
+        <div class="mini-phone"><img src="menu-polished/02-confirm-name.png" alt="이름 확인 화면" /></div>
+      </article>
+
+      <article class="step">
+        <div class="step-top"><span class="num">3</span><span class="tag">주문 열기</span></div>
+        <h2>오늘은 내가 쏠게요</h2>
+        <p>아직 주문이 열리지 않았다면 이 버튼을 누릅니다. 이후 멤버들이 메뉴를 고를 수 있습니다.</p>
+        <div class="mini-phone"><img src="menu-polished/03-host-start.png" alt="오늘은 내가 쏠게요 화면" /></div>
+      </article>
+
+      <article class="step">
+        <div class="step-top"><span class="num">4</span><span class="tag">주문 받기</span></div>
+        <h2>메뉴 선택</h2>
+        <p>자주 마시는 메뉴를 바로 누릅니다. 더 많은 메뉴는 전체 메뉴판에서 찾습니다.</p>
+        <div class="mini-phone"><img src="menu-polished/04-menu-open.png" alt="메뉴 선택 화면" /></div>
+      </article>
+
+      <article class="step">
+        <div class="step-top"><span class="num">5</span><span class="tag">상세 옵션</span></div>
+        <h2>온도와 옵션</h2>
+        <p>ICE/HOT, 디카페인, 연하게, 샷추가, 메모를 고르고 이걸로 주문을 누릅니다.</p>
+        <div class="mini-phone"><img src="menu-polished/05-options-submit.png" alt="옵션 선택 화면" /></div>
+      </article>
+
+      <article class="step">
+        <div class="step-top"><span class="num">6</span><span class="tag">마감 전 확인</span></div>
+        <h2>현황 확인</h2>
+        <p>총 잔수, 미응답자, 사람별 주문 내역을 확인합니다. 끝나면 주문을 마감합니다.</p>
+        <div class="mini-phone"><img src="menu-polished/06-status.png" alt="주문 현황 화면" /></div>
+      </article>
+    </section>
+
+    <section class="request" aria-label="셀 링크 요청 방법">
+      <h2>마음에 드셨다면 셀 링크를 요청해주세요</h2>
+      <p>사용법을 보시고 마음에 드신다면 관리자에게 셀 이름과 함께 URL을 요청해주세요.</p>
+      <p class="sample">"3-3셀 ㅇㅇㅇ입니다. 링크 요청드립니다."</p>
+      <p>위와 같이 <a href="mailto:tempyo42@gmail.com">이메일</a> 주시면 빠르게 답변드리겠습니다.</p>
+    </section>
+
+    <p class="note"><strong>팁:</strong> 이미 다른 사람이 주문을 열어둔 상태라면 3단계는 생략되고 바로 메뉴 선택 화면으로 이동합니다.</p>
+  </main>
+</body>
+</html>
