@@ -117,7 +117,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.18";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.19";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -182,7 +182,7 @@ const GIL_MENUS = [
   { id:"trad_ssanghwa", name:"전통 한방쌍화차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"trad_jujube", name:"전통 한방대추차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   // 아이스티
-  { id:"peachicedtea", name:"복숭아 아이스티", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:[], popular:true },
+  { id:"peachicedtea", name:"복숭아 아이스티", emoji:"🍑", cat:"icedtea", temps:["ICE"], extras:[], popular:true },
   { id:"ashotchu", name:"아샷추 (아이스티+샷)", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:["샷추가"] },
   { id:"amangchu", name:"아망추 (아이스티+망고)", emoji:"🥭", cat:"icedtea", temps:["ICE"], extras:[] },
   { id:"rooibospeach", name:"루이보스 복숭아 아이스티", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:[] },
