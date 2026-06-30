@@ -41,7 +41,8 @@ returns jsonb language sql immutable set search_path = public as $$
   )
   select coalesce(jsonb_agg(j), '[]'::jsonb) from d
 $$;
-revoke all on function public.member_diff(jsonb,jsonb) from public;
+-- 내부 헬퍼 — 외부 노출 불필요. Supabase 기본권한 때문에 anon/authenticated 까지 명시 회수.
+revoke all on function public.member_diff(jsonb,jsonb) from public, anon, authenticated;
 
 -- 3) set_members: p_actor 추가 + 변경분 자동 로그 (옛 2-인자 제거 후 재생성)
 drop function if exists public.set_members(text,jsonb);

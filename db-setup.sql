@@ -208,7 +208,9 @@ language sql immutable set search_path = public as $$
   )
   select coalesce(jsonb_agg(j), '[]'::jsonb) from d
 $$;
-revoke all on function public.member_diff(jsonb,jsonb) from public;
+-- 내부 헬퍼(set_members가 정의자 권한으로 호출). 외부 노출 불필요 → anon/authenticated 모두 회수.
+-- (Supabase 기본권한이 함수 생성 시 anon에 EXECUTE를 부여하므로 from public 만으론 부족)
+revoke all on function public.member_diff(jsonb,jsonb) from public, anon, authenticated;
 
 create or replace function public.set_members(p_id text, p_members jsonb, p_actor text default null)
 returns void

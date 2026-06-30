@@ -95,7 +95,7 @@
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
   .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; }
   .scrim { position: fixed; inset: 0; background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
-  .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; }
+  .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; }
   .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: 19px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.32";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.33";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -502,7 +502,7 @@ window.addEventListener("online", updateOffline); window.addEventListener("offli
 //   뒤로가기가 평소처럼 앱 밖으로 나간다(갇히지 않음).
 let sheetOpen=false, curView="main", subActive=false;
 function pushSub(){ if(!subActive){ subActive=true; try{ history.pushState({sub:1},""); }catch(e){} } }
-function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $scrim.classList.add("show"); sheetOpen=true; pushSub(); }
+function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $sheet.scrollTop=0; $scrim.classList.add("show"); sheetOpen=true; pushSub(); }
 function closeSheet(){ $scrim.classList.remove("show"); sheetOpen=false; }  // history 항목은 다음 뒤로가기/열기가 소비·재사용
 $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
 window.addEventListener("popstate",()=>{
@@ -733,7 +733,7 @@ function openFullMenuSheet(){
         <span class="pmenu" style="margin-left:auto">${m.temps.length?m.temps.join("/"):"·"}</span></div>`).join("")+`</div></div>`;
   }).join("");
   openSheet(`
-    <div style="position:sticky;top:0;background:var(--bg);z-index:5;padding:2px 0 10px">
+    <div style="position:sticky;top:0;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
       <h3 style="margin:0 0 8px">📋 전체 메뉴판</h3>
       <input type="text" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" />
     </div>
