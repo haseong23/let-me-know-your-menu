@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.34";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.35";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -771,12 +771,10 @@ function renderClosed(){
 /* ---------- 대시보드 ---------- */
 let dashTab="people";
 function dashboardHtml(){
-  const drinks=countDrinks();
   const ordered=MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink");
   const skipped=MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="skip");
   const pending=MEMBERS.filter(m=>!ORDERS[m.id]);
   const stats=`<div class="stats">
-    <div class="stat total"><div class="num">${drinks}</div><div class="lbl">총 잔수</div></div>
     <div class="stat"><div class="num" style="color:var(--green)">${ordered.length}</div><div class="lbl">주문</div></div>
     <div class="stat"><div class="num" style="color:var(--gray)">${skipped.length}</div><div class="lbl">안마심</div></div>
     <div class="stat"><div class="num" style="color:var(--accent)">${pending.length}</div><div class="lbl">미응답</div></div></div>`;
