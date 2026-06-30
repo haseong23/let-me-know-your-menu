@@ -123,7 +123,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.30";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.31";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1233,9 +1233,13 @@ document.addEventListener("visibilitychange", async ()=>{
   if(!SHARED || !CELL || adminMode || inPicker) return;
   if(document.hidden){ if(Sync.pause) Sync.pause(); }
   else { try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } }catch(e){}   // 멤버(이름변경/추가) 최신화
-         try{ await Sync.resubscribe(); }catch(e){} render(); }
+         try{ await Sync.resubscribe(); }catch(e){}
+         if(sheetOpen || confirmOpen) return;                    // 입력 중이면 화면 유지
+         if(curView==="pick") renderPickMe(); else if(curView==="host") renderHostView(); else render(); }   // 이름 선택 중이면 메인으로 튕기지 않음
 });
-function onRemote(){ if(inPicker || adminMode) return; if(curView==="host") renderHostView(); else render(); }
+function onRemote(){ if(inPicker || adminMode) return;
+  if(curView==="pick" || sheetOpen || confirmOpen) return;   // 이름 선택/시트/확인창 사용 중엔 폴링이 화면을 갈아엎지 않음(선택 화면이 스스로 닫히던 문제)
+  if(curView==="host") renderHostView(); else render(); }
 (async function boot(){
   console.log("[오늘은 제가 섬기겠습니다] build "+APP_VERSION);  // 캐시/배포 확인용
   updateOffline();   // 오프라인 초기 표시
