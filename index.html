@@ -123,7 +123,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.29";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.30";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -641,6 +641,8 @@ function renderOpen(){
     forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } }));
 }
 
+// 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
+const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가" };
 function openOrderSheet(menuId, existing){
   let temp = existing&&existing.temp ? existing.temp : null;
   let extras = existing&&existing.extras ? [...existing.extras] : [];
@@ -669,7 +671,10 @@ function openOrderSheet(menuId, existing){
       ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost" id="closeSheet">닫기</button>'}`);
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(); }; });
-    const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v); i>=0?extras.splice(i,1):extras.push(v); note=document.getElementById("note").value; draw(); });
+    const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v);
+      if(i>=0){ extras.splice(i,1); }
+      else { extras.push(v); const opp=EXCLUSIVE_EXTRAS[v]; if(opp){ const j=extras.indexOf(opp); if(j>=0) extras.splice(j,1); } }   // 배반 옵션 자동 해제
+      note=document.getElementById("note").value; draw(); });
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
       if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
