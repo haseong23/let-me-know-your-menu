@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.33";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.34";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -569,7 +569,6 @@ function renderPickMe(){
     <header><div class="room-name" style="padding-top:6px">☕ ${esc(ROOM_NAME)}</div>
     <div class="date">먼저 <b>본인</b>을 선택해 주세요 (ㄱㄴㄷ순)</div></header>
     <div class="card" style="padding:8px 18px">${list}</div>
-    <p class="muted center" style="margin:8px 0 4px">이름을 누르면 아래에서 <b>한 번 더 확인</b>해요.</p>
     <div class="label">내 이름이 목록에 없나요?</div>
     <div style="display:flex;gap:8px"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력" style="flex:1;min-width:0"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
@@ -636,7 +635,7 @@ function renderOpen(){
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
       <h2>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
-      <p>${myOrder?'메뉴 잘 전했어요 🙏':'드시고 싶은 메뉴를 골라주세요'}</p></div>
+      ${myOrder?'':'<p>드시고 싶은 메뉴를 골라주세요</p>'}</div>
     ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
 
   const grid=document.getElementById("menuGrid");
@@ -837,7 +836,7 @@ function renderBottom(inHostView){
   if(SESSION.state==="idle"){ html=`<button class="btn btn-brand" id="claim">🙋 오늘은 제가 섬기겠습니다</button>`; }
   else if(SESSION.state==="open"){
     if(amHost){ html=inHostView
-        ? `<button class="btn btn-danger btn-sm" id="unclaim">취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`
+        ? `<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`
         : `<button class="btn btn-soft" id="hostView">📊 현황 (${countDrinks()}잔)</button><button class="btn btn-brand" id="close">마감</button>`; }
     else html=`<button class="btn btn-soft" id="hostView">📊 현황 보기 · 총 ${countDrinks()}잔</button>`;
   } else { html = amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`; }
