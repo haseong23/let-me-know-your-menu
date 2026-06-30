@@ -56,10 +56,22 @@ create table if not exists public.cafe_menus (
   primary key (cafe_id, menu_id)
 );
 
+-- 셀원 편집 감사 로그: 누가(자기신고 이름/'관리자') 무엇을(추가/이름변경/삭제) 바꿨는지.
+-- set_members RPC 안에서 old/new diff 를 계산해 자동 기록(정의자 권한으로 RLS 우회 insert).
+create table if not exists public.member_logs (
+  id bigint generated always as identity primary key,
+  cell_id text not null,
+  actor text,                       -- 편집자 자기신고 이름(일반) 또는 '관리자'(IT). null=익명
+  changes jsonb not null,           -- [{op:'add',name} | {op:'remove',name} | {op:'rename',from,to}]
+  created_at timestamptz not null default now()
+);
+create index if not exists member_logs_cell_idx on public.member_logs (cell_id, created_at desc);
+
 alter table public.cells enable row level security;
 alter table public.sessions enable row level security;
 alter table public.orders enable row level security;
 alter table public.cafe_menus enable row level security;
+alter table public.member_logs enable row level security;
 
 do $$
 declare p record;
@@ -68,7 +80,7 @@ begin
     select schemaname, tablename, policyname
     from pg_policies
     where schemaname = 'public'
-      and tablename in ('cells','sessions','orders','cafe_menus')
+      and tablename in ('cells','sessions','orders','cafe_menus','member_logs')
   loop
     execute format('drop policy if exists %I on %I.%I', p.policyname, p.schemaname, p.tablename);
   end loop;
@@ -76,10 +88,11 @@ end $$;
 
 grant usage on schema public to anon, authenticated;
 
-revoke all on table public.sessions, public.orders, public.cells, public.cafe_menus from anon, authenticated;
+revoke all on table public.sessions, public.orders, public.cells, public.cafe_menus, public.member_logs from anon, authenticated;
 grant select, insert, update, delete on table public.cells to authenticated;
 grant select, insert, update, delete on table public.cafe_menus to authenticated;
 grant select on table public.cafe_menus to anon, authenticated;
+grant select on table public.member_logs to authenticated;  -- 로그 열람=관리자(authenticated)만. insert는 set_members(정의자)가 수행.
 
 create policy cells_admin_select on public.cells
   for select to authenticated using (true);
@@ -111,6 +124,10 @@ create policy cafe_menus_admin_update on public.cafe_menus
 create policy cafe_menus_admin_delete on public.cafe_menus
   for delete to authenticated using (true);
 
+-- 수정 내역: 관리자(authenticated)만 열람. anon 직접 접근 없음.
+create policy member_logs_admin_select on public.member_logs
+  for select to authenticated using (true);
+
 -- 기존(구버전) 함수 먼저 제거: create or replace 는 반환타입/파라미터명 변경을 허용하지 않아
 -- get_cell 등 옛 정의가 있으면 트랜잭션 전체가 롤백됨. 안전하게 drop 후 재생성.
 drop function if exists public.is_valid_app_date(text);
@@ -118,6 +135,8 @@ drop function if exists public.room_exists(text);
 drop function if exists public.room_has_member(text,text);
 drop function if exists public.get_cell(text);
 drop function if exists public.set_members(text,jsonb);
+drop function if exists public.set_members(text,jsonb,text);
+drop function if exists public.member_diff(jsonb,jsonb);
 drop function if exists public.get_room_day(text,text);
 drop function if exists public.get_room_history(text,text);
 drop function if exists public.claim_host(text,text,text,text);
@@ -166,10 +185,35 @@ $$;
 revoke all on function public.get_cell(text) from public;
 grant execute on function public.get_cell(text) to anon, authenticated;
 
-create or replace function public.set_members(p_id text, p_members jsonb)
+-- 멤버 명단 diff: 숨은 id 기준으로 추가/이름변경/삭제 계산(레거시 문자열·객체 모두 정규화).
+create or replace function public.member_diff(old_m jsonb, new_m jsonb)
+returns jsonb
+language sql immutable set search_path = public as $$
+  with
+  o as (select coalesce(e->>'id', e #>> '{}') as id,
+               coalesce(e->>'name', e #>> '{}') as nm
+        from jsonb_array_elements(coalesce(old_m, '[]'::jsonb)) e),
+  n as (select coalesce(e->>'id', e #>> '{}') as id,
+               coalesce(e->>'name', e #>> '{}') as nm
+        from jsonb_array_elements(coalesce(new_m, '[]'::jsonb)) e),
+  d as (
+    select jsonb_build_object('op','add','name', n.nm) j
+      from n left join o on o.id = n.id where o.id is null
+    union all
+    select jsonb_build_object('op','remove','name', o.nm)
+      from o left join n on n.id = o.id where n.id is null
+    union all
+    select jsonb_build_object('op','rename','from', o.nm, 'to', n.nm)
+      from o join n on n.id = o.id where o.nm is distinct from n.nm
+  )
+  select coalesce(jsonb_agg(j), '[]'::jsonb) from d
+$$;
+revoke all on function public.member_diff(jsonb,jsonb) from public;
+
+create or replace function public.set_members(p_id text, p_members jsonb, p_actor text default null)
 returns void
 language plpgsql security definer set search_path = public as $$
-declare norm jsonb;
+declare norm jsonb; old_m jsonb; ch jsonb;
 begin
   if jsonb_typeof(p_members) <> 'array'
      or jsonb_array_length(p_members) < 1
@@ -198,11 +242,20 @@ begin
   ), '[]'::jsonb) into norm
   from jsonb_array_elements(p_members) e;
 
-  update public.cells set members = norm where id = p_id;
+  select members into old_m from public.cells where id = p_id;
   if not found then raise exception 'no cell'; end if;
+
+  update public.cells set members = norm where id = p_id;
+
+  -- 변경분이 있을 때만 감사 로그 기록(순서/무변경 재저장은 기록 안 함)
+  ch := public.member_diff(coalesce(old_m, '[]'::jsonb), norm);
+  if jsonb_array_length(ch) > 0 then
+    insert into public.member_logs(cell_id, actor, changes)
+    values (p_id, nullif(left(coalesce(p_actor,''), 40), ''), ch);
+  end if;
 end $$;
-revoke all on function public.set_members(text,jsonb) from public;
-grant execute on function public.set_members(text,jsonb) to anon, authenticated;
+revoke all on function public.set_members(text,jsonb,text) from public;
+grant execute on function public.set_members(text,jsonb,text) to anon, authenticated;
 
 create or replace function public.get_room_day(p_room text, p_date text)
 returns jsonb

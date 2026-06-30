@@ -75,6 +75,14 @@
   .avatar { width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff; background: var(--brand); }
   .person .pname { font-weight: 700; font-size: 15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .person .pmenu { font-size: 13px; color: var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .person > div { min-width: 0; }
+  .logrow { padding: 9px 2px; border-bottom: 1px solid var(--line); }
+  .logrow:last-child { border-bottom: none; }
+  .logmeta { font-size: 12px; color: var(--sub); margin-bottom: 5px; }
+  .logchips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .logchip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); color: var(--ink); }
+  .logchip.add { background: #e6f4ea; color: #1e7a37; }
+  .logchip.rem { background: #fdeaea; color: #b3261e; }
+  .logchip.ren { background: #eaeef6; color: #33415c; }
   .pill { margin-left: auto; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
   .pill.ordered { background: #e7f4ec; color: var(--green); } .pill.skip { background: #f1eee9; color: var(--gray); } .pill.pending { background: #fbecdf; color: var(--accent); }
   .person.picksel { background: var(--brand-soft); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--brand); }
@@ -123,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.31";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.32";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -898,8 +906,16 @@ async function loadDbCells(){
 }
 function loadLocalCells(){ try{ DB_CELLS=JSON.parse(localStorage.getItem("coffee_local_cells")||"{}")||{}; }catch(e){ DB_CELLS={}; } }
 // 셀원 저장: 링크(id) 아는 사람이 그 셀 하나만 갱신(단건 RPC, 코드검증 없음 #6)
-async function saveMembers(arr){
-  if(SHARED){ const {error}=await Sync.client.rpc("set_members",{p_id:CELL.id,p_members:arr}); if(error){ toast("저장 실패: "+(error.message||"")); return false; }
+// set_members 호출 — actor 포함(감사 로그용). 구버전(2-인자) DB면 자동으로 actor 없이 재시도(배포 순서 무관).
+async function rpcSetMembers(id, members, actor){
+  let res = await Sync.client.rpc("set_members",{p_id:id,p_members:members,p_actor:(actor||null)});
+  if(res.error && (res.error.code==="PGRST202" || /could not find the function/i.test(res.error.message||""))){
+    res = await Sync.client.rpc("set_members",{p_id:id,p_members:members});   // 옛 스키마 폴백(로그 미기록)
+  }
+  return res;
+}
+async function saveMembers(arr, actor){
+  if(SHARED){ const {error}=await rpcSetMembers(CELL.id, arr, (actor||meName())); if(error){ toast("저장 실패: "+(error.message||"")); return false; }
     const fresh=await fetchCell(CELL.id); if(fresh) CELL=fresh;
   } else { CELL.members=arr; DB_CELLS[CELL.id]=CELL; localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS)); }
   applyCellGlobals(); rememberCell(CELL);
@@ -1035,7 +1051,9 @@ function openEditCellSheet(cell){
         mlist=memObjs(cur.members).map(m=>({id:m.id,name:m.name})); baseline=memSig(mlist);
         toast("이 셀의 셀원이 다른 곳에서 바뀌었어요 — 최신을 불러왔어요. 다시 확인 후 저장해주세요"); draw(); return;
       }
-      const {error}=await Sync.client.from("cells").update({name,members,home_cafe:cafeId}).eq("id",cell.id);
+      const {error:eMem}=await rpcSetMembers(cell.id, members, "관리자");   // 멤버 변경 → 감사 로그 기록
+      if(eMem){ toast("저장 실패: "+(eMem.message||"")); return; }
+      const {error}=await Sync.client.from("cells").update({name,home_cafe:cafeId}).eq("id",cell.id);
       if(error){ toast("저장 실패: "+(error.message||"")); return; }
       if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
       closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
@@ -1107,6 +1125,7 @@ async function renderAdminDash(){
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
           <button class="btn btn-soft btn-sm copylink" data-url="${esc(url)}">📋 링크</button>
           <button class="btn btn-soft btn-sm editcell" data-id="${esc(c.id)}">✏️ 수정</button>
+          ${SHARED?`<button class="btn btn-soft btn-sm logcell" data-id="${esc(c.id)}">🕘 내역</button>`:''}
           ${c.builtin?'':`<button class="btn btn-danger btn-sm delcell" data-id="${esc(c.id)}">삭제</button>`}
         </div>
       </div></div>`;
@@ -1127,11 +1146,40 @@ async function renderAdminDash(){
   const lo=document.getElementById("admLogout"); if(lo) lo.onclick=async()=>{ await Sync.client.auth.signOut(); toast("로그아웃됨"); renderAdminLogin(); };
   $app.querySelectorAll(".copylink").forEach(b=> b.onclick=()=>copyText(b.dataset.url,"링크 복사됨"));
   $app.querySelectorAll(".editcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openEditCellSheet(c); });
+  $app.querySelectorAll(".logcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openCellLogSheet(c); });
   $app.querySelectorAll(".delcell").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 셀을 삭제할까요?\n지난 주문 데이터는 남지만 링크 접근은 막힙니다.",{ok:"삭제",danger:true}))) return;
     if(SHARED){ const {error}=await Sync.client.from("cells").delete().eq("id",b.dataset.id); if(error){ toast("삭제 실패: "+(error.message||"")); return; } }
     delete DB_CELLS[b.dataset.id]; if(!SHARED) localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS));
     toast("삭제됨"); renderAdminDash(); });
 }
+
+// 셀별 셀원 수정 내역(관리자 전용 열람) — member_logs 최신순
+async function openCellLogSheet(cell){
+  openSheet(`<h3>🕘 ${esc(cell.name)} · 수정 내역</h3><p class="muted" style="margin-top:0">불러오는 중…</p>`);
+  let logs=[];
+  try{ const {data,error}=await Sync.client.from("member_logs").select("*").eq("cell_id",cell.id).order("created_at",{ascending:false}).limit(100);
+    if(error) throw error; logs=data||[];
+  }catch(e){
+    openSheet(`<h3>🕘 ${esc(cell.name)} · 수정 내역</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}</p><button class="btn btn-ghost" id="lclose">닫기</button>`);
+    document.getElementById("lclose").onclick=closeSheet; return;
+  }
+  const body = logs.length ? logs.map(renderLogEntry).join("") : '<p class="muted center" style="padding:14px 0">아직 셀원 수정 내역이 없어요.</p>';
+  openSheet(`
+    <h3>🕘 ${esc(cell.name)} · 수정 내역</h3>
+    <p class="muted" style="margin-top:0">누가 셀원을 추가/이름변경/삭제했는지 (최신순${logs.length>=100?" · 최근 100건":""})</p>
+    <div class="card" style="padding:2px 14px">${body}</div>
+    <div style="height:10px"></div><button class="btn btn-ghost" id="lclose">닫기</button>`);
+  document.getElementById("lclose").onclick=closeSheet;
+}
+function renderLogEntry(l){
+  const chips=(l.changes||[]).map(c=>
+    c.op==="add"    ? `<span class="logchip add">+ ${esc(c.name||"")}</span>` :
+    c.op==="remove" ? `<span class="logchip rem">− ${esc(c.name||"")}</span>` :
+    c.op==="rename" ? `<span class="logchip ren">${esc(c.from||"")} → ${esc(c.to||"")}</span>` : ""
+  ).join("");
+  return `<div class="logrow"><div class="logmeta"><b>${esc(l.actor||"익명")}</b> · ${esc(fmtLogTime(l.created_at))}</div><div class="logchips">${chips}</div></div>`;
+}
+function fmtLogTime(iso){ try{ const p=new Intl.DateTimeFormat("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"}).formatToParts(new Date(iso)); const g=t=>(p.find(x=>x.type===t)||{}).value||""; return `${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`; }catch(e){ return iso||""; } }
 
 // 카페 메뉴 관리 (관리자) — DB(cafe_menus) CRUD + 코드 76개 시드
 async function openCafeMenuAdmin(cafeId){
