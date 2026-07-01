@@ -451,4 +451,165 @@ values ('demo','demo','ㅇ-ㅇ셀',
 on conflict (id) do update
   set name = excluded.name, members = excluded.members, home_cafe = excluded.home_cafe;
 
+-- ============================================================
+-- 다중 섬김(하루 N번) 오버레이 — seq 차원 (db-migration-multi-serving.sql 과 동일)
+-- 위에서 만든 단일-섬김 정의를 seq 지원 버전으로 교체. 재실행 안전.
+-- ============================================================
+alter table public.sessions add column if not exists seq int not null default 1;
+alter table public.orders   add column if not exists seq int not null default 1;
+alter table public.sessions drop constraint if exists sessions_pkey;
+alter table public.sessions add  constraint sessions_pkey primary key (room_id, date, seq);
+alter table public.orders   drop constraint if exists orders_pkey;
+alter table public.orders   add  constraint orders_pkey  primary key (room_id, date, seq, member_id);
+create unique index if not exists sessions_one_open on public.sessions(room_id, date) where state = 'open';
+
+create or replace function public._active_seq(p_room text, p_date text)
+returns int language sql stable security definer set search_path = public as $$
+  select seq from public.sessions where room_id = p_room and date = p_date
+  order by (state = 'open') desc, seq desc limit 1
+$$;
+revoke all on function public._active_seq(text,text) from public, anon, authenticated;
+
+drop function if exists public.set_order(text,text,text,text,text,text,text,jsonb,text);
+drop function if exists public.remove_order(text,text,text);
+
+create or replace function public.get_day(p_room text, p_date text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare arr jsonb;
+begin
+  if not public.room_exists(p_room) or not public.is_valid_app_date(p_date) then raise exception 'no room'; end if;
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.seq), '[]'::jsonb) into arr
+  from (
+    select s.seq, s.state, s.host_id, s.cafe_id, s.close_at,
+      (select coalesce(jsonb_agg(to_jsonb(o)), '[]'::jsonb) from public.orders o
+        where o.room_id = s.room_id and o.date = s.date and o.seq = s.seq) as orders
+    from public.sessions s where s.room_id = p_room and s.date = p_date
+  ) x;
+  return jsonb_build_object('servings', arr);
+end $$;
+revoke all on function public.get_day(text,text) from public;
+grant execute on function public.get_day(text,text) to anon, authenticated;
+
+create or replace function public.start_serving(p_room text, p_date text, p_me text, p_cafe text)
+returns int language plpgsql security definer set search_path = public as $$
+declare nseq int;
+begin
+  if not public.room_exists(p_room) or not public.room_has_member(p_room, p_me)
+     or not public.is_valid_app_date(p_date) or length(coalesce(p_cafe,'')) > 40 then raise exception 'bad request'; end if;
+  select coalesce(max(seq),0)+1 into nseq from public.sessions where room_id = p_room and date = p_date;
+  insert into public.sessions(room_id, date, seq, state, host_id, cafe_id, updated_at)
+    values (p_room, p_date, nseq, 'open', p_me, p_cafe, now());
+  return nseq;
+exception when unique_violation then return 0;
+end $$;
+revoke all on function public.start_serving(text,text,text,text) from public;
+grant execute on function public.start_serving(text,text,text,text) to anon, authenticated;
+
+create or replace function public.set_serving_state(p_room text, p_date text, p_seq int, p_state text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.room_exists(p_room) or not public.is_valid_app_date(p_date) or p_state not in ('open','closed') then raise exception 'bad request'; end if;
+  update public.sessions set state = p_state,
+      close_at = case when p_state = 'closed' then (extract(epoch from now())*1000)::bigint else null end, updated_at = now()
+   where room_id = p_room and date = p_date and seq = p_seq;
+end $$;
+revoke all on function public.set_serving_state(text,text,int,text) from public;
+grant execute on function public.set_serving_state(text,text,int,text) to anon, authenticated;
+
+create or replace function public.unclaim_serving(p_room text, p_date text, p_seq int)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.room_exists(p_room) or not public.is_valid_app_date(p_date) then raise exception 'bad request'; end if;
+  if not exists (select 1 from public.orders where room_id = p_room and date = p_date and seq = p_seq) then
+    delete from public.sessions where room_id = p_room and date = p_date and seq = p_seq;
+  else
+    update public.sessions set host_id = null, updated_at = now() where room_id = p_room and date = p_date and seq = p_seq;
+  end if;
+end $$;
+revoke all on function public.unclaim_serving(text,text,int) from public;
+grant execute on function public.unclaim_serving(text,text,int) to anon, authenticated;
+
+create or replace function public.set_order(
+  p_room text, p_date text, p_member_id text, p_type text,
+  p_menu_id text, p_menu_name text, p_temp text, p_extras jsonb, p_note text, p_seq int default null
+) returns void language plpgsql security definer set search_path = public as $$
+declare tseq int;
+begin
+  if not public.room_exists(p_room) or not public.room_has_member(p_room, p_member_id) or not public.is_valid_app_date(p_date)
+     or p_type not in ('drink','skip') or length(coalesce(p_member_id,'')) > 40 or length(coalesce(p_menu_id,'')) > 60
+     or length(coalesce(p_menu_name,'')) > 60 or length(coalesce(p_temp,'')) > 20 or length(coalesce(p_note,'')) > 200
+     or jsonb_typeof(coalesce(p_extras,'[]'::jsonb)) <> 'array' then raise exception 'bad request'; end if;
+  tseq := coalesce(p_seq, public._active_seq(p_room, p_date));
+  if tseq is null then raise exception 'no serving'; end if;
+  insert into public.orders(room_id, date, seq, member_id, type, menu_id, menu_name, temp, extras, note, updated_at)
+    values (p_room, p_date, tseq, p_member_id, p_type, p_menu_id, p_menu_name, p_temp, coalesce(p_extras,'[]'::jsonb), coalesce(p_note,''), now())
+  on conflict (room_id, date, seq, member_id) do update
+    set type = excluded.type, menu_id = excluded.menu_id, menu_name = excluded.menu_name,
+        temp = excluded.temp, extras = excluded.extras, note = excluded.note, updated_at = now();
+end $$;
+revoke all on function public.set_order(text,text,text,text,text,text,text,jsonb,text,int) from public;
+grant execute on function public.set_order(text,text,text,text,text,text,text,jsonb,text,int) to anon, authenticated;
+
+create or replace function public.remove_order(p_room text, p_date text, p_member_id text, p_seq int default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare tseq int;
+begin
+  if not public.room_exists(p_room) or not public.room_has_member(p_room, p_member_id) or not public.is_valid_app_date(p_date) then raise exception 'bad request'; end if;
+  tseq := coalesce(p_seq, public._active_seq(p_room, p_date));
+  delete from public.orders where room_id = p_room and date = p_date and seq = tseq and member_id = p_member_id;
+end $$;
+revoke all on function public.remove_order(text,text,text,int) from public;
+grant execute on function public.remove_order(text,text,text,int) to anon, authenticated;
+
+-- 하위호환(옛 클라이언트) — 활성 섬김 대상
+create or replace function public.get_room_day(p_room text, p_date text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare sess jsonb; ords jsonb; aseq int;
+begin
+  if not public.room_exists(p_room) or not public.is_valid_app_date(p_date) then raise exception 'no room'; end if;
+  aseq := public._active_seq(p_room, p_date);
+  select to_jsonb(s) into sess from public.sessions s where s.room_id = p_room and s.date = p_date and s.seq = aseq;
+  select coalesce(jsonb_agg(to_jsonb(o)), '[]'::jsonb) into ords from public.orders o where o.room_id = p_room and o.date = p_date and o.seq = aseq;
+  return jsonb_build_object('session', sess, 'orders', ords);
+end $$;
+revoke all on function public.get_room_day(text,text) from public;
+grant execute on function public.get_room_day(text,text) to anon, authenticated;
+
+create or replace function public.claim_host(p_room text, p_date text, p_me text, p_cafe text)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare oseq int; n int;
+begin
+  if not public.room_exists(p_room) or not public.room_has_member(p_room, p_me)
+     or not public.is_valid_app_date(p_date) or length(coalesce(p_cafe,'')) > 40 then raise exception 'bad request'; end if;
+  select seq into oseq from public.sessions where room_id = p_room and date = p_date and state = 'open' order by seq desc limit 1;
+  if oseq is not null then
+    update public.sessions set host_id = p_me, cafe_id = coalesce(cafe_id, p_cafe), updated_at = now()
+      where room_id = p_room and date = p_date and seq = oseq and host_id is null;
+    get diagnostics n = row_count; return n > 0;
+  end if;
+  return public.start_serving(p_room, p_date, p_me, p_cafe) > 0;
+end $$;
+revoke all on function public.claim_host(text,text,text,text) from public;
+grant execute on function public.claim_host(text,text,text,text) to anon, authenticated;
+
+create or replace function public.set_room_state(p_room text, p_date text, p_state text)
+returns void language plpgsql security definer set search_path = public as $$
+declare tseq int;
+begin
+  if not public.room_exists(p_room) or not public.is_valid_app_date(p_date) or p_state not in ('idle','open','closed') then raise exception 'bad request'; end if;
+  if p_state = 'idle' then
+    select seq into tseq from public.sessions where room_id = p_room and date = p_date and state = 'open' order by seq desc limit 1;
+    if tseq is not null then update public.sessions set host_id = null, updated_at = now() where room_id = p_room and date = p_date and seq = tseq; end if;
+  else
+    tseq := public._active_seq(p_room, p_date);
+    if tseq is not null then
+      update public.sessions set state = p_state,
+          close_at = case when p_state = 'closed' then (extract(epoch from now())*1000)::bigint else null end, updated_at = now()
+        where room_id = p_room and date = p_date and seq = tseq;
+    end if;
+  end if;
+end $$;
+revoke all on function public.set_room_state(text,text,text) from public;
+grant execute on function public.set_room_state(text,text,text) to anon, authenticated;
+
 commit;

@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.41";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.42";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -373,11 +373,35 @@ const SHARED = !!(sbUrl && sbKey && window.supabase);
 // ROOM은 위에서 let으로 선언됨 (현재 셀의 roomId). 부팅 시 enterCell에서 설정.
 
 // 공통 상태 (오늘 세션 + 주문)
-let SESSION = { state:"idle", hostId:null, closeAt:null, cafeId:null };
-let ORDERS = {}; // memberId -> {type, menuId, temp, extras, note}
+let SESSION = { state:"idle", hostId:null, closeAt:null, cafeId:null };  // '현재 보고 있는 섬김'의 뷰
+let ORDERS = {}; // memberId -> {type, menuId, temp, extras, note}  (현재 섬김의 주문)
 let onChange = ()=>{};
 
-const emptySession = ()=>({ state:"idle", hostId:null, closeAt:null, cafeId:null });
+// 다중 섬김(하루 N번, 순차): SERVINGS=오늘의 섬김 배열, activeSeq=열린 섬김, viewSeq=보고 있는 섬김(null=활성/개요)
+let SERVINGS = [];      // [{seq,state,hostId,cafeId,closeAt, orders:{memberId:{...}}}]
+let activeSeq = null;
+let viewSeq = null;
+
+const emptySession = ()=>({ state:"idle", hostId:null, closeAt:null, cafeId:null, seq:null });
+
+function ordersObj(arr){ const o={}; (arr||[]).forEach(r=>{ o[r.member_id]={type:r.type,menuId:r.menu_id,menuName:r.menu_name||"",temp:r.temp,extras:r.extras||[],note:r.note||""}; }); return o; }
+function servingsFromDB(arr){ return (arr||[]).map(s=>({seq:s.seq, state:s.state, hostId:s.host_id, cafeId:s.cafe_id||null, closeAt:s.close_at, orders:ordersObj(s.orders)})); }
+function projectServing(seq){
+  const s = SERVINGS.find(x=>x.seq===seq);
+  if(s){ SESSION={state:s.state, hostId:s.hostId, closeAt:s.closeAt, cafeId:s.cafeId, seq:s.seq}; ORDERS=s.orders||{}; }
+  else { SESSION=emptySession(); ORDERS={}; }
+  applyCafeGlobals();
+}
+// 섬김 배열을 반영하고 SESSION/ORDERS를 활성(또는 보고 있는) 섬김으로 투영
+function setServings(list){
+  SERVINGS = list || [];
+  const open = SERVINGS.find(x=>x.state==="open");
+  activeSeq = open ? open.seq : null;
+  if(viewSeq!=null && !SERVINGS.some(x=>x.seq===viewSeq)) viewSeq=null;  // 사라진 섬김 보기 정리
+  projectServing(viewSeq!=null ? viewSeq : activeSeq);
+}
+function servingLabel(seq){ return seq ? (seq + "번째 섬김") : ""; }
+function servingDrinks(s){ let n=0; const o=s&&s.orders||{}; for(const k in o){ if(o[k].type==="drink") n++; } return n; }
 
 // 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시 + 수동 새로고침)
 let lastSyncAt=0;
@@ -387,9 +411,10 @@ setInterval(()=>{ try{ const el=document.getElementById("syncAgo"); if(el) el.te
 /* ---- 단독(로컬) 모드 ---- */
 const LocalSync = () => {
   const key = ()=> `coffee_local_${ROOM}_${todayKey()}`;
-  function read(){ try{ const r=localStorage.getItem(key()); if(r) return JSON.parse(r);}catch(e){} return {session:emptySession(),orders:{}}; }
+  function read(){ try{ const r=localStorage.getItem(key()); if(r){ const d=JSON.parse(r); if(Array.isArray(d.servings)) return d; } }catch(e){} return {servings:[]}; }
   function write(d){ localStorage.setItem(key(), JSON.stringify(d)); apply(d); }
-  function apply(d){ SESSION=d.session; ORDERS=d.orders; applyCafeGlobals(); }
+  function apply(d){ setServings((d.servings||[]).map(s=>({seq:s.seq,state:s.state,hostId:s.hostId,cafeId:s.cafeId||null,closeAt:s.closeAt,orders:s.orders||{}}))); }
+  const nextSeq = d => d.servings.reduce((m,s)=>Math.max(m,s.seq),0)+1;
   return {
     shared:false,
     async init(cb){ onChange=cb;
@@ -397,12 +422,13 @@ const LocalSync = () => {
     async reload(){ apply(read()); },
     async resubscribe(){ apply(read()); },
     pause(){},
-    async claim(me,cafeId){ const d=read(); if(d.session.state!=="idle") { apply(d); return false; } d.session={state:"open",hostId:me,closeAt:null,cafeId:cafeId||null}; write(d); return true; },
-    async unclaim(){ const d=read(); d.session=emptySession(); write(d); }, // 주문은 보존
-    async close(){ const d=read(); d.session.state="closed"; write(d); },
-    async reopen(){ const d=read(); d.session.state="open"; write(d); },
-    async setOrder(me,o){ const d=read(); d.orders[me]=o; write(d); },
-    async removeOrder(me){ const d=read(); delete d.orders[me]; write(d); },
+    async startServing(me,cafeId){ const d=read(); if(d.servings.some(s=>s.state==="open")){ apply(d); return 0; } const ns=nextSeq(d); d.servings.push({seq:ns,state:"open",hostId:me,cafeId:cafeId||null,closeAt:null,orders:{}}); write(d); return ns; },
+    async claim(me,cafeId){ const d=read(); const o=d.servings.find(s=>s.state==="open"); if(o){ if(o.hostId){ apply(d); return false; } o.hostId=me; if(!o.cafeId) o.cafeId=cafeId||null; write(d); return true; } const ns=nextSeq(d); d.servings.push({seq:ns,state:"open",hostId:me,cafeId:cafeId||null,closeAt:null,orders:{}}); write(d); return true; },
+    async unclaim(seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq); if(!s){ apply(d); return; } if(!s.orders||!Object.keys(s.orders).length){ d.servings=d.servings.filter(x=>x.seq!==seq); } else { s.hostId=null; } write(d); }, // 빈 섬김 삭제/주문 있으면 인계
+    async close(seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq); if(s){ s.state="closed"; s.closeAt=Date.now(); } write(d); },
+    async reopen(seq){ const d=read(); if(d.servings.some(s=>s.state==="open"&&s.seq!==seq)){ apply(d); throw new Error("다른 섬김이 열려 있어요"); } const s=d.servings.find(x=>x.seq===seq); if(s){ s.state="open"; s.closeAt=null; } write(d); },
+    async setOrder(me,o,seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq)||d.servings.find(x=>x.state==="open"); if(!s){ apply(d); return; } s.orders=s.orders||{}; s.orders[me]=o; write(d); },
+    async removeOrder(me,seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq)||d.servings.find(x=>x.state==="open"); if(s&&s.orders){ delete s.orders[me]; } write(d); },
   };
 };
 
@@ -415,17 +441,19 @@ const SupabaseSync = () => {
   let pollTimer=null;
   function startPolling(){ stopPolling(); pollTimer=setInterval(async()=>{ if(document.hidden) return; try{ await reload(); onChange(); }catch(e){} }, 12000); }
   function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
-  function applyRoomData(s, os){
-    SESSION = s ? { state:s.state, hostId:s.host_id, closeAt:s.close_at, cafeId:s.cafe_id||null } : emptySession();
-    ORDERS = {};
-    (os||[]).forEach(r=>{ ORDERS[r.member_id] = { type:r.type, menuId:r.menu_id, menuName:r.menu_name||"", temp:r.temp, extras:r.extras||[], note:r.note||"" }; });
-    applyCafeGlobals();
-  }
   async function reload(){
-    // room_id를 아는 사람만 읽는 RPC(열거 불가). 실패 시 직접 SELECT로 우회하지 않는다.
-    const { data, error } = await client.rpc("get_room_day",{p_room:ROOM,p_date:date()});
-    if(error) throw error;
-    applyRoomData((data&&data.session)||null, (data&&data.orders)||[]);
+    // 하루 전체 섬김을 1회 조회(열거 불가 RPC). get_day 없으면 옛 get_room_day로 폴백(단일 섬김).
+    const { data, error } = await client.rpc("get_day",{p_room:ROOM,p_date:date()});
+    if(error){
+      if(error.code==="PGRST202"){
+        const r = await client.rpc("get_room_day",{p_room:ROOM,p_date:date()}); if(r.error) throw r.error;
+        const s=r.data&&r.data.session;
+        setServings(s ? [{seq:s.seq||1, state:s.state, hostId:s.host_id, cafeId:s.cafe_id||null, closeAt:s.close_at, orders:ordersObj(r.data.orders)}] : []);
+        lastSyncAt=Date.now(); return;
+      }
+      throw error;
+    }
+    setServings(servingsFromDB(data&&data.servings));
     lastSyncAt=Date.now();
   }
   return {
@@ -434,24 +462,22 @@ const SupabaseSync = () => {
     reload,
     async resubscribe(){ await reload(); startPolling(); },
     pause(){ stopPolling(); },
-    async claim(me,cafeId){
-      // 경쟁 안전 클레임 — definer RPC(반환=성공여부)
+    async startServing(me,cafeId){   // 새 섬김 시작 → 새 seq 반환(0=이미 열린 섬김 있음)
+      const { data, error } = await client.rpc("start_serving",{p_room:ROOM,p_date:date(),p_me:me,p_cafe:cafeId||null});
+      if(error) throw error; await reload(); return data|0;
+    },
+    async claim(me,cafeId){          // 열린(호스트 없는) 섬김 인계
       const { data, error } = await client.rpc("claim_host",{p_room:ROOM,p_date:date(),p_me:me,p_cafe:cafeId||null});
-      if(error) throw error;
-      await reload();
-      return !!data;
+      if(error) throw error; await reload(); return !!data;
     },
-    async unclaim(){ // 주문은 보존 — 다른 분이 다시 섬기기로 하면 그대로 유지
-      const {error}=await client.rpc("set_room_state",{p_room:ROOM,p_date:date(),p_state:"idle"}); if(error) throw error;
-      await reload();
-    },
-    async close(){ const {error}=await client.rpc("set_room_state",{p_room:ROOM,p_date:date(),p_state:"closed"}); if(error) throw error; await reload(); },
-    async reopen(){ const {error}=await client.rpc("set_room_state",{p_room:ROOM,p_date:date(),p_state:"open"}); if(error) throw error; await reload(); },
-    async setOrder(me,o){
-      const {error}=await client.rpc("set_order",{p_room:ROOM,p_date:date(),p_member_id:me,p_type:o.type,p_menu_id:o.menuId||null,p_menu_name:o.menuName||null,p_temp:o.temp||null,p_extras:o.extras||[],p_note:o.note||""}); if(error) throw error;
+    async unclaim(seq){ const {error}=await client.rpc("unclaim_serving",{p_room:ROOM,p_date:date(),p_seq:seq}); if(error) throw error; await reload(); },
+    async close(seq){ const {error}=await client.rpc("set_serving_state",{p_room:ROOM,p_date:date(),p_seq:seq,p_state:"closed"}); if(error) throw error; await reload(); },
+    async reopen(seq){ const {error}=await client.rpc("set_serving_state",{p_room:ROOM,p_date:date(),p_seq:seq,p_state:"open"}); if(error) throw error; await reload(); },
+    async setOrder(me,o,seq){
+      const {error}=await client.rpc("set_order",{p_room:ROOM,p_date:date(),p_member_id:me,p_type:o.type,p_menu_id:o.menuId||null,p_menu_name:o.menuName||null,p_temp:o.temp||null,p_extras:o.extras||[],p_note:o.note||"",p_seq:seq}); if(error) throw error;
       await reload();
     },
-    async removeOrder(me){ const {error}=await client.rpc("remove_order",{p_room:ROOM,p_date:date(),p_member_id:me}); if(error) throw error; await reload(); },
+    async removeOrder(me,seq){ const {error}=await client.rpc("remove_order",{p_room:ROOM,p_date:date(),p_member_id:me,p_seq:seq}); if(error) throw error; await reload(); },
   };
 };
 
@@ -519,8 +545,9 @@ window.addEventListener("popstate",()=>{
 /* ===================== 렌더 ===================== */
 function render(){
   if(!ME || !memberById(ME)){ curView="pick"; renderPickMe(); $bottom.innerHTML=""; return; }
+  projectServing(viewSeq!=null ? viewSeq : activeSeq);   // 현재 볼 섬김으로 투영(활성 or 보고있는 것)
   curView="main"; renderHeader();
-  if(SESSION.state==="idle") renderIdle();
+  if(!SESSION.seq) renderIdle();            // 열린 섬김 없음 = 오늘의 섬김 개요
   else if(SESSION.state==="open") renderOpen();
   else renderClosed();
   renderBottom();
@@ -531,7 +558,7 @@ function renderHeader(){
   const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span> <span class="reload" id="refreshBtn" role="button" aria-label="새로고침" title="새로고침">↻</span>` : `<span class="dot off"></span>이 기기 전용`;
   $app.innerHTML = `
     <header><div class="h-row">
-      <div style="min-width:0;overflow:hidden"><div class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}</div>
+      <div style="min-width:0;overflow:hidden"><div class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</div>
         <div class="date">${prettyDate()} · ${connHtml}</div></div>
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         <div class="me-chip" id="meChip" role="button" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
@@ -591,11 +618,25 @@ function renderPickMe(){
 }
 
 function renderIdle(){
+  const past = SERVINGS.slice().sort((a,b)=>a.seq-b.seq);
+  let list="";
+  if(past.length){
+    list=`<div class="label">오늘의 섬김 (${past.length}회)</div><div class="card" style="padding:6px 14px">`+
+      past.map(s=>{ const h=memberById(s.hostId); const n=servingDrinks(s);
+        const badge = s.state==="open" ? `<span class="pill ordered">진행 중</span>` : `<span class="pill skip">마감</span>`;
+        return `<div class="person"><div class="avatar" style="background:var(--brand-soft);color:var(--brand)">${s.seq}</div>
+          <div style="min-width:0"><div class="pname">${s.seq}번째 섬김 ${badge}</div>
+          <div class="pmenu">${h?esc(h.name)+"님 · ":""}총 ${n}잔</div></div>
+          <button class="btn btn-sm btn-soft viewserv" data-seq="${s.seq}">보기</button></div>`;
+      }).join("")+`</div>`;
+  }
   view().innerHTML=`
     <div class="card banner"><div class="emoji">🫧</div>
-      <h2>오늘은 아직<br>섬기기로 하신 분이 없어요</h2>
-      <p>오늘 음료로 섬겨주실 분은 아래 버튼을 눌러주세요</p></div>
-    <p class="muted center">버튼을 누르면 <b>${esc(meName())}</b>님이 오늘 섬기는 분으로 확정되고,<br>구성원들에게 주문이 열립니다.</p>`;
+      <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
+      <p>오늘 음료로 섬겨주실 분은 아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
+    ${list}
+    <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>님이 시작하면 이번 섬김의 주문이 열립니다.</p>`;
+  view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
 
 let forceGrid=false;
@@ -640,12 +681,12 @@ function renderOpen(){
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null); else t.onclick=()=>openOrderSheet(t.dataset.id,null); });
-  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"}))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
+  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } }));
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } }));
 }
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
@@ -686,9 +727,9 @@ function openOrderSheet(menuId, existing){
       else { extras.push(v); const opp=EXCLUSIVE_EXTRAS[v]; if(opp){ const j=extras.indexOf(opp); if(j>=0) extras.splice(j,1); } }   // 배반 옵션 자동 해제
       note=document.getElementById("note").value; draw(); });
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
-      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note}))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
+      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note},SESSION.seq))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
-    const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
+    const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
   }
   draw();
 }
@@ -714,7 +755,7 @@ function openCustomSheet(existing){
   document.getElementById("cAdd").onclick=async()=>{ const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
     if(!name){ toast("메뉴 이름을 입력해주세요"); return; }
     forceGrid=false;
-    if(!(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note})))) return;
+    if(!(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note},SESSION.seq)))) return;
     bumpFreq("c:"+name);
     // 직접입력 메뉴는 이 셀 주문(menu_name)으로만 저장 — 그날 이 셀 그리드에 표시(customMenusFromOrders).
     // (공유 카페로의 자동 승격은 익명 오염 방지를 위해 제거; 카페 공식 메뉴 추가는 관리자만)
@@ -765,7 +806,7 @@ function renderClosed(){
   const host=memberById(SESSION.hostId);
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">✅</div>
-      <h2>오늘 주문 마감</h2>
+      <h2>${SESSION.seq?SESSION.seq+"번째 섬김 ":""}주문 마감</h2>
       <p>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다 · `:``}총 ${countDrinks()}잔</p></div>
     ${dashboardHtml()}`;
   wireDashboard();
@@ -823,10 +864,11 @@ function cafeText(){
 }
 function renderHostView(){
   if(curView!=="host") pushSub();   // 현황 진입 시 1회만 history 적재(실시간 재렌더 땐 안 함)
+  projectServing(viewSeq!=null ? viewSeq : activeSeq);
   curView="host"; renderHeader();
   const host=memberById(SESSION.hostId);
   view().innerHTML=`<div class="row-between" style="margin-bottom:12px">
-      <div><b style="font-size:17px">주문 현황</b> <span class="muted">· 섬기는 분: ${host?esc(host.name)+"님":"—"}</span></div>
+      <div><b style="font-size:17px">${SESSION.seq?SESSION.seq+"번째 섬김 ":""}현황</b> <span class="muted">· 섬기는 분: ${host?esc(host.name)+"님":"—"}</span></div>
       <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
   document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
   wireDashboard(); renderBottom(true);
@@ -834,28 +876,46 @@ function renderHostView(){
 
 /* ---------- 하단 액션바 ---------- */
 function renderBottom(inHostView){
-  const amHost=SESSION.hostId===ME; let html="";
-  if(SESSION.state==="idle"){ html=`<button class="btn btn-brand" id="claim">🙋 오늘은 제가 섬기겠습니다</button>`; }
-  else if(SESSION.state==="open"){
-    if(amHost){ html=inHostView
+  const s=SESSION; const amHost=s.hostId===ME; let html="";
+  if(!s.seq){                                   // 열린 섬김 없음(개요) → 새 섬김 시작
+    html=`<button class="btn btn-brand" id="startserv">☕ 오늘 섬기기 시작</button>`;
+  } else if(s.state==="open"){
+    if(!s.hostId){                              // 호스트 없는(인계 대기) 열린 섬김 → 누구나 이어받기
+      html=`<button class="btn btn-brand" id="takeover">🙋 제가 이어서 섬길게요</button>`;
+    } else if(amHost){ html=inHostView
         ? `<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`
-        : `<button class="btn btn-soft" id="hostView">📊 현황 (${countDrinks()}잔)</button><button class="btn btn-brand" id="close">마감</button>`; }
-    else html=`<button class="btn btn-soft" id="hostView">📊 현황 보기 · 총 ${countDrinks()}잔</button>`;
-  } else { html = amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`; }
+        : `<button class="btn btn-soft" id="hostView">📊 현황 (${countDrinks()}잔)</button><button class="btn btn-brand" id="close">마감</button>`;
+    } else html=`<button class="btn btn-soft" id="hostView">📊 현황 보기 · 총 ${countDrinks()}잔</button>`;
+  } else {                                       // closed(섬김 보기 중)
+    html = (amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`)
+         + `<button class="btn btn-soft" id="toOverview">오늘의 섬김</button>`;
+  }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
-  bind("claim",()=>{ if(CAFE_LIST.length<=1) doClaim((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
-  bind("unclaim",async()=>{ if(await askConfirm("오늘 섬김을 취소할까요?\n(다른 분이 다시 섬기기로 하면 지금까지 받은 주문은 그대로 유지됩니다)",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim())) render(); }});
-  bind("close",async()=>{ if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'를 누르면 다시 열어 수정할 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close())) render(); }});
-  bind("reopen",async()=>{ if(await safeWrite(Sync.reopen())) render(); });
+  bind("startserv",()=>{ if(CAFE_LIST.length<=1) doStartServing((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
+  bind("takeover",()=>doClaim(SESSION.cafeId||(CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
+  bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("이 섬김을 취소할까요?\n(주문이 있으면 다른 분이 이어받게 남고, 없으면 이 섬김은 사라져요)",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
+  bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ viewSeq=seq; render(); } }});
+  bind("reopen",async()=>{ const seq=SESSION.seq; if(await safeWrite(Sync.reopen(seq),"다시 열 수 없어요 — 다른 섬김이 진행 중입니다")){ viewSeq=null; render(); } });
   bind("hostView",()=>renderHostView());
+  bind("toOverview",()=>{ viewSeq=null; render(); });
 }
 function bind(id,fn){ const el=document.getElementById(id); if(el) el.onclick=fn; }
 
 /* ---------- 클레임 시 카페 선택 ---------- */
-async function doClaim(cafeId){
-  await guardWrite(async()=>{   // 이중 클레임 방지
+async function doStartServing(cafeId){   // 새 섬김 시작(순차: 열린 섬김 있으면 거부)
+  await guardWrite(async()=>{
+    toast("시작하는 중…");
+    try{ const seq=await Sync.startServing(ME, cafeId);
+      if(seq){ viewSeq=null; toast(meName()+"님이 "+seq+"번째 섬김을 시작했어요 🙏"); }
+      else toast("이미 진행 중인 섬김이 있어요");
+      render();
+    }catch(e){ console.error(e); toast("시작 실패 — 다시 시도해주세요"); render(); }
+  });
+}
+async function doClaim(cafeId){   // 호스트 없는 열린 섬김 이어받기(인계)
+  await guardWrite(async()=>{
     toast("저장 중…");
-    try{ const ok=await Sync.claim(ME, cafeId); toast(ok ? (meName()+"님이 오늘 섬기는 분으로 설정됐어요") : "앗, 방금 다른 분이 먼저 섬기기로 하셨어요!"); render(); }
+    try{ const ok=await Sync.claim(ME, cafeId); viewSeq=null; toast(ok ? (meName()+"님이 이어서 섬겨요 🙏") : "앗, 방금 다른 분이 먼저 이어받으셨어요!"); render(); }
     catch(e){ console.error(e); toast("저장 실패 — 다시 시도해주세요"); render(); }
   });
 }
@@ -871,7 +931,7 @@ function openClaimCafeSheet(){
       <button class="btn btn-brand" id="goClaim">🎉 '${esc((CAFES[cafeId]||{}).name||"")}'(으)로 섬김 시작하기</button>
       <div style="height:8px"></div><button class="btn btn-ghost" id="claimClose">닫기</button>`);
     document.getElementById("cafechips").querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; draw(); });
-    document.getElementById("goClaim").onclick=()=>{ closeSheet(); doClaim(cafeId); };
+    document.getElementById("goClaim").onclick=()=>{ closeSheet(); doStartServing(cafeId); };
     document.getElementById("claimClose").onclick=closeSheet;
   }
   draw();
@@ -920,9 +980,9 @@ async function saveMembers(arr, actor){
     const fresh=await fetchCell(CELL.id); if(fresh) CELL=fresh;
   } else { CELL.members=arr; DB_CELLS[CELL.id]=CELL; localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS)); }
   applyCellGlobals(); rememberCell(CELL);
-  // 호스트가 명단에서 빠지면 세션이 open으로 잠겨 아무도 마감 못 함 → 자동 해제(idle)
-  if(SESSION && SESSION.state!=="idle" && SESSION.hostId && !memberById(SESSION.hostId)){
-    try{ await Sync.unclaim(); }catch(e){}
+  // 호스트가 명단에서 빠지면 섬김이 open으로 잠겨 아무도 마감 못 함 → 자동 해제(주문 있으면 인계 대기)
+  if(activeSeq!=null && SESSION.hostId && !memberById(SESSION.hostId)){
+    try{ await Sync.unclaim(activeSeq); }catch(e){}
   }
   return true;
 }
