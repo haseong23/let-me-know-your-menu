@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.40";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.41";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -145,7 +145,7 @@ const CONFIG = {
 // CAFE GIL 전체 메뉴 (가격 제외). popular=기본 그리드에 노출. temps=[] 는 온도선택 없음(디저트)
 const GIL_MENUS = [
   // 커피·에스프레소
-  { id:"americano", name:"아메리카노", emoji:"☕", cat:"coffee", temps:["ICE","HOT"], extras:["연하게","샷추가"], popular:true },
+  { id:"americano", name:"아메리카노", emoji:"☕", cat:"coffee", temps:["ICE","HOT"], extras:["연하게","샷추가","물적게","물많이"], popular:true },
   { id:"espresso", name:"에스프레소", emoji:"☕", cat:"coffee", temps:["HOT"], extras:["샷추가"] },
   { id:"conpanna", name:"에스프레소 콘파나", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[] },
   // 라떼
@@ -649,7 +649,7 @@ function renderOpen(){
 }
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
-const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가", "얼음적게":"얼음많이", "얼음많이":"얼음적게", "우유적게":"우유많이", "우유많이":"우유적게" };
+const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가", "얼음적게":"얼음많이", "얼음많이":"얼음적게", "우유적게":"우유많이", "우유많이":"우유적게", "물적게":"물많이", "물많이":"물적게" };
 function openOrderSheet(menuId, existing){
   let temp = existing&&existing.temp ? existing.temp : null;
   let extras = existing&&existing.extras ? [...existing.extras] : [];
