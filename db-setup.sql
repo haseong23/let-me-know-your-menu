@@ -56,7 +56,7 @@ create table if not exists public.cafe_menus (
   primary key (cafe_id, menu_id)
 );
 
--- 셀원 편집 감사 로그: 누가(자기신고 이름/'관리자') 무엇을(추가/이름변경/삭제) 바꿨는지.
+-- 구성원 편집 감사 로그: 누가(자기신고 이름/'관리자') 무엇을(추가/이름변경/삭제) 바꿨는지.
 -- set_members RPC 안에서 old/new diff 를 계산해 자동 기록(정의자 권한으로 RLS 우회 insert).
 create table if not exists public.member_logs (
   id bigint generated always as identity primary key,
