@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.39";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.40";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -622,7 +622,7 @@ function renderOpen(){
     othersHtml=`<div class="label">다른 분 주문 · [나도] 누르면 같은 걸로</div>
       <div class="card" style="padding:6px 14px">${others.map(m=>{ const o=ORDERS[m.id], d=orderDisplay(o);
         return `<div class="person"><div class="avatar">${esc(initials(m.name))}</div>
-          <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}</div></div>
+          <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}</div>${o.note?`<div class="pmenu">📝 ${esc(o.note)}</div>`:''}</div>
           <button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button></div>`;}).join("")}</div>`;
   }
   const gridHtml = showGrid ? `
