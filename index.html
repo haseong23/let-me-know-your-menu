@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.38";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.39";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -649,7 +649,7 @@ function renderOpen(){
 }
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
-const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가" };
+const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가", "얼음적게":"얼음많이", "얼음많이":"얼음적게", "우유적게":"우유많이", "우유많이":"우유적게" };
 function openOrderSheet(menuId, existing){
   let temp = existing&&existing.temp ? existing.temp : null;
   let extras = existing&&existing.extras ? [...existing.extras] : [];
@@ -658,7 +658,10 @@ function openOrderSheet(menuId, existing){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
     const caf = ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능
-    const availExtras = (caf?["디카페인"]:[]).concat(m.extras||[]);
+    const isLatte = ["latte","tealatte","fruitlatte"].includes(m.cat) || /라떼|밀크/.test(m.name||""); // 라떼류 = 우유 조절
+    const milkOpts = isLatte ? ["우유적게","우유많이"] : [];
+    const iceOpts  = (temp==="ICE") ? ["얼음적게","얼음많이"] : [];   // 얼음은 ICE 주문일 때만
+    const availExtras = (caf?["디카페인"]:[]).concat(m.extras||[]).concat(milkOpts).concat(iceOpts);
     extras = extras.filter(x=>availExtras.includes(x));
     const tempHtml = m.temps.length>1
       ? `<div class="seg-temp" id="temps">${m.temps.map(t=>`<button class="tbtn ${t==='ICE'?'ice':'hot'} ${t===temp?'on':''}" data-t="${t}">${t==='ICE'?'🧊 ICE':'🔥 HOT'}</button>`).join("")}</div>`
@@ -671,7 +674,7 @@ function openOrderSheet(menuId, existing){
       <div class="grid">${gridTilesHtml(menuId)}</div>
       ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
       ${availExtras.length?`<div class="label">옵션 (여러 개 가능)</div><div class="chips" id="extras">${availExtras.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`:""}
-      <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 얼음 적게" value="${esc(note)}" />
+      <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
       <div style="height:18px"></div>
       <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
       <div style="height:8px"></div>
