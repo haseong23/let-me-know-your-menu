@@ -151,7 +151,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.46";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.47";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1284,6 +1284,8 @@ async function renderAdminDash(){
           <button class="btn btn-soft btn-sm copylink" data-url="${esc(url)}">📋 링크</button>
           <button class="btn btn-soft btn-sm editcell" data-id="${esc(c.id)}">✏️ 수정</button>
           ${SHARED?`<button class="btn btn-soft btn-sm logcell" data-id="${esc(c.id)}">🕘 내역</button>`:''}
+          ${SHARED?`<button class="btn btn-soft btn-sm servcell" data-id="${esc(c.id)}">🧹 섬김정리</button>`:''}
+          ${SHARED&&!c.builtin?`<button class="btn btn-soft btn-sm renamecell" data-id="${esc(c.id)}">🔗 주소변경</button>`:''}
           ${c.builtin?'':`<button class="btn btn-danger btn-sm delcell" data-id="${esc(c.id)}">삭제</button>`}
         </div>
       </div></div>`;
@@ -1307,6 +1309,8 @@ async function renderAdminDash(){
   $app.querySelectorAll(".copylink").forEach(b=> b.onclick=()=>copyText(b.dataset.url,"링크 복사됨"));
   $app.querySelectorAll(".editcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openEditCellSheet(c); });
   $app.querySelectorAll(".logcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openCellLogSheet(c); });
+  $app.querySelectorAll(".servcell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openServingAdminSheet(c); });
+  $app.querySelectorAll(".renamecell").forEach(b=> b.onclick=()=>{ const c=cells.find(x=>x.id===b.dataset.id); if(c) openRenameCellSheet(c); });
   $app.querySelectorAll(".delcell").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 셀을 삭제할까요?\n지난 주문 데이터는 남지만 링크 접근은 막힙니다.",{ok:"삭제",danger:true}))) return;
     if(SHARED){ const {error}=await Sync.client.from("cells").delete().eq("id",b.dataset.id); if(error){ toast("삭제 실패: "+(error.message||"")); return; } }
     delete DB_CELLS[b.dataset.id]; if(!SHARED) localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS));
@@ -1382,6 +1386,63 @@ function menuByMemberHtml(c){
     <div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🥤 사람별 메뉴</b>
       <span class="muted" style="font-size:11px">이 기간 주문 횟수</span></div>${rows}`;
 }
+// 셀 카드 1개 (관리자 대시보드·셀 단위 대시보드 공용)
+function dashCardHtml(c, opts){ opts=opts||{};
+  const used=c.used_days||0, servings=c.servings_total||0;
+  const meta = opts.showCode ? ` · 초대코드 ${esc(c.cell_id)} · ${c.member_count||0}명` : ` · ${c.member_count||0}명`;
+  return `<div class="card" style="padding:14px 16px 12px">
+    <div class="row-between" style="margin-bottom:6px">
+      <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
+        <span class="muted" style="font-size:12px">${meta}</span></div>
+      <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
+    </div>
+    <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--gray)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행중</span>)</span></div>
+    ${usageBarsHtml(c.days)}
+    <div style="height:10px"></div>
+    ${serveRankHtml(c)}
+    ${attendMatrixHtml(c)}
+    ${menuByMemberHtml(c)}
+  </div>`;
+}
+// 셀 단위 대시보드 — ?cell=<id>&view=dashboard (관리자 로그인 없이 그 셀만)
+async function renderCellDashboard(cellId){
+  inPicker=false; adminMode=false; curView="celldash"; $bottom.innerHTML="";
+  const cellLink=`${esc(location.pathname)}?cell=${esc(cellId)}`;
+  if(!SHARED){
+    $app.innerHTML=`<header><div class="room-name" style="padding-top:6px">📊 대시보드</div>
+      <div class="date">공유(Supabase 연결) 환경에서만 동작해요</div></header>`;
+    return;
+  }
+  $app.innerHTML=`
+    <header><div class="h-row"><div><div class="room-name">📊 대시보드</div><div class="date">불러오는 중…</div></div>
+      <a href="${cellLink}" class="nav-link" style="font-size:14px">← 셀로</a></div></header>
+    <div class="loading"><div class="spinner"></div>집계하는 중…</div>`;
+  let payload=null, err=null;
+  try{ const {data,error}=await Sync.client.rpc("get_cell_dashboard",{p_cell:cellId,p_days:dashDays}); if(error) throw error; payload=data; }
+  catch(e){ err=e; }
+  if(err){
+    $app.innerHTML=`<header><div class="room-name" style="padding-top:6px">📊 대시보드</div><div class="date">불러오기 실패</div></header>
+      <div class="card"><p class="muted" style="margin:0;line-height:1.7">집계 함수를 불러오지 못했어요.<br><b>db-migration-admin-dashboard.sql</b> 을 Supabase에서 실행했는지 확인해주세요.<br><br><span style="font-size:12px;color:var(--red)">${esc(err.message||String(err))}</span></p></div>
+      <p class="center" style="margin-top:12px"><a href="${cellLink}" class="nav-link">← 셀로 돌아가기</a></p>`;
+    return;
+  }
+  if(!payload || !payload.cell){
+    $app.innerHTML=`<header><div class="room-name" style="padding-top:6px">📊 대시보드</div><div class="date">셀을 찾을 수 없어요</div></header>
+      <div class="card"><p class="muted center" style="margin:0;padding:8px 0">이 링크의 셀을 찾을 수 없어요. 링크를 다시 확인해주세요.</p></div>
+      <p class="center" style="margin-top:12px"><a href="${esc(location.pathname)}" class="nav-link">← 처음으로</a></p>`;
+    return;
+  }
+  const c=payload.cell, today=(payload&&payload.today)||todayKey();
+  const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
+  $app.innerHTML=`
+    <header><div class="h-row"><div style="min-width:0"><div class="room-name">📊 ${esc(c.name)}</div>
+      <div class="date">${esc(today)} 기준 · 우리 셀 현황</div></div>
+      <a href="${cellLink}" class="nav-link" style="font-size:14px">← 셀로</a></div></header>
+    <div class="tabs" id="dashTabs">${tabBtn(7)}${tabBtn(30)}</div>
+    ${dashCardHtml(c,{showCode:false})}
+    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날 · 누적 출석은 표시 기간과 무관하게 전체</p>`;
+  $app.querySelectorAll("#dashTabs .tab").forEach(t=> t.onclick=()=>{ const n=+t.dataset.days; if(n!==dashDays){ dashDays=n; renderCellDashboard(cellId); } });
+}
 async function renderAdminDashboard(){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
   if(curView!=="admindash") pushSub();
@@ -1408,22 +1469,8 @@ async function renderAdminDashboard(){
   const cells=(payload&&payload.cells)||[];
   const today=(payload&&payload.today)||todayKey();
   const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
-  const cardsHtml = cells.length ? cells.map(c=>{
-    const used=c.used_days||0, servings=c.servings_total||0;
-    return `<div class="card" style="padding:14px 16px 12px">
-      <div class="row-between" style="margin-bottom:6px">
-        <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
-          <span class="muted" style="font-size:12px"> · 초대코드 ${esc(c.cell_id)} · ${c.member_count||0}명</span></div>
-        <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
-      </div>
-      <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--gray)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행중</span>)</span></div>
-      ${usageBarsHtml(c.days)}
-      <div style="height:10px"></div>
-      ${serveRankHtml(c)}
-      ${attendMatrixHtml(c)}
-      ${menuByMemberHtml(c)}
-    </div>`;
-  }).join("") : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
+  const cardsHtml = cells.length ? cells.map(c=>dashCardHtml(c,{showCode:true})).join("")
+    : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
 
   $app.innerHTML=`
     <header><div class="h-row"><div><div class="room-name">📊 대시보드</div>
@@ -1454,6 +1501,74 @@ async function openCellLogSheet(cell){
     <div style="height:10px"></div><button class="btn btn-ghost" id="lclose">닫기</button>`);
   document.getElementById("lclose").onclick=closeSheet;
 }
+// 섬김 정리(관리자) — 셀의 섬김 목록 + 특정 섬김 삭제(실수 데이터 정리)
+async function openServingAdminSheet(cell){
+  openSheet(`<h3>🧹 ${esc(cell.name)} · 섬김 정리</h3><p class="muted" style="margin-top:0">불러오는 중…</p>`);
+  async function draw(){
+    let list=[];
+    try{ const {data,error}=await Sync.client.rpc("admin_list_servings",{p_room:cell.roomId||cell.id}); if(error) throw error; list=data||[]; }
+    catch(e){
+      openSheet(`<h3>🧹 ${esc(cell.name)} · 섬김 정리</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}<br><br><b>db-migration-admin-tools.sql</b> 실행 여부를 확인해주세요.</p><button class="btn btn-ghost" id="sclose">닫기</button>`);
+      document.getElementById("sclose").onclick=closeSheet; return;
+    }
+    const rows = list.length ? list.map(s=>{
+      const host = s.host_id ? esc((memInCell(cell,s.host_id))||s.host_id) : "호스트 없음";
+      const badge = s.state==="open" ? '<span class="pill pending">진행중</span>' : '<span class="pill skip">마감</span>';
+      return `<div class="person" style="align-items:center">
+        <div style="flex:1;min-width:0">
+          <div class="pname">${esc(s.dt)} · ${s.seq}번째 ${badge}</div>
+          <div class="pmenu">주문 ${s.n_orders}건 · ${host}</div>
+        </div>
+        <button class="btn btn-danger btn-sm servdel" data-d="${esc(s.dt)}" data-s="${s.seq}" style="flex:none">삭제</button>
+      </div>`;
+    }).join("") : '<p class="muted center" style="padding:14px 0">섬김 기록이 없어요.</p>';
+    openSheet(`
+      <h3>🧹 ${esc(cell.name)} · 섬김 정리</h3>
+      <p class="muted" style="margin-top:0">실수로 만들어진 섬김을 지웁니다. <b>그 섬김의 주문도 함께 삭제</b>되며 되돌릴 수 없어요.</p>
+      <div class="card" style="padding:2px 14px">${rows}</div>
+      <div style="height:10px"></div><button class="btn btn-ghost" id="sclose">닫기</button>`);
+    document.getElementById("sclose").onclick=closeSheet;
+    $sheet.querySelectorAll(".servdel").forEach(b=> b.onclick=async()=>{
+      if(!(await askConfirm(`${b.dataset.d} · ${b.dataset.s}번째 섬김을 삭제할까요?\n이 섬김의 주문도 함께 지워집니다.`,{ok:"삭제",danger:true}))) return;
+      const {error}=await Sync.client.rpc("admin_delete_serving",{p_room:cell.roomId||cell.id,p_date:b.dataset.d,p_seq:+b.dataset.s});
+      if(error){ toast("삭제 실패: "+(error.message||"")); return; }
+      toast("삭제됨"); draw();
+    });
+  }
+  draw();
+}
+function memInCell(cell,id){ const m=(cell.members||[]).find(x=> (x&&typeof x==="object")? x.id===id : x===id); return m ? (m.name||m) : null; }
+
+// 셀 URL(초대코드) 변경(관리자) — 데이터·대시보드 전부 이관
+function openRenameCellSheet(cell){
+  const old=cell.id;
+  openSheet(`
+    <h3>🔗 주소(초대코드) 변경</h3>
+    <p class="muted" style="margin-top:0"><b>${esc(cell.name)}</b>의 링크를 바꿉니다. 기존 주문·섬김·출석(대시보드)·수정내역이 <b>새 주소로 모두 이관</b>돼요.</p>
+    <div class="banner-warn" style="margin:0 0 10px">⚠️ 예전 링크(<b>${esc(old)}</b>)는 더 이상 열리지 않습니다. 바꾼 뒤 <b>새 링크를 다시 공유</b>하세요.</div>
+    <div class="label">새 초대코드</div>
+    <input type="text" id="newid" maxlength="40" value="${esc(old)}" placeholder="영문 소문자·숫자·하이픈(-)" autocapitalize="off" autocomplete="off" spellcheck="false" />
+    <p class="muted" style="font-size:12px;margin:6px 0 0">2~40자, 소문자/숫자/하이픈만. 새 링크: <span id="prev" style="word-break:break-all;color:var(--brand)"></span></p>
+    <div style="height:16px"></div>
+    <button class="btn btn-brand" id="dorename">주소 변경 + 데이터 이관</button>
+    <div style="height:8px"></div><button class="btn btn-ghost" id="rclose">닫기</button>`);
+  const inp=document.getElementById("newid"), prev=document.getElementById("prev");
+  const norm=v=> (v||"").toLowerCase().replace(/[^a-z0-9-]/g,"");
+  const upd=()=>{ const v=norm(inp.value); if(inp.value!==v) inp.value=v; prev.textContent=`${location.origin}${location.pathname}?cell=${v}`; };
+  inp.oninput=upd; upd();
+  document.getElementById("rclose").onclick=closeSheet;
+  document.getElementById("dorename").onclick=()=>guardWrite(async()=>{
+    const nid=norm(inp.value);
+    if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(nid)){ toast("초대코드 형식을 확인해주세요(2~40자, 소문자/숫자/-)"); return; }
+    if(nid===old){ toast("기존과 다른 주소를 입력해주세요"); return; }
+    if(cellById(nid)){ toast("이미 사용 중인 초대코드예요"); return; }
+    if(!(await askConfirm(`주소를 '${old}' → '${nid}' 로 바꾸고 데이터를 이관할까요?\n예전 링크는 열리지 않게 됩니다.`,{ok:"변경",danger:true}))) return;
+    const {error}=await Sync.client.rpc("admin_rename_cell",{p_old:old,p_new:nid});
+    if(error){ toast("변경 실패: "+(error.message||"")); return; }
+    closeSheet(); toast("주소를 바꾸고 데이터를 이관했어요"); await loadDbCells(); renderAdminDash();
+  });
+}
+
 function renderLogEntry(l){
   const chips=(l.changes||[]).map(c=>
     c.op==="add"    ? `<span class="logchip add">+ ${esc(c.name||"")}</span>` :
@@ -1581,9 +1696,10 @@ function onRemote(){ if(inPicker || adminMode) return;
   if(!SHARED) loadLocalCells();   // 일반 사용자는 전체 셀 열거 안 함(자기 셀만 단건 조회)
   const params=new URLSearchParams(location.search);
   try {
-    if(params.has("admin")){ await renderAdmin(); }   // 숨은 관리자 경로(전체 셀은 여기서만)
+    if(params.has("admin")){ await renderAdmin(); }   // 숨은 관리자 경로(전체 셀 대시보드는 여기)
     else { const target=params.get("cell"); // 바 URL은 최근 셀 자동입장 안 함 — 랜딩만
-      if(target) await enterCell(target);   // ?cell= 링크만 단건 입장
+      if(target && params.get("view")==="dashboard") await renderCellDashboard(target);  // ?cell=..&view=dashboard → 그 셀 대시보드(무로그인)
+      else if(target) await enterCell(target);   // ?cell= 링크만 단건 입장
       else renderCellPicker(); }            // 바 URL → 개발자 메시지/앱 안내 랜딩
   } catch(e){ console.error("초기 렌더 실패",e); }
 })();

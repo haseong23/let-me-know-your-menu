@@ -1,36 +1,31 @@
 -- ============================================================
--- 마이그레이션: 관리자 대시보드 집계 RPC
+-- 마이그레이션: 대시보드 집계 RPC (관리자 전체 + 셀 단위)
 -- Supabase Dashboard > SQL Editor 에 '전체' 붙여넣고 Run.
 -- 재실행 안전(idempotent). 스키마 변경 없음(집계 함수만 추가).
 --
--- 목적: 관리자(로그인/authenticated)만 볼 수 있는 셀 현황 대시보드.
+-- 목적:
 --   1) 셀별 최근 N일(기본 7일, KST) 사용 빈도 — 섬김 오픈/마감 기준
 --   2) 셀별 구성원 출석횟수 — 이 앱에서 의사표현(주문/안마심)한 날 수
+--   3) 사람별 메뉴 주문 횟수 / 섬김(호스트) 횟수
+--
+-- 두 진입점:
+--   - get_admin_dashboard(p_days)          : 관리자(authenticated) 전용, 모든 셀
+--   - get_cell_dashboard(p_cell, p_days)   : 셀 링크(=id) 아는 누구나, 그 셀 1개
+--     (기존 모델과 동일: 셀 링크를 아는 것 = 그 셀 접근 권한)
 --
 -- 보안: sessions/orders 는 anon 직접권한 0(정의자 RPC 전용).
---   이 함수도 authenticated(관리자)에게만 execute 부여 + auth.role() 재확인.
+--   내부 집계 헬퍼 _dashboard_cells 는 클라이언트가 직접 호출 못 하도록 execute 회수.
 -- ============================================================
 begin;
 
-drop function if exists public.get_admin_dashboard(int);
-
-create or replace function public.get_admin_dashboard(p_days int default 7)
+-- ── 내부 헬퍼: 셀(들)의 대시보드 집계 jsonb 배열 ──────────────────
+--   p_cell 이 null 이면 전체 셀, 값이 있으면 그 셀 1개만.
+--   클라이언트 직접 호출 불가(아래 revoke) — 두 래퍼 함수(정의자)만 사용.
+drop function if exists public._dashboard_cells(text,text,text);
+create or replace function public._dashboard_cells(p_cell text, v_from_t text, v_today_t text)
 returns jsonb
-language plpgsql stable security definer set search_path = public as $$
-declare
-  v_days    int  := least(greatest(coalesce(p_days,7),1),31);   -- 1~31일로 제한
-  v_today   date := (now() at time zone 'Asia/Seoul')::date;
-  v_from    date := v_today - (v_days - 1);
-  v_from_t  text := to_char(v_from,  'YYYY-MM-DD');
-  v_today_t text := to_char(v_today, 'YYYY-MM-DD');
-  cells_json jsonb;
-begin
-  -- 관리자만: authenticated 세션이 아니면 거부(grant + 재확인 이중 방어)
-  if auth.role() is distinct from 'authenticated' then
-    raise exception 'admin only';
-  end if;
-
-  select coalesce(jsonb_agg(to_jsonb(c) order by c.name), '[]'::jsonb) into cells_json
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(to_jsonb(c) order by c.name), '[]'::jsonb)
   from (
     select
       cl.id        as cell_id,
@@ -38,7 +33,7 @@ begin
       cl.home_cafe as home_cafe,
       jsonb_array_length(cl.members) as member_count,
 
-      -- (1) 최근 N일 섬김: 날짜별 오픈/마감 수 (실제 섬김이 있는 날만; 없는 날은 클라이언트에서 0 채움)
+      -- (1) 최근 N일 섬김: 날짜별 오픈/마감 수 (실제 섬김이 있는 날만; 없는 날은 클라이언트에서 생략)
       (
         select coalesce(jsonb_agg(jsonb_build_object(
                  'date', d.dt, 'servings', d.cnt, 'closed', d.closed) order by d.dt), '[]'::jsonb)
@@ -62,8 +57,7 @@ begin
         where s.room_id = cl.room_id and s.date >= v_from_t and s.date <= v_today_t
           and s.state in ('open','closed')) as servings_total,
 
-      -- (2) 구성원별: 최근 N일 출석 날짜(dates) + 섬김(호스트) 날짜(serve_dates) + 누적 출석(attend_total).
-      --   출석=그 날 주문/안마심(=의사표현), 섬김=그 날 그 사람이 host_id 인 섬김.
+      -- (2) 구성원별: 최근 N일 출석 날짜(dates) + 섬김(호스트) 날짜(serve_dates) + 누적 출석 + 메뉴 주문 횟수
       (
         select coalesce(jsonb_agg(jsonb_build_object(
                  'member_id',    m.id,
@@ -107,17 +101,57 @@ begin
         ) mnu on true
       ) as members
     from public.cells cl
+    where p_cell is null or cl.id = p_cell
   ) c;
+$$;
+revoke all on function public._dashboard_cells(text,text,text) from public, anon, authenticated;
 
+-- ── 진입점 1: 관리자 전체 대시보드 (authenticated 전용) ───────────
+drop function if exists public.get_admin_dashboard(int);
+create or replace function public.get_admin_dashboard(p_days int default 7)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_days    int  := least(greatest(coalesce(p_days,7),1),31);   -- 1~31일로 제한
+  v_today   date := (now() at time zone 'Asia/Seoul')::date;
+  v_from_t  text := to_char(v_today - (v_days - 1), 'YYYY-MM-DD');
+  v_today_t text := to_char(v_today, 'YYYY-MM-DD');
+begin
+  -- 관리자만: authenticated 세션이 아니면 거부(grant + 재확인 이중 방어)
+  if auth.role() is distinct from 'authenticated' then
+    raise exception 'admin only';
+  end if;
   return jsonb_build_object(
-    'today', v_today_t,
-    'from',  v_from_t,
-    'days',  v_days,
-    'cells', cells_json
+    'today', v_today_t, 'from', v_from_t, 'days', v_days,
+    'cells', public._dashboard_cells(null, v_from_t, v_today_t)
   );
 end $$;
-
 revoke all on function public.get_admin_dashboard(int) from public, anon;
 grant execute on function public.get_admin_dashboard(int) to authenticated;
+
+-- ── 진입점 2: 셀 단위 대시보드 (셀 링크=id 아는 누구나) ────────────
+drop function if exists public.get_cell_dashboard(text,int);
+create or replace function public.get_cell_dashboard(p_cell text, p_days int default 7)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_days    int  := least(greatest(coalesce(p_days,7),1),31);
+  v_today   date := (now() at time zone 'Asia/Seoul')::date;
+  v_from_t  text := to_char(v_today - (v_days - 1), 'YYYY-MM-DD');
+  v_today_t text := to_char(v_today, 'YYYY-MM-DD');
+  arr jsonb;
+begin
+  if p_cell is null or length(p_cell) = 0 then return null; end if;
+  arr := public._dashboard_cells(p_cell, v_from_t, v_today_t);
+  if arr is null or jsonb_array_length(arr) = 0 then
+    return null;   -- 없는 셀 → 프런트에서 "찾을 수 없음" 처리
+  end if;
+  return jsonb_build_object(
+    'today', v_today_t, 'from', v_from_t, 'days', v_days,
+    'cell', arr->0
+  );
+end $$;
+revoke all on function public.get_cell_dashboard(text,int) from public;
+grant execute on function public.get_cell_dashboard(text,int) to anon, authenticated;
 
 commit;
