@@ -62,30 +62,49 @@ begin
         where s.room_id = cl.room_id and s.date >= v_from_t and s.date <= v_today_t
           and s.state in ('open','closed')) as servings_total,
 
-      -- (2) 구성원 출석: window=최근 N일, total=전체 기간. 출석=그 날 주문/안마심(=의사표현)한 것.
+      -- (2) 구성원별: 최근 N일 출석 날짜(dates) + 섬김(호스트) 날짜(serve_dates) + 누적 출석(attend_total).
+      --   출석=그 날 주문/안마심(=의사표현), 섬김=그 날 그 사람이 host_id 인 섬김.
       (
         select coalesce(jsonb_agg(jsonb_build_object(
-                 'member_id',     m.id,
-                 'name',          m.name,
-                 'attend_window', coalesce(a.aw, 0),
-                 'attend_total',  coalesce(a.total, 0),
-                 'last_date',     a.last_date
-               ) order by coalesce(a.total,0) desc, m.name), '[]'::jsonb)
+                 'member_id',    m.id,
+                 'name',         m.name,
+                 'dates',        att.dates,        -- 최근 N일 출석한 날짜(오름차순)
+                 'serve_dates',  srv.dates,        -- 최근 N일 섬긴 날짜(오름차순)
+                 'attend_total', att.total,        -- 전체 기간 누적 출석일 수
+                 'menus',        mnu.menus         -- 최근 N일 메뉴별 주문 횟수 [{name,count}] (많은 순)
+               ) order by jsonb_array_length(att.dates) desc,
+                          jsonb_array_length(srv.dates) desc, m.name), '[]'::jsonb)
         from (
           -- 멤버(숨은 id/이름). 레거시(문자열=id가 곧 이름)도 정규화.
           select coalesce(e->>'id',   e #>> '{}') as id,
                  coalesce(e->>'name', e #>> '{}') as name
           from jsonb_array_elements(cl.members) e
         ) m
-        left join (
-          select o.member_id,
-                 count(distinct o.date) filter (where o.date >= v_from_t) as aw,
-                 count(distinct o.date)                                    as total,
-                 max(o.date)                                               as last_date
-          from public.orders o
-          where o.room_id = cl.room_id
-          group by o.member_id
-        ) a on a.member_id = m.id
+        left join lateral (
+          select coalesce(jsonb_agg(x.d order by x.d), '[]'::jsonb) as dates,
+                 (select count(distinct o.date) from public.orders o
+                    where o.room_id = cl.room_id and o.member_id = m.id) as total
+          from (select distinct o.date d from public.orders o
+                 where o.room_id = cl.room_id and o.member_id = m.id
+                   and o.date >= v_from_t and o.date <= v_today_t) x
+        ) att on true
+        left join lateral (
+          select coalesce(jsonb_agg(y.d order by y.d), '[]'::jsonb) as dates
+          from (select distinct s.date d from public.sessions s
+                 where s.room_id = cl.room_id and s.host_id = m.id
+                   and s.state in ('open','closed')
+                   and s.date >= v_from_t and s.date <= v_today_t) y
+        ) srv on true
+        left join lateral (
+          -- 이 사람이 최근 N일 무엇을 몇 번 주문했는지(음료만). menu_name 우선, 없으면 menu_id.
+          select coalesce(jsonb_agg(jsonb_build_object('name', z.nm, 'count', z.ct)
+                            order by z.ct desc, z.nm), '[]'::jsonb) as menus
+          from (select coalesce(nullif(o.menu_name,''), o.menu_id, '기타') as nm, count(*) as ct
+                from public.orders o
+                where o.room_id = cl.room_id and o.member_id = m.id and o.type = 'drink'
+                  and o.date >= v_from_t and o.date <= v_today_t
+                group by 1) z
+        ) mnu on true
       ) as members
     from public.cells cl
   ) c;

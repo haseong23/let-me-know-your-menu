@@ -112,6 +112,26 @@
   #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   #offline.show { display:block; }
   .demo-badge { display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
+  /* 대시보드 */
+  .usage-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0 2px; }
+  .usage { display:inline-flex; gap:8px; align-items:flex-end; height:66px; min-width:100%; padding-bottom:2px; }
+  .ubar { flex:0 0 auto; width:34px; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .ubar-n { font-size:10px; font-weight:800; color:var(--ink); line-height:1; }
+  .ubar-b { width:24px; border-radius:5px 5px 0 0; }
+  .ubar-d { font-size:9.5px; color:var(--sub); line-height:1.2; text-align:center; white-space:nowrap; }
+  .ubar-d .wk { color:var(--gray); }
+  .mx-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.mx { border-collapse:collapse; font-size:12px; }
+  table.mx th, table.mx td { padding:5px 3px; text-align:center; white-space:nowrap; }
+  table.mx th.mx-date { font-weight:700; color:var(--sub); font-size:10px; line-height:1.15; }
+  table.mx th.mx-date .wk { color:var(--gray); }
+  table.mx .mx-name { text-align:left; font-weight:700; color:var(--ink); padding-right:8px; position:sticky; left:0; background:var(--card); max-width:78px; overflow:hidden; text-overflow:ellipsis; }
+  table.mx thead .mx-name, table.mx th.mx-sum { color:var(--sub); font-weight:700; font-size:10px; }
+  table.mx .mx-cell { color:var(--line); font-size:13px; min-width:22px; }
+  table.mx .mx-cell.att { color:var(--brand); }
+  table.mx .mx-cell.srv { color:var(--accent); font-size:13px; }
+  table.mx td.mx-sum { font-weight:800; color:var(--ink); padding-left:8px; position:sticky; right:0; background:var(--card); }
+  table.mx tr + tr td { border-top:1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -131,7 +151,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.43";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.46";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -142,14 +162,27 @@ const CONFIG = {
 };
 
 /* ===================== 고정 데이터 (모든 기기 공통) ===================== */
+// 공용 옵션 그룹 프리셋 — "○○와 동일"인 옵션은 여기 한 곳만 고치면 쓰는 메뉴 전체에 반영.
+// (draw()는 그룹 객체를 읽기만 하므로 여러 메뉴가 참조 공유해도 안전)
+const OPT_SIZE     = { key:"size",     label:"사이즈",   opts:["R","L"], def:"R" };
+const OPT_SHOT     = { key:"shot",     label:"샷",       opts:["기본","1/4샷","1/2샷","1샷 추가","2샷 추가"], def:"기본" };
+const OPT_MILKTYPE = { key:"milktype", label:"우유 종류", opts:["기본","오트밀크"], def:"기본" };
+const OPT_MILK     = { key:"milk",     label:"우유",     opts:["기본","우유 1/3","우유 1/2","우유 많이"], def:"기본" };
+const OPT_ICE      = { key:"ice",      label:"얼음",     opts:["기본","얼음 없이","얼음 1/3","얼음 1/2","얼음 가득"], def:"기본", tempOnly:"ICE" };
 // CAFE GIL 전체 메뉴 (가격 제외). popular=기본 그리드에 노출. temps=[] 는 온도선택 없음(디저트)
 const GIL_MENUS = [
   // 커피·에스프레소
-  { id:"americano", name:"아메리카노", emoji:"☕", cat:"coffee", temps:["ICE","HOT"], extras:["연하게","샷추가","물적게","물많이"], popular:true },
+  { id:"americano", name:"아메리카노", emoji:"☕", cat:"coffee", temps:["ICE","HOT"], decaf:false, extras:[], popular:true,
+    optionGroups:[
+      OPT_SIZE, OPT_SHOT,
+      { key:"water", label:"물", opts:["기본","물 없이","물 1/3","물 1/2","물 가득"], def:"기본" },
+      OPT_ICE,
+    ] },
   { id:"espresso", name:"에스프레소", emoji:"☕", cat:"coffee", temps:["HOT"], extras:["샷추가"] },
   { id:"conpanna", name:"에스프레소 콘파나", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[] },
   // 라떼
-  { id:"caffelatte", name:"카페라떼", emoji:"🥛", cat:"latte", temps:["ICE","HOT"], extras:["연하게","샷추가"], popular:true },
+  { id:"caffelatte", name:"카페라떼", emoji:"🥛", cat:"latte", temps:["ICE","HOT"], extras:[], popular:true,
+    optionGroups:[ OPT_SIZE, OPT_SHOT, OPT_MILKTYPE, OPT_MILK, OPT_ICE ] },
   { id:"cappuccino", name:"카푸치노", emoji:"☕", cat:"latte", temps:["HOT"], extras:["샷추가"] },
   { id:"vanillabean", name:"바닐라빈라떼", emoji:"🍦", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"] },
   { id:"vanilla", name:"바닐라라떼", emoji:"🍦", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"], popular:true },
@@ -285,7 +318,11 @@ async function loadCafeMenus(cafeId){
   if(!SHARED) return [];
   if(CAFEMENU_CACHE[cafeId]) return CAFEMENU_CACHE[cafeId];
   try{ const {data,error}=await Sync.client.from("cafe_menus").select("*").eq("cafe_id",cafeId).limit(500); if(error) throw error;
-    CAFEMENU_CACHE[cafeId]=(data||[]).map(r=>({id:r.menu_id,name:r.name,emoji:r.emoji||"🥤",cat:r.cat||"extra",temps:Array.isArray(r.temps)?r.temps:["ICE","HOT"],extras:Array.isArray(r.extras)?r.extras:[],popular:!!r.popular,sort:r.sort||0}));
+    // 상세 옵션(optionGroups)·디카페인 여부는 코드가 소유 — DB 메뉴에 menu_id로 접목(스키마 변경 없이 상세 옵션 유지)
+    const codeCafe=CAFES[cafeId], codeById={}; (codeCafe&&codeCafe.menus||[]).forEach(m=>{ codeById[m.id]=m; });
+    CAFEMENU_CACHE[cafeId]=(data||[]).map(r=>{ const cm=codeById[r.menu_id]||{};
+      return {id:r.menu_id,name:r.name,emoji:r.emoji||"🥤",cat:r.cat||"extra",temps:Array.isArray(r.temps)?r.temps:["ICE","HOT"],extras:Array.isArray(r.extras)?r.extras:[],popular:!!r.popular,sort:r.sort||0,
+        optionGroups:cm.optionGroups, decaf:cm.decaf}; });
     return CAFEMENU_CACHE[cafeId];
   }catch(e){ CAFEMENU_CACHE[cafeId]=[]; return []; }
 }
@@ -692,6 +729,40 @@ function renderOpen(){
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
 const EXCLUSIVE_EXTRAS = { "샷추가":"연하게", "연하게":"샷추가", "얼음적게":"얼음많이", "얼음많이":"얼음적게", "우유적게":"우유많이", "우유많이":"우유적게", "물적게":"물많이", "물많이":"물적게" };
+
+/* 커피샷/우유 음료 옵션 자동 부여 — 아메리카노/카페라떼를 기준으로 눈치껏.
+   명시 optionGroups가 있으면 그걸 쓰고, 없으면 카테고리·이름으로 판별해 그룹을 구성한다.
+   플래그로 개별 예외 지정 가능: shot:true/false, milk:true/false, decaf:false */
+function menuHasShot(m){                                  // 에스프레소 샷 들어가는 음료
+  if(m.shot===false) return false; if(m.shot===true) return true;
+  if(m.cat==="coffee" || m.cat==="latte") return true;   // 아메리카노·에스프레소·라떼류(에스프레소 베이스)
+  if(m.cat==="icedtea" && /샷/.test(m.name||"")) return true;  // 아샷추
+  return false;
+}
+function menuHasMilk(m){                                  // 우유 들어가는 음료
+  if(m.milk===false) return false; if(m.milk===true) return true;
+  if(m.cat==="latte" || m.cat==="tealatte" || m.cat==="fruitlatte") return true;
+  if(m.cat==="coldbrew" && /라떼|밀크/.test(m.name||"")) return true;  // 콜드브루 라떼/밀크
+  return false;
+}
+function menuTakesDecaf(m){ return m.decaf!==false && (m.cat==="coffee" || m.cat==="latte"); }
+function deriveOptionGroups(m){                           // 명시 그룹 없을 때 자동 구성(범위 밖이면 null)
+  const hasShot=menuHasShot(m), hasMilk=menuHasMilk(m);
+  if(!hasShot && !hasMilk) return null;
+  const canIce=(m.temps||[]).includes("ICE");
+  const g=[];
+  if(hasMilk || canIce) g.push(OPT_SIZE);                // 컵 음료(우유/아이스 가능)만 사이즈
+  if(hasShot) g.push(OPT_SHOT);
+  if(hasMilk){ g.push(OPT_MILKTYPE); g.push(OPT_MILK); }
+  if(canIce) g.push(OPT_ICE);
+  return g.length ? g : null;
+}
+function menuFlatToggles(m){                              // 그룹에 안 담기는 토글(디카페인/덜달게) — 다중선택 유지
+  const t=[];
+  if(menuTakesDecaf(m)) t.push("디카페인");
+  if((m.extras||[]).includes("덜달게")) t.push("덜달게");
+  return t;
+}
 function openOrderSheet(menuId, existing){
   let temp = existing&&existing.temp ? existing.temp : null;
   let extras = existing&&existing.extras ? [...existing.extras] : [];
@@ -699,12 +770,30 @@ function openOrderSheet(menuId, existing){
   function draw(){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
-    const caf = ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능
-    const isLatte = ["latte","tealatte","fruitlatte"].includes(m.cat) || /라떼|밀크/.test(m.name||""); // 라떼류 = 우유 조절
-    const milkOpts = isLatte ? ["우유적게","우유많이"] : [];
-    const iceOpts  = (temp==="ICE") ? ["얼음적게","얼음많이"] : [];   // 얼음은 ICE 주문일 때만
-    const availExtras = (caf?["디카페인"]:[]).concat(m.extras||[]).concat(milkOpts).concat(iceOpts);
-    extras = extras.filter(x=>availExtras.includes(x));
+    // 구조화 옵션(단일선택 그룹): 명시 optionGroups 또는 커피샷/우유 자동 판별. 있으면 그룹+토글, 없으면 기존 flat extras.
+    const allGroups = m.optionGroups || deriveOptionGroups(m) || [];
+    const groups = allGroups.filter(g=> !g.tempOnly || g.tempOnly===temp);
+    const hasGroups = groups.length>0;
+    const flatToggles = hasGroups ? menuFlatToggles(m) : [];   // 디카페인/덜달게(다중선택)
+    let availExtras, optionsHtml="";
+    if(hasGroups){
+      const groupOpts = groups.reduce((a,g)=>a.concat(g.opts.filter(o=>o!==g.def)),[]);  // 기본값은 저장 안 함
+      availExtras = groupOpts.concat(flatToggles);
+      extras = extras.filter(x=>availExtras.includes(x));
+      optionsHtml = groups.map(g=>{
+        const cur = g.opts.find(o=>extras.includes(o)) || g.def;   // 저장된 값 없으면 기본값 선택
+        return `<div class="label">${esc(g.label)}</div><div class="chips optgroup" data-key="${esc(g.key)}">${g.opts.map(o=>`<div class="chip ${o===cur?'sel':''}" data-opt="${esc(o)}">${esc(o)}</div>`).join("")}</div>`;
+      }).join("");
+      if(flatToggles.length) optionsHtml += `<div class="label">추가 옵션 (여러 개 가능)</div><div class="chips" id="extras">${flatToggles.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`;
+    } else {
+      const caf = m.decaf!==false && ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능(단, decaf:false 제외)
+      const isLatte = ["latte","tealatte","fruitlatte"].includes(m.cat) || /라떼|밀크/.test(m.name||""); // 라떼류 = 우유 조절
+      const milkOpts = isLatte ? ["우유적게","우유많이"] : [];
+      const iceOpts  = (temp==="ICE") ? ["얼음적게","얼음많이"] : [];   // 얼음은 ICE 주문일 때만
+      availExtras = (caf?["디카페인"]:[]).concat(m.extras||[]).concat(milkOpts).concat(iceOpts);
+      extras = extras.filter(x=>availExtras.includes(x));
+      optionsHtml = availExtras.length?`<div class="label">옵션 (여러 개 가능)</div><div class="chips" id="extras">${availExtras.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`:"";
+    }
     const tempHtml = m.temps.length>1
       ? `<div class="seg-temp" id="temps">${m.temps.map(t=>`<button class="tbtn ${t==='ICE'?'ice':'hot'} ${t===temp?'on':''}" data-t="${t}">${t==='ICE'?'🧊 ICE':'🔥 HOT'}</button>`).join("")}</div>`
       : m.temps.length===1
@@ -715,7 +804,7 @@ function openOrderSheet(menuId, existing){
       <p class="muted" style="margin-top:0">다른 메뉴로 바꾸려면 아래에서 다시 선택</p>
       <div class="grid">${gridTilesHtml(menuId)}</div>
       ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
-      ${availExtras.length?`<div class="label">옵션 (여러 개 가능)</div><div class="chips" id="extras">${availExtras.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`:""}
+      ${optionsHtml}
       <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
       <div style="height:18px"></div>
       <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
@@ -723,11 +812,18 @@ function openOrderSheet(menuId, existing){
       ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost" id="closeSheet">닫기</button>'}`);
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(); }; });
+    // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
+    $sheet.querySelectorAll(".optgroup").forEach(gEl=>{ const g=groups.find(x=>x.key===gEl.dataset.key); if(!g) return;
+      gEl.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const opt=c.dataset.opt;
+        extras = extras.filter(x=>!g.opts.includes(x));
+        if(opt!==g.def) extras.push(opt);
+        note=document.getElementById("note").value; draw(); }); });
     const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v);
       if(i>=0){ extras.splice(i,1); }
       else { extras.push(v); const opp=EXCLUSIVE_EXTRAS[v]; if(opp){ const j=extras.indexOf(opp); if(j>=0) extras.splice(j,1); } }   // 배반 옵션 자동 해제
       note=document.getElementById("note").value; draw(); });
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
+      if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
       if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note},SESSION.seq))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
@@ -1217,59 +1313,74 @@ async function renderAdminDash(){
     toast("삭제됨"); renderAdminDash(); });
 }
 
-/* ---------- 관리자 대시보드: 셀별 사용 빈도 + 구성원 출석 ---------- */
-let dashDays = 7;   // 조회 기간(일) — 7/14/30 토글
-// 'YYYY-MM-DD' 문자열 today에서 과거로 n일치 날짜 배열(오래된→최신). UTC 파싱으로 타임존 드리프트 방지.
-function lastNDates(todayStr, n){
-  const [y,m,d]=todayStr.split("-").map(Number); const base=Date.UTC(y,m-1,d);
-  const out=[]; for(let i=n-1;i>=0;i--){ const dt=new Date(base - i*86400000);
-    out.push(`${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,"0")}-${String(dt.getUTCDate()).padStart(2,"0")}`); }
-  return out;
-}
-function dashDayLabel(dateStr){ // "7/12(토)" 형태
+/* ---------- 관리자 대시보드: 셀별 사용 빈도 + 섬김 랭킹 + 출석 타임라인 ---------- */
+let dashDays = 7;   // 조회 기간(일) — 7/30 토글
+// 'YYYY-MM-DD' → "7/12<br>(토)" (2줄). UTC 파싱으로 타임존 드리프트 방지.
+function dashColLabel(dateStr){
   const [y,m,d]=dateStr.split("-").map(Number); const dt=new Date(Date.UTC(y,m-1,d));
   const wk=["일","월","화","수","목","금","토"][dt.getUTCDay()];
-  return `${m}/${d}(${wk})`;
+  return `${m}/${d}<br><span class="wk">${wk}</span>`;
 }
-function usageBarsHtml(days, dateList){
-  const byDate={}; (days||[]).forEach(x=>{ byDate[x.date]=x; });
-  const max=Math.max(1, ...dateList.map(dt=>(byDate[dt]?byDate[dt].servings:0)));
-  return `<div style="display:flex;gap:5px;align-items:flex-end;height:64px;margin:4px 0 2px">
-    ${dateList.map(dt=>{ const rec=byDate[dt]; const n=rec?rec.servings:0; const closed=rec?rec.closed:0;
-      const h=n?Math.max(8,Math.round(n/max*54)):3;
-      const isToday=dt===dateList[dateList.length-1];
-      const col = n ? (closed>0?"var(--brand)":"var(--accent)") : "var(--line)";
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0" title="${esc(dt)} · 섬김 ${n}회${closed?` (마감 ${closed})`:''}">
-        <div style="font-size:10px;font-weight:800;color:${n?'var(--ink)':'var(--gray)'};line-height:1">${n||''}</div>
-        <div style="width:100%;max-width:26px;height:${h}px;background:${col};border-radius:4px 4px 0 0;${isToday?'outline:2px solid var(--brand-soft);outline-offset:1px':''}"></div>
-        <div style="font-size:9px;color:var(--sub);line-height:1;white-space:nowrap">${dashDayLabel(dt)}</div>
-      </div>`; }).join("")}
-  </div>`;
+// 사용 빈도 막대 — 데이터(섬김)가 있는 날짜만 나열(빈 날 미표시 → 라벨 잘림 없음). 많으면 가로 스크롤.
+function usageBarsHtml(days){
+  const list=(days||[]).slice().sort((a,b)=> a.date<b.date?-1:1);
+  if(!list.length) return `<div class="muted" style="font-size:12px;padding:6px 0">이 기간 섬김 기록이 없어요</div>`;
+  const max=Math.max(1, ...list.map(x=>x.servings));
+  return `<div class="usage-wrap"><div class="usage">${list.map(x=>{
+    const h=Math.max(8,Math.round(x.servings/max*54));
+    const col=x.closed>0?"var(--brand)":"var(--accent)";
+    return `<div class="ubar" title="${esc(x.date)} · 섬김 ${x.servings}회${x.closed?` (마감 ${x.closed})`:''}">
+      <div class="ubar-n">${x.servings}</div>
+      <div class="ubar-b" style="height:${h}px;background:${col}"></div>
+      <div class="ubar-d">${dashColLabel(x.date)}</div></div>`;
+  }).join("")}</div></div>`;
 }
-function attendCellHtml(c){
-  const total=c.member_count||0;
+// 누가 자주 섬겼는지 — 이 기간 섬김(호스트) 횟수 랭킹 칩
+function serveRankHtml(c){
+  const ranked=(c.members||[]).map(m=>({name:m.name, ct:(m.serve_dates||[]).length}))
+    .filter(x=>x.ct>0).sort((a,b)=> b.ct-a.ct || a.name.localeCompare(b.name,"ko"));
+  const body = ranked.length
+    ? ranked.map((r,i)=>`<span class="logchip ${i===0?'add':''}" style="font-size:12px">${i===0?'👑 ':''}${esc(r.name)} <b>${r.ct}회</b></span>`).join("")
+    : '<span class="muted" style="font-size:12px">이 기간 섬긴 사람이 없어요</span>';
+  return `<div class="muted" style="font-size:12px;margin:2px 0 4px">🙌 이 기간 누가 섬겼나</div>
+    <div class="logchips" style="margin-bottom:8px">${body}</div>`;
+}
+// 누가 언제 출석했는지 — 구성원 × (데이터 있는)날짜 매트릭스. ☕=섬김 / ●=출석 / ·=없음.
+function attendMatrixHtml(c){
   const members=c.members||[];
-  const rows = members.length ? members.map(m=>{
-    const aw=m.attend_window||0, at=m.attend_total||0;
-    const pct=dashDays?Math.round(aw/dashDays*100):0;
-    const barW=Math.min(100,pct);
-    const last=m.last_date?`최근 ${dashDayLabel(m.last_date)}`:"참여 없음";
+  const colSet={}; (c.days||[]).forEach(d=>colSet[d.date]=1);
+  members.forEach(m=>{ (m.dates||[]).forEach(d=>colSet[d]=1); (m.serve_dates||[]).forEach(d=>colSet[d]=1); });
+  const cols=Object.keys(colSet).sort();
+  const title=`<div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">📅 누가 언제 출석했나</b>
+    <span class="muted" style="font-size:11px">☕섬김 · ●출석</span></div>`;
+  if(!cols.length) return title+`<p class="muted center" style="padding:8px 0">이 기간 출석 기록이 없어요</p>`;
+  const head=`<tr><th class="mx-name">구성원</th>${cols.map(d=>`<th class="mx-date">${dashColLabel(d)}</th>`).join("")}<th class="mx-sum">출석·섬김</th></tr>`;
+  const rows=members.length ? members.map(m=>{
+    const att={}; (m.dates||[]).forEach(d=>att[d]=1);
+    const srv={}; (m.serve_dates||[]).forEach(d=>srv[d]=1);
+    const cells=cols.map(d=> srv[d] ? `<td class="mx-cell srv" title="${esc(d)} 섬김">☕</td>`
+      : att[d] ? `<td class="mx-cell att" title="${esc(d)} 출석">●</td>`
+      : `<td class="mx-cell">·</td>`).join("");
+    const aCt=(m.dates||[]).length, sCt=(m.serve_dates||[]).length, at=m.attend_total||0;
+    return `<tr><td class="mx-name" title="${esc(m.name)}">${esc(m.name)}</td>${cells}<td class="mx-sum" title="이 기간 출석 ${aCt} · 섬김 ${sCt} · 누적 출석 ${at}">${aCt}<span class="muted" style="font-weight:600">·</span>☕${sCt}<span class="muted" style="font-weight:600;font-size:10px"> · 누적${at}</span></td></tr>`;
+  }).join("") : `<tr><td class="mx-name">—</td><td class="mx-cell" colspan="${cols.length+1}">구성원이 없어요</td></tr>`;
+  return title+`<div class="mx-wrap"><table class="mx"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+}
+// 사람별로 어떤 메뉴를 몇 번 주문했는지 — 이 기간 기준
+function menuByMemberHtml(c){
+  const members=(c.members||[]).filter(m=>(m.menus||[]).length);
+  if(!members.length) return "";
+  const rows=members.map(m=>{
+    const tot=(m.menus||[]).reduce((s,x)=>s+(x.count||0),0);
+    const chips=(m.menus||[]).map(x=>`<span class="logchip" style="font-size:12px">${esc(x.name)} <b>${x.count}</b></span>`).join("");
     return `<div style="padding:8px 2px;border-bottom:1px solid var(--line)">
-      <div class="row-between" style="gap:8px">
-        <div style="min-width:0;flex:1"><span style="font-weight:700;font-size:14px">${esc(m.name)}</span>
-          <span class="muted" style="font-size:11px"> · ${esc(last)}</span></div>
-        <div style="font-size:13px;font-weight:800;color:var(--brand);white-space:nowrap">${aw}<span class="muted" style="font-weight:600">/${dashDays}일</span> · 누적 ${at}</div>
-      </div>
-      <div style="height:6px;background:var(--brand-soft);border-radius:99px;overflow:hidden;margin-top:5px">
-        <div style="height:100%;width:${barW}%;background:var(--brand);border-radius:99px"></div>
-      </div>
-    </div>`;
-  }).join("") : '<p class="muted center" style="padding:10px 0">구성원이 없어요</p>';
-  return `<div class="card" style="padding:4px 16px 8px">
-    <div class="row-between" style="padding:8px 0 4px">
-      <b style="font-size:13px">👥 구성원 출석 <span class="muted" style="font-weight:600">(최근 ${dashDays}일 / 누적)</span></b>
-      <span class="muted" style="font-size:12px">${total}명</span>
-    </div>${rows}</div>`;
+      <div class="row-between" style="margin-bottom:5px"><span style="font-weight:700;font-size:13px">${esc(m.name)}</span>
+        <span class="muted" style="font-size:11px">총 ${tot}잔</span></div>
+      <div class="logchips">${chips}</div></div>`;
+  }).join("");
+  return `<div style="height:10px"></div>
+    <div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🥤 사람별 메뉴</b>
+      <span class="muted" style="font-size:11px">이 기간 주문 횟수</span></div>${rows}`;
 }
 async function renderAdminDashboard(){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
@@ -1296,20 +1407,21 @@ async function renderAdminDashboard(){
 
   const cells=(payload&&payload.cells)||[];
   const today=(payload&&payload.today)||todayKey();
-  const dateList=lastNDates(today, dashDays);
   const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
   const cardsHtml = cells.length ? cells.map(c=>{
     const used=c.used_days||0, servings=c.servings_total||0;
-    return `<div class="card" style="padding:14px 16px 10px">
-      <div class="row-between" style="margin-bottom:2px">
+    return `<div class="card" style="padding:14px 16px 12px">
+      <div class="row-between" style="margin-bottom:6px">
         <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
-          <span class="muted" style="font-size:12px"> · 초대코드 ${esc(c.cell_id)}</span></div>
+          <span class="muted" style="font-size:12px"> · 초대코드 ${esc(c.cell_id)} · ${c.member_count||0}명</span></div>
         <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
       </div>
-      <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 최근 ${dashDays}일 섬김 <span style="color:var(--gray)">(막대 클릭 없음 · 색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행</span>)</span></div>
-      ${usageBarsHtml(c.days, dateList)}
-      <div style="height:8px"></div>
-      ${attendCellHtml(c)}
+      <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--gray)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행중</span>)</span></div>
+      ${usageBarsHtml(c.days)}
+      <div style="height:10px"></div>
+      ${serveRankHtml(c)}
+      ${attendMatrixHtml(c)}
+      ${menuByMemberHtml(c)}
     </div>`;
   }).join("") : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
 
@@ -1319,7 +1431,7 @@ async function renderAdminDashboard(){
       <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
     <div class="tabs" id="dashTabs">${tabBtn(7)}${tabBtn(30)}</div>
     ${cardsHtml}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날</p>`;
+    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날 · 누적 출석은 매트릭스의 표시 기간과 무관하게 전체</p>`;
   back();
   $app.querySelectorAll("#dashTabs .tab").forEach(t=> t.onclick=()=>{ const n=+t.dataset.days; if(n!==dashDays){ dashDays=n; renderAdminDashboard(); } });
 }
