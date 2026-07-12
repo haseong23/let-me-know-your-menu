@@ -131,7 +131,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.42";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.43";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -539,6 +539,7 @@ window.addEventListener("popstate",()=>{
   if(curView==="host"){ render(); return; }              // 현황 → 주문
   if(curView==="pick" && ME){ render(); return; }         // 이름변경 → 주문
   if(curView==="adminmenu"){ renderAdminDash(); return; } // 메뉴관리 → 관리자
+  if(curView==="admindash"){ renderAdminDash(); return; } // 대시보드 → 관리자
   // main/랜딩/초기 이름선택: 더 빠질 항목 없음 → 브라우저가 그대로 앱 밖으로
 });
 
@@ -1198,11 +1199,13 @@ async function renderAdminDash(){
     </div></header>
     <button class="btn btn-brand" id="admNew">➕ 새 셀 만들기 (초대코드 생성)</button>
     <div style="height:8px"></div>
+    ${SHARED?'<button class="btn btn-soft" id="admDash">📊 대시보드 (사용 현황 · 출석)</button><div style="height:8px"></div>':''}
     <button class="btn btn-soft" id="admMenu">🍽️ 카페 메뉴 관리 (카페길)</button>
     <div style="height:12px"></div>
     <div class="card" style="padding:8px 18px">${rows}</div>
     <p class="muted center" style="margin-top:12px"><a href="${esc(location.pathname)}" style="color:var(--sub)">← 일반 화면으로</a></p>`;
   document.getElementById("admNew").onclick=()=>openCreateCellSheet();
+  const dashBtn=document.getElementById("admDash"); if(dashBtn) dashBtn.onclick=()=>renderAdminDashboard();
   document.getElementById("admMenu").onclick=()=>openCafeMenuAdmin("gil");
   const lo=document.getElementById("admLogout"); if(lo) lo.onclick=async()=>{ await Sync.client.auth.signOut(); toast("로그아웃됨"); renderAdminLogin(); };
   $app.querySelectorAll(".copylink").forEach(b=> b.onclick=()=>copyText(b.dataset.url,"링크 복사됨"));
@@ -1212,6 +1215,113 @@ async function renderAdminDash(){
     if(SHARED){ const {error}=await Sync.client.from("cells").delete().eq("id",b.dataset.id); if(error){ toast("삭제 실패: "+(error.message||"")); return; } }
     delete DB_CELLS[b.dataset.id]; if(!SHARED) localStorage.setItem("coffee_local_cells",JSON.stringify(DB_CELLS));
     toast("삭제됨"); renderAdminDash(); });
+}
+
+/* ---------- 관리자 대시보드: 셀별 사용 빈도 + 구성원 출석 ---------- */
+let dashDays = 7;   // 조회 기간(일) — 7/14/30 토글
+// 'YYYY-MM-DD' 문자열 today에서 과거로 n일치 날짜 배열(오래된→최신). UTC 파싱으로 타임존 드리프트 방지.
+function lastNDates(todayStr, n){
+  const [y,m,d]=todayStr.split("-").map(Number); const base=Date.UTC(y,m-1,d);
+  const out=[]; for(let i=n-1;i>=0;i--){ const dt=new Date(base - i*86400000);
+    out.push(`${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,"0")}-${String(dt.getUTCDate()).padStart(2,"0")}`); }
+  return out;
+}
+function dashDayLabel(dateStr){ // "7/12(토)" 형태
+  const [y,m,d]=dateStr.split("-").map(Number); const dt=new Date(Date.UTC(y,m-1,d));
+  const wk=["일","월","화","수","목","금","토"][dt.getUTCDay()];
+  return `${m}/${d}(${wk})`;
+}
+function usageBarsHtml(days, dateList){
+  const byDate={}; (days||[]).forEach(x=>{ byDate[x.date]=x; });
+  const max=Math.max(1, ...dateList.map(dt=>(byDate[dt]?byDate[dt].servings:0)));
+  return `<div style="display:flex;gap:5px;align-items:flex-end;height:64px;margin:4px 0 2px">
+    ${dateList.map(dt=>{ const rec=byDate[dt]; const n=rec?rec.servings:0; const closed=rec?rec.closed:0;
+      const h=n?Math.max(8,Math.round(n/max*54)):3;
+      const isToday=dt===dateList[dateList.length-1];
+      const col = n ? (closed>0?"var(--brand)":"var(--accent)") : "var(--line)";
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0" title="${esc(dt)} · 섬김 ${n}회${closed?` (마감 ${closed})`:''}">
+        <div style="font-size:10px;font-weight:800;color:${n?'var(--ink)':'var(--gray)'};line-height:1">${n||''}</div>
+        <div style="width:100%;max-width:26px;height:${h}px;background:${col};border-radius:4px 4px 0 0;${isToday?'outline:2px solid var(--brand-soft);outline-offset:1px':''}"></div>
+        <div style="font-size:9px;color:var(--sub);line-height:1;white-space:nowrap">${dashDayLabel(dt)}</div>
+      </div>`; }).join("")}
+  </div>`;
+}
+function attendCellHtml(c){
+  const total=c.member_count||0;
+  const members=c.members||[];
+  const rows = members.length ? members.map(m=>{
+    const aw=m.attend_window||0, at=m.attend_total||0;
+    const pct=dashDays?Math.round(aw/dashDays*100):0;
+    const barW=Math.min(100,pct);
+    const last=m.last_date?`최근 ${dashDayLabel(m.last_date)}`:"참여 없음";
+    return `<div style="padding:8px 2px;border-bottom:1px solid var(--line)">
+      <div class="row-between" style="gap:8px">
+        <div style="min-width:0;flex:1"><span style="font-weight:700;font-size:14px">${esc(m.name)}</span>
+          <span class="muted" style="font-size:11px"> · ${esc(last)}</span></div>
+        <div style="font-size:13px;font-weight:800;color:var(--brand);white-space:nowrap">${aw}<span class="muted" style="font-weight:600">/${dashDays}일</span> · 누적 ${at}</div>
+      </div>
+      <div style="height:6px;background:var(--brand-soft);border-radius:99px;overflow:hidden;margin-top:5px">
+        <div style="height:100%;width:${barW}%;background:var(--brand);border-radius:99px"></div>
+      </div>
+    </div>`;
+  }).join("") : '<p class="muted center" style="padding:10px 0">구성원이 없어요</p>';
+  return `<div class="card" style="padding:4px 16px 8px">
+    <div class="row-between" style="padding:8px 0 4px">
+      <b style="font-size:13px">👥 구성원 출석 <span class="muted" style="font-weight:600">(최근 ${dashDays}일 / 누적)</span></b>
+      <span class="muted" style="font-size:12px">${total}명</span>
+    </div>${rows}</div>`;
+}
+async function renderAdminDashboard(){
+  if(!SHARED){ toast("Supabase 연결 필요"); return; }
+  if(curView!=="admindash") pushSub();
+  curView="admindash";
+  $app.innerHTML=`
+    <header><div class="h-row"><div><div class="room-name">📊 대시보드</div><div class="date">불러오는 중…</div></div>
+      <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
+    <div class="loading"><div class="spinner"></div>집계하는 중…</div>`;
+  document.getElementById("dback").onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
+
+  let payload=null, err=null;
+  try{ const {data,error}=await Sync.client.rpc("get_admin_dashboard",{p_days:dashDays}); if(error) throw error; payload=data; }
+  catch(e){ err=e; }
+
+  const back=()=>{ const b=document.getElementById("dback"); if(b) b.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); }; };
+  if(err){
+    $app.innerHTML=`
+      <header><div class="h-row"><div><div class="room-name">📊 대시보드</div><div class="date">불러오기 실패</div></div>
+        <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
+      <div class="card"><p class="muted" style="margin:0;line-height:1.7">집계 함수를 불러오지 못했어요.<br><b>db-migration-admin-dashboard.sql</b> 을 Supabase에서 실행했는지 확인해주세요.<br><br><span style="font-size:12px;color:var(--red)">${esc(err.message||String(err))}</span></p></div>`;
+    back(); return;
+  }
+
+  const cells=(payload&&payload.cells)||[];
+  const today=(payload&&payload.today)||todayKey();
+  const dateList=lastNDates(today, dashDays);
+  const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
+  const cardsHtml = cells.length ? cells.map(c=>{
+    const used=c.used_days||0, servings=c.servings_total||0;
+    return `<div class="card" style="padding:14px 16px 10px">
+      <div class="row-between" style="margin-bottom:2px">
+        <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
+          <span class="muted" style="font-size:12px"> · 초대코드 ${esc(c.cell_id)}</span></div>
+        <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
+      </div>
+      <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 최근 ${dashDays}일 섬김 <span style="color:var(--gray)">(막대 클릭 없음 · 색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행</span>)</span></div>
+      ${usageBarsHtml(c.days, dateList)}
+      <div style="height:8px"></div>
+      ${attendCellHtml(c)}
+    </div>`;
+  }).join("") : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
+
+  $app.innerHTML=`
+    <header><div class="h-row"><div><div class="room-name">📊 대시보드</div>
+      <div class="date">셀 ${cells.length}개 · ${esc(today)} 기준</div></div>
+      <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
+    <div class="tabs" id="dashTabs">${tabBtn(7)}${tabBtn(30)}</div>
+    ${cardsHtml}
+    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날</p>`;
+  back();
+  $app.querySelectorAll("#dashTabs .tab").forEach(t=> t.onclick=()=>{ const n=+t.dataset.days; if(n!==dashDays){ dashDays=n; renderAdminDashboard(); } });
 }
 
 // 셀별 구성원 수정 내역(관리자 전용 열람) — member_logs 최신순
