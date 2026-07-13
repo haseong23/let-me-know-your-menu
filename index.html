@@ -29,6 +29,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", sans-serif;
     background: var(--bg); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased;
+    word-break: keep-all; overflow-wrap: break-word;   /* 한글은 어절 단위로 줄바꿈(모바일 가독성) · 긴 URL 등은 안전하게 끊김 */
   }
   #app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 0 16px 120px; }
   header { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 14px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
@@ -65,7 +66,8 @@
   .seg { display:flex; gap:8px; }
   .sameas { flex:none; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .chip { padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); }
+  .chip { padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
+  .chip:active { transform: scale(.94); }
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
   .label { font-size: 13px; font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
   input[type=text], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); }
@@ -91,12 +93,19 @@
   .stat .num { font-size: 24px; font-weight: 900; letter-spacing: -1px; } .stat .lbl { font-size: 12px; color: var(--sub); margin-top: 2px; } .stat.total .num { color: var(--brand); }
   .tabs { display: flex; gap: 6px; background: var(--brand-soft); padding: 5px; border-radius: 12px; margin-bottom: 14px; }
   .tab { flex: 1; text-align: center; padding: 9px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  /* 대시보드 조회기간 표시(7/30 토글 통합 → 최근 30일 고정) */
+  .dash-period { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; margin: 0 0 14px; }
   .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
   .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; }
   .scrim { position: fixed; inset: 0; background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
   .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; }
   .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: 19px; }
+  /* 하단 고정 액션 바 — 긴 옵션 목록에서도 스크롤 없이 주문/취소 가능. 푸터가 있는 시트는 하단 패딩 0으로 밀착 */
+  .sheet.has-foot { padding-bottom: 0; }
+  .sheet-foot { position: sticky; bottom: 0; z-index: 3; background: var(--bg); margin: 16px -16px 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -10px 22px -12px rgba(40,28,16,.22); }
+  .ord-sum { font-size: 13px; font-weight: 700; color: var(--brand); text-align: center; margin: 0 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
   .cdialog .cmsg { font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
@@ -565,9 +574,11 @@ window.addEventListener("online", updateOffline); window.addEventListener("offli
 //   뒤로가기가 평소처럼 앱 밖으로 나간다(갇히지 않음).
 let sheetOpen=false, curView="main", subActive=false;
 function pushSub(){ if(!subActive){ subActive=true; try{ history.pushState({sub:1},""); }catch(e){} } }
-function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $sheet.scrollTop=0; $scrim.classList.add("show"); sheetOpen=true; pushSub(); }
+function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $sheet.classList.toggle("has-foot", !!$sheet.querySelector(".sheet-foot")); $sheet.scrollTop=0; $scrim.classList.add("show"); sheetOpen=true; pushSub(); }
 function closeSheet(){ $scrim.classList.remove("show"); sheetOpen=false; }  // history 항목은 다음 뒤로가기/열기가 소비·재사용
 $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
+// 칩 키보드 접근성: 포커스된 칩(tabindex=0)에서 Enter/Space → 클릭(키보드·스크린리더 사용자)
+document.addEventListener("keydown",e=>{ const t=e.target; if((e.key==="Enter"||e.key===" "||e.key==="Spacebar")&&t&&t.classList&&t.classList.contains("chip")&&t.getAttribute("tabindex")==="0"){ e.preventDefault(); t.click(); } });
 window.addEventListener("popstate",()=>{
   if(ignorePop){ ignorePop=false; return; }   // 버튼으로 확인창 닫을 때의 history.back() 무시
   if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
@@ -767,7 +778,7 @@ function openOrderSheet(menuId, existing){
   let temp = existing&&existing.temp ? existing.temp : null;
   let extras = existing&&existing.extras ? [...existing.extras] : [];
   let note = existing&&existing.note ? existing.note : "";
-  function draw(){
+  function draw(keepScroll){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
     // 구조화 옵션(단일선택 그룹): 명시 optionGroups 또는 커피샷/우유 자동 판별. 있으면 그룹+토글, 없으면 기존 flat extras.
@@ -782,9 +793,9 @@ function openOrderSheet(menuId, existing){
       extras = extras.filter(x=>availExtras.includes(x));
       optionsHtml = groups.map(g=>{
         const cur = g.opts.find(o=>extras.includes(o)) || g.def;   // 저장된 값 없으면 기본값 선택
-        return `<div class="label">${esc(g.label)}</div><div class="chips optgroup" data-key="${esc(g.key)}">${g.opts.map(o=>`<div class="chip ${o===cur?'sel':''}" data-opt="${esc(o)}">${esc(o)}</div>`).join("")}</div>`;
+        return `<div class="label" id="lbl-${esc(g.key)}">${esc(g.label)}</div><div class="chips optgroup" role="radiogroup" aria-labelledby="lbl-${esc(g.key)}" data-key="${esc(g.key)}">${g.opts.map(o=>`<div class="chip ${o===cur?'sel':''}" role="radio" tabindex="0" aria-checked="${o===cur}" data-opt="${esc(o)}">${esc(o)}</div>`).join("")}</div>`;
       }).join("");
-      if(flatToggles.length) optionsHtml += `<div class="label">추가 옵션 (여러 개 가능)</div><div class="chips" id="extras">${flatToggles.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`;
+      if(flatToggles.length) optionsHtml += `<div class="label">추가 옵션 (여러 개 가능)</div><div class="chips" id="extras">${flatToggles.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" role="button" tabindex="0" aria-pressed="${extras.includes(x)}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`;
     } else {
       const caf = m.decaf!==false && ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능(단, decaf:false 제외)
       const isLatte = ["latte","tealatte","fruitlatte"].includes(m.cat) || /라떼|밀크/.test(m.name||""); // 라떼류 = 우유 조절
@@ -792,13 +803,17 @@ function openOrderSheet(menuId, existing){
       const iceOpts  = (temp==="ICE") ? ["얼음적게","얼음많이"] : [];   // 얼음은 ICE 주문일 때만
       availExtras = (caf?["디카페인"]:[]).concat(m.extras||[]).concat(milkOpts).concat(iceOpts);
       extras = extras.filter(x=>availExtras.includes(x));
-      optionsHtml = availExtras.length?`<div class="label">옵션 (여러 개 가능)</div><div class="chips" id="extras">${availExtras.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`:"";
+      optionsHtml = availExtras.length?`<div class="label">옵션 (여러 개 가능)</div><div class="chips" id="extras">${availExtras.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" role="button" tabindex="0" aria-pressed="${extras.includes(x)}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`:"";
     }
     const tempHtml = m.temps.length>1
       ? `<div class="seg-temp" id="temps">${m.temps.map(t=>`<button class="tbtn ${t==='ICE'?'ice':'hot'} ${t===temp?'on':''}" data-t="${t}">${t==='ICE'?'🧊 ICE':'🔥 HOT'}</button>`).join("")}</div>`
       : m.temps.length===1
       ? `<div class="seg-temp"><button class="tbtn ${m.temps[0]==='ICE'?'ice on':'hot on'}" disabled>${m.temps[0]==='ICE'?'🧊 ICE 전용':'🔥 HOT 전용'}</button></div>`
       : "";
+    // 하단 고정 바에 보여줄 현재 선택 요약(온도·옵션) — 스크롤 없이 무엇을 골랐는지 확인
+    const summaryText = ()=>{ const parts=[]; if(temp && m.temps.length>1) parts.push(temp==="ICE"?"🧊 ICE":"🔥 HOT"); availExtras.forEach(x=>{ if(extras.includes(x)) parts.push(x); }); return parts.length?parts.join(" · "):"기본 그대로"; };
+    const refreshSum = ()=>{ const s=document.getElementById("ordSum"); if(s) s.textContent=summaryText(); };
+    const prevScroll = keepScroll && sheetOpen ? $sheet.scrollTop : 0;   // 온도 전환 등 리렌더 시 스크롤 위치 유지
     openSheet(`
       <h3>${esc(m.emoji)} ${esc(m.name)}</h3>
       <p class="muted" style="margin-top:0">다른 메뉴로 바꾸려면 아래에서 다시 선택</p>
@@ -806,22 +821,29 @@ function openOrderSheet(menuId, existing){
       ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
       ${optionsHtml}
       <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
-      <div style="height:18px"></div>
-      <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
-      <div style="height:8px"></div>
-      ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost" id="closeSheet">닫기</button>'}`);
+      <div class="sheet-foot">
+        <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
+        <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
+        <div style="height:8px"></div>
+        ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost" id="closeSheet">닫기</button>'}
+      </div>`);
+    if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
-    const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(); }; });
+    const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(true); }; });
     // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
+    // 제자리에서 .sel만 갱신 — 전체 리렌더/스크롤 리셋 없이(카톡·모바일에서 위로 튐 방지)
     $sheet.querySelectorAll(".optgroup").forEach(gEl=>{ const g=groups.find(x=>x.key===gEl.dataset.key); if(!g) return;
       gEl.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const opt=c.dataset.opt;
         extras = extras.filter(x=>!g.opts.includes(x));
         if(opt!==g.def) extras.push(opt);
-        note=document.getElementById("note").value; draw(); }); });
+        gEl.querySelectorAll(".chip").forEach(x=>{ const on=x===c; x.classList.toggle("sel", on); x.setAttribute("aria-checked", on); });
+        refreshSum(); }); });
     const ex=document.getElementById("extras"); if(ex) ex.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const v=c.dataset.x,i=extras.indexOf(v);
-      if(i>=0){ extras.splice(i,1); }
-      else { extras.push(v); const opp=EXCLUSIVE_EXTRAS[v]; if(opp){ const j=extras.indexOf(opp); if(j>=0) extras.splice(j,1); } }   // 배반 옵션 자동 해제
-      note=document.getElementById("note").value; draw(); });
+      if(i>=0){ extras.splice(i,1); c.classList.remove("sel"); c.setAttribute("aria-pressed","false"); }
+      else { extras.push(v); c.classList.add("sel"); c.setAttribute("aria-pressed","true"); const opp=EXCLUSIVE_EXTRAS[v]; if(opp){ const j=extras.indexOf(opp); if(j>=0){ extras.splice(j,1);   // 배반 옵션 자동 해제
+        ex.querySelectorAll(".chip").forEach(x=>{ if(x.dataset.x===opp){ x.classList.remove("sel"); x.setAttribute("aria-pressed","false"); } }); } } }
+      refreshSum(); });
+    const noteEl=document.getElementById("note"); if(noteEl) noteEl.onfocus=()=>{ setTimeout(()=>{ try{ noteEl.scrollIntoView({block:"center",behavior:"smooth"}); }catch(e){} },250); };  // 키보드가 입력창 가리지 않게
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
       if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
       if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note},SESSION.seq))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
@@ -1318,7 +1340,7 @@ async function renderAdminDash(){
 }
 
 /* ---------- 관리자 대시보드: 셀별 사용 빈도 + 섬김 랭킹 + 출석 타임라인 ---------- */
-let dashDays = 7;   // 조회 기간(일) — 7/30 토글
+const dashDays = 30;   // 조회 기간(일) — 최근 30일 고정(7/30 토글 통합)
 // 'YYYY-MM-DD' → "7/12<br>(토)" (2줄). UTC 파싱으로 타임존 드리프트 방지.
 function dashColLabel(dateStr){
   const [y,m,d]=dateStr.split("-").map(Number); const dt=new Date(Date.UTC(y,m-1,d));
@@ -1433,15 +1455,13 @@ async function renderCellDashboard(cellId){
     return;
   }
   const c=payload.cell, today=(payload&&payload.today)||todayKey();
-  const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
   $app.innerHTML=`
     <header><div class="h-row"><div style="min-width:0"><div class="room-name">📊 ${esc(c.name)}</div>
       <div class="date">${esc(today)} 기준 · 우리 셀 현황</div></div>
       <a href="${cellLink}" class="nav-link" style="font-size:14px">← 셀로</a></div></header>
-    <div class="tabs" id="dashTabs">${tabBtn(7)}${tabBtn(30)}</div>
+    <div class="dash-period">📅 최근 30일 기준</div>
     ${dashCardHtml(c,{showCode:false})}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날 · 누적 출석은 표시 기간과 무관하게 전체</p>`;
-  $app.querySelectorAll("#dashTabs .tab").forEach(t=> t.onclick=()=>{ const n=+t.dataset.days; if(n!==dashDays){ dashDays=n; renderCellDashboard(cellId); } });
+    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
 }
 async function renderAdminDashboard(){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
@@ -1468,7 +1488,6 @@ async function renderAdminDashboard(){
 
   const cells=(payload&&payload.cells)||[];
   const today=(payload&&payload.today)||todayKey();
-  const tabBtn=(n)=>`<button class="tab ${dashDays===n?'on':''}" data-days="${n}">${n}일</button>`;
   const cardsHtml = cells.length ? cells.map(c=>dashCardHtml(c,{showCode:true})).join("")
     : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
 
@@ -1476,11 +1495,10 @@ async function renderAdminDashboard(){
     <header><div class="h-row"><div><div class="room-name">📊 대시보드</div>
       <div class="date">셀 ${cells.length}개 · ${esc(today)} 기준</div></div>
       <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
-    <div class="tabs" id="dashTabs">${tabBtn(7)}${tabBtn(30)}</div>
+    <div class="dash-period">📅 최근 30일 기준</div>
     ${cardsHtml}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px">사용=섬김 오픈/마감 · 출석=이 앱에서 주문·안마심으로 의사표현한 날 · 누적 출석은 매트릭스의 표시 기간과 무관하게 전체</p>`;
+    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 매트릭스의 표시 기간과 무관하게 전체</p>`;
   back();
-  $app.querySelectorAll("#dashTabs .tab").forEach(t=> t.onclick=()=>{ const n=+t.dataset.days; if(n!==dashDays){ dashDays=n; renderAdminDashboard(); } });
 }
 
 // 셀별 구성원 수정 내역(관리자 전용 열람) — member_logs 최신순
