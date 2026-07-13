@@ -112,6 +112,15 @@
   .menu-switch > summary::after { content: "▾"; color: var(--gray); font-size: 12px; transition: transform .15s; }
   .menu-switch[open] > summary::after { transform: rotate(180deg); }
   .menu-switch > .grid { padding: 2px 12px 12px; }
+  /* 주문 옵션 영역만 간격 촘촘화(온도~메모) — 옵션 그룹이 많은 메뉴도 스크롤 덜 하고 한눈에 */
+  .order-opts .label { margin: 10px 0 5px; }
+  .order-opts .chips { gap: 6px; margin-top: 5px; }
+  .order-opts .chip { padding: 7px 12px; }
+  /* 열린 섬김 없음(idle) 화면 — 헤더/하단바 사이 여백에 붕 떠 보이지 않도록 세로 중앙 정렬 */
+  .idle-wrap { min-height: calc(100vh - 260px); display: flex; flex-direction: column; justify-content: center; }
+  /* 닫기·취소 버튼 — 붉은 계열로 통일해 직관적으로(파괴적 액션인 danger 버튼은 이미 붉음) */
+  .btn-close { color: var(--red); border-color: #f0d4c8; }
+  .sheet-x { background: none; border: none; font-size: 19px; line-height: 1; cursor: pointer; padding: 6px 4px; margin: -6px -4px -6px 0; flex: none; }
   .chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
@@ -553,7 +562,7 @@ function askConfirm(message, opts){ opts=opts||{};
     $cscrim.innerHTML=`<div class="cdialog" role="alertdialog" aria-modal="true" aria-label="확인">
       <div class="cmsg">${esc(message)}</div>
       <div class="crow">
-        <button class="btn btn-soft" id="cCancel">${esc(opts.cancel||"취소")}</button>
+        <button class="btn btn-soft btn-close" id="cCancel">${esc(opts.cancel||"취소")}</button>
         <button class="btn ${opts.danger?'btn-danger':'btn-brand'}" id="cOk">${esc(opts.ok||"확인")}</button>
       </div></div>`;
     $cscrim.classList.add("show"); confirmOpen=true;
@@ -692,11 +701,13 @@ function renderIdle(){
       }).join("")+`</div>`;
   }
   view().innerHTML=`
-    <div class="card banner"><div class="emoji">🫧</div>
-      <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
-      <p>오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
-    ${list}
-    <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.</p>`;
+    <div class="idle-wrap">
+      <div class="card banner"><div class="emoji">🫧</div>
+        <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
+        <p>오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
+      ${list}
+      <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.</p>
+    </div>`;
   view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
 
@@ -830,14 +841,16 @@ function openOrderSheet(menuId, existing){
     openSheet(`
       <h3>${esc(m.emoji)} ${esc(m.name)}</h3>
       <details class="menu-switch"><summary>🔄 다른 메뉴로 바꾸기</summary><div class="grid">${gridTilesHtml(menuId)}</div></details>
-      ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
-      ${optionsHtml}
-      <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
+      <div class="order-opts">
+        ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
+        ${optionsHtml}
+        <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
+      </div>
       <div class="sheet-foot">
         <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
         <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
         <div style="height:8px"></div>
-        ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost" id="closeSheet">닫기</button>'}
+        ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost btn-close" id="closeSheet">닫기</button>'}
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
@@ -880,7 +893,7 @@ function openCustomSheet(existing){
     <div class="label">메모 (선택)</div><input type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" />
     <div style="height:18px"></div>
     <button class="btn btn-brand" id="cAdd">추가하고 주문</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="cClose">닫기</button>`);
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="cClose">닫기</button>`);
   document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(b=> b.onclick=()=>{ temp=b.dataset.t;
     document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(x=>x.classList.toggle("on", x.dataset.t===temp)); });
   document.getElementById("cAdd").onclick=async()=>{ const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
@@ -908,13 +921,13 @@ function openFullMenuSheet(){
   }).join("");
   openSheet(`
     <div style="position:sticky;top:0;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
-      <h3 style="margin:0 0 8px">📋 전체 메뉴판</h3>
+      <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기">✕</button></div>
       <input type="text" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" />
     </div>
     <div id="mResults">${listHtml}<p class="muted center" id="mEmpty" style="margin-top:24px;display:none">검색 결과가 없어요</p></div>
     <div style="height:14px"></div>
     <button class="btn btn-soft" id="freeInput">목록에 없어요 — 직접 입력</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="mClose">닫기</button>`);
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="mClose">닫기</button>`);
   const mq=document.getElementById("mq"), results=document.getElementById("mResults"), empty=document.getElementById("mEmpty");
   function applyFilter(){
     const ql=mq.value.trim().toLowerCase(); let any=false;
@@ -930,7 +943,8 @@ function openFullMenuSheet(){
   results.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(r) openOrderSheet(r.dataset.id,null); });
   document.getElementById("freeInput").onclick=()=>openCustomSheet(null);
   document.getElementById("mClose").onclick=closeSheet;
-  setTimeout(()=>{ try{ mq.focus(); }catch(e){} },60);
+  document.getElementById("mCloseX").onclick=closeSheet;
+  // 자동 포커스 안 함 — 키보드가 올라와 목록을 가리지 않도록(스크롤로 훑어보기 우선)
 }
 
 function renderClosed(){
@@ -1018,7 +1032,7 @@ function renderBottom(inHostView){
         : `<button class="btn btn-soft" id="hostView">📊 현황 (${countDrinks()}잔)</button><button class="btn btn-brand" id="close">마감</button>`;
     } else html=`<button class="btn btn-soft" id="hostView">📊 현황 보기 · 총 ${countDrinks()}잔</button>`;
   } else {                                       // closed(섬김 보기 중)
-    html = (amHost ? `<button class="btn btn-ghost" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`)
+    html = (amHost ? `<button class="btn btn-ghost btn-close" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`)
          + `<button class="btn btn-soft" id="toOverview">오늘의 섬김</button>`;
   }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
@@ -1060,7 +1074,7 @@ function openClaimCafeSheet(){
       <p class="muted" style="margin-top:8px">${CAFES[cafeId]&&CAFES[cafeId].freeform?'프리셋 메뉴 없이 각자 \'직접 입력\'으로 받아요 (외부 카페용).':'정해진 메뉴판에서 고르고, 없으면 직접 입력도 가능해요.'}</p>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="goClaim">🎉 '${esc((CAFES[cafeId]||{}).name||"")}'(으)로 섬김 시작하기</button>
-      <div style="height:8px"></div><button class="btn btn-ghost" id="claimClose">닫기</button>`);
+      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="claimClose">닫기</button>`);
     document.getElementById("cafechips").querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; draw(); });
     document.getElementById("goClaim").onclick=()=>{ closeSheet(); doStartServing(cafeId); };
     document.getElementById("claimClose").onclick=closeSheet;
@@ -1180,7 +1194,7 @@ function openCreateCellSheet(){
     <div class="chips" id="newCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
     <div style="height:16px"></div>
     <button class="btn btn-brand" id="createCell">만들기</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="createClose">닫기</button>`);
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="createClose">닫기</button>`);
   const chips=document.getElementById("newCafe");
   chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
   document.getElementById("createClose").onclick=closeSheet;
@@ -1221,7 +1235,7 @@ function openEditCellSheet(cell){
       <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="ecSave">저장</button>
-      <div style="height:8px"></div><button class="btn btn-ghost" id="ecClose">닫기</button>`);
+      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="ecClose">닫기</button>`);
     document.getElementById("ecName").oninput=e=>{ nameVal=e.target.value; };
     $sheet.querySelectorAll(".ecm").forEach(inp=> inp.oninput=()=>{ mlist[+inp.dataset.i].name=inp.value; });   // 이름만 갱신(id 보존)
     $sheet.querySelectorAll(".ecmdel").forEach(b=> b.onclick=()=>{ mlist.splice(+b.dataset.i,1); draw(); });
@@ -1263,7 +1277,7 @@ function showCellCreated(cell){
     <button class="btn btn-soft btn-sm" id="copyUrl" style="margin-top:8px">📋 초대 링크 복사</button>
     <p class="muted" style="margin-top:10px">이 링크를 받은 분은 <b>주문 + 구성원 편집</b>이 가능합니다. (유추 불가 랜덤 주소)</p>
     <div style="height:12px"></div>
-    <button class="btn btn-ghost" id="enterNew">${adminMode?'관리자 목록으로':'닫기'}</button>`);
+    <button class="btn btn-ghost btn-close" id="enterNew">${adminMode?'관리자 목록으로':'닫기'}</button>`);
   document.getElementById("copyUrl").onclick=()=>copyText(url,"초대 링크 복사됨");
   document.getElementById("enterNew").onclick=()=>{ closeSheet(); if(adminMode) renderAdminDash(); else enterCell(cell.id); };
 }
@@ -1520,7 +1534,7 @@ async function openCellLogSheet(cell){
   try{ const {data,error}=await Sync.client.from("member_logs").select("*").eq("cell_id",cell.id).order("created_at",{ascending:false}).limit(100);
     if(error) throw error; logs=data||[];
   }catch(e){
-    openSheet(`<h3>🕘 ${esc(cell.name)} · 수정 내역</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}</p><button class="btn btn-ghost" id="lclose">닫기</button>`);
+    openSheet(`<h3>🕘 ${esc(cell.name)} · 수정 내역</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}</p><button class="btn btn-ghost btn-close" id="lclose">닫기</button>`);
     document.getElementById("lclose").onclick=closeSheet; return;
   }
   const body = logs.length ? logs.map(renderLogEntry).join("") : '<p class="muted center" style="padding:14px 0">아직 구성원 수정 내역이 없어요.</p>';
@@ -1528,7 +1542,7 @@ async function openCellLogSheet(cell){
     <h3>🕘 ${esc(cell.name)} · 수정 내역</h3>
     <p class="muted" style="margin-top:0">누가 구성원을 추가/이름변경/삭제했는지 (최신순${logs.length>=100?" · 최근 100건":""})</p>
     <div class="card" style="padding:2px 14px">${body}</div>
-    <div style="height:10px"></div><button class="btn btn-ghost" id="lclose">닫기</button>`);
+    <div style="height:10px"></div><button class="btn btn-ghost btn-close" id="lclose">닫기</button>`);
   document.getElementById("lclose").onclick=closeSheet;
 }
 // 섬김 정리(관리자) — 셀의 섬김 목록 + 특정 섬김 삭제(실수 데이터 정리)
@@ -1538,7 +1552,7 @@ async function openServingAdminSheet(cell){
     let list=[];
     try{ const {data,error}=await Sync.client.rpc("admin_list_servings",{p_room:cell.roomId||cell.id}); if(error) throw error; list=data||[]; }
     catch(e){
-      openSheet(`<h3>🧹 ${esc(cell.name)} · 섬김 정리</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}<br><br><b>db-migration-admin-tools.sql</b> 실행 여부를 확인해주세요.</p><button class="btn btn-ghost" id="sclose">닫기</button>`);
+      openSheet(`<h3>🧹 ${esc(cell.name)} · 섬김 정리</h3><p class="muted">불러오기 실패: ${esc(e.message||e)}<br><br><b>db-migration-admin-tools.sql</b> 실행 여부를 확인해주세요.</p><button class="btn btn-ghost btn-close" id="sclose">닫기</button>`);
       document.getElementById("sclose").onclick=closeSheet; return;
     }
     const rows = list.length ? list.map(s=>{
@@ -1556,7 +1570,7 @@ async function openServingAdminSheet(cell){
       <h3>🧹 ${esc(cell.name)} · 섬김 정리</h3>
       <p class="muted" style="margin-top:0">실수로 만들어진 섬김을 지웁니다. <b>그 섬김의 주문도 함께 삭제</b>되며 되돌릴 수 없어요.</p>
       <div class="card" style="padding:2px 14px">${rows}</div>
-      <div style="height:10px"></div><button class="btn btn-ghost" id="sclose">닫기</button>`);
+      <div style="height:10px"></div><button class="btn btn-ghost btn-close" id="sclose">닫기</button>`);
     document.getElementById("sclose").onclick=closeSheet;
     $sheet.querySelectorAll(".servdel").forEach(b=> b.onclick=async()=>{
       if(!(await askConfirm(`${b.dataset.d} · ${b.dataset.s}번째 섬김을 삭제할까요?\n이 섬김의 주문도 함께 지워집니다.`,{ok:"삭제",danger:true}))) return;
@@ -1581,7 +1595,7 @@ function openRenameCellSheet(cell){
     <p class="muted" style="font-size:12px;margin:6px 0 0">2~40자, 소문자/숫자/하이픈만. 새 링크: <span id="prev" style="word-break:break-all;color:var(--brand)"></span></p>
     <div style="height:16px"></div>
     <button class="btn btn-brand" id="dorename">주소 변경 + 데이터 이관</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="rclose">닫기</button>`);
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="rclose">닫기</button>`);
   const inp=document.getElementById("newid"), prev=document.getElementById("prev");
   const norm=v=> (v||"").toLowerCase().replace(/[^a-z0-9-]/g,"");
   const upd=()=>{ const v=norm(inp.value); if(inp.value!==v) inp.value=v; prev.textContent=`${location.origin}${location.pathname}?cell=${v}`; };
@@ -1657,7 +1671,7 @@ function openMenuEditSheet(cafeId, existing){
     <div class="label">온도</div><div class="chips" id="mtemps">${tchip("ICE")}${tchip("HOT")}</div>
     <div style="height:14px"></div>
     <button class="btn btn-brand" id="msave">${existing?'수정':'추가'}</button>
-    <div style="height:8px"></div><button class="btn btn-ghost" id="mcancel">닫기</button>`);
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="mcancel">닫기</button>`);
   document.getElementById("mtemps").querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const t=c.dataset.t,i=temps.indexOf(t); i>=0?temps.splice(i,1):temps.push(t); c.classList.toggle("sel"); });
   document.getElementById("mcancel").onclick=closeSheet;
   document.getElementById("msave").onclick=async()=>{
@@ -1680,7 +1694,7 @@ function openMembersSheet(){
       <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="saveM">저장</button>
-      <div style="height:8px"></div><button class="btn btn-ghost" id="closeM">닫기</button>`);
+      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="closeM">닫기</button>`);
     $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
     $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
     document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
