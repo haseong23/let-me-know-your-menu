@@ -283,7 +283,7 @@ const GIL_CATEGORIES = [
 
 /* ===================== 카페(메뉴 세트) 레지스트리 ===================== */
 const CAFES = {
-  gil: { id:"gil", name:"카페길", emoji:"☕", freeform:false, menus:GIL_MENUS, categories:GIL_CATEGORIES },
+  gil: { id:"gil", name:"카페길", emoji:"☕", freeform:false, decaf:false, menus:GIL_MENUS, categories:GIL_CATEGORIES },   // decaf:false — 길카페는 디카페인 없음
 };
 const CAFE_LIST = [CAFES.gil];
 
@@ -405,6 +405,10 @@ function meKey(){ return "coffee_me_v3_" + (CELL ? CELL.id : "none"); }
 function loadMe(){ ME = localStorage.getItem(meKey()) || null; }
 function setMe(id){ ME = id; try{ if(id) localStorage.setItem(meKey(), id); else localStorage.removeItem(meKey()); }catch(e){} }
 function meName(){ const m=memberById(ME); return m?m.name:null; }
+// 이름 뒤 존칭 '님' — 이미 '님'으로 끝나는 이름(목사님·전도사님·권사님·집사님 등)엔 중복해서 붙이지 않음.
+// hon(): 존칭형 이름 전체("홍길동"→"홍길동님", "김목사님"→"김목사님"). nimSfx(): 하이라이트 뒤에 붙일 접미사("님" 또는 "").
+function hon(name){ const n=(name==null?"":String(name)); return /님\s*$/.test(n) ? n : n+"님"; }
+function nimSfx(name){ return /님\s*$/.test(name==null?"":String(name)) ? "" : "님"; }
 // 항상 한국시간(KST) 기준 — 기기 타임존/자정 경계로 세션이 갈라지는 문제 방지
 function todayKey(){ return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
 function prettyDate(){ const o={}; new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",month:"numeric",day:"numeric",weekday:"short"}).formatToParts(new Date()).forEach(p=>o[p.type]=p.value); return `${o.month}월 ${o.day}일 (${o.weekday})`; }
@@ -654,15 +658,15 @@ function renderPickMe(){
     if(exist){ pickSel=exist.id; renderPickMe(); toast("이미 있는 이름이라 선택했어요"); return; }
     const nid=genMemberId();
     const arr=[...MEMBERS.map(m=>({id:m.id,name:m.name})), {id:nid,name:nm}];
-    if(await saveMembers(arr)){ setMe(nid); toast(nm+"님, 반가워요 🙏"); render(); }
+    if(await saveMembers(arr)){ setMe(nid); toast(hon(nm)+", 반가워요 🙏"); render(); }
   };
   if(sel){
     const bar=document.createElement("div"); bar.className="bottombar";
     bar.innerHTML=`<div class="inner" style="flex-direction:column;gap:8px">
-      ${selOrder?`<div class="banner-warn" style="margin:0;text-align:center">⚠️ '${esc(sel.name)}'님은 이미 ${selOrder.type==="skip"?"'안 마심'":"주문"}이 있어요. 본인이 맞는지 꼭 확인!</div>`:''}
-      <button class="btn btn-brand" id="confirmMe">🙋 '${esc(sel.name)}' 님으로 시작하기</button></div>`;
+      ${selOrder?`<div class="banner-warn" style="margin:0;text-align:center">⚠️ '${esc(sel.name)}'${nimSfx(sel.name)}은 이미 ${selOrder.type==="skip"?"'안 마심'":"주문"}이 있어요. 본인이 맞는지 꼭 확인!</div>`:''}
+      <button class="btn btn-brand" id="confirmMe">🙋 '${esc(hon(sel.name))}'으로 시작하기</button></div>`;
     $app.appendChild(bar);
-    document.getElementById("confirmMe").onclick=()=>{ const id=pickSel; pickSel=null; setMe(id); toast(memberById(id).name+"님으로 시작할게요"); render(); };
+    document.getElementById("confirmMe").onclick=()=>{ const id=pickSel; pickSel=null; setMe(id); toast(hon(memberById(id).name)+"으로 시작할게요"); render(); };
   }
 }
 
@@ -675,7 +679,7 @@ function renderIdle(){
         const badge = s.state==="open" ? `<span class="pill ordered">진행 중</span>` : `<span class="pill skip">마감</span>`;
         return `<div class="person"><div class="avatar" style="background:var(--brand-soft);color:var(--brand)">${s.seq}</div>
           <div style="min-width:0"><div class="pname">${s.seq}번째 섬김 ${badge}</div>
-          <div class="pmenu">${h?esc(h.name)+"님 · ":""}총 ${n}잔</div></div>
+          <div class="pmenu">${h?esc(hon(h.name))+" · ":""}총 ${n}잔</div></div>
           <button class="btn btn-sm btn-soft viewserv" data-seq="${s.seq}">보기</button></div>`;
       }).join("")+`</div>`;
   }
@@ -684,7 +688,7 @@ function renderIdle(){
       <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
       <p>오늘 음료로 섬겨주실 분은 아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
     ${list}
-    <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>님이 시작하면 이번 섬김의 주문이 열립니다.</p>`;
+    <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.</p>`;
   view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
 
@@ -724,7 +728,7 @@ function renderOpen(){
 
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
-      <h2>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
+      <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
       ${myOrder?'':'<p>드시고 싶은 메뉴를 골라주세요</p>'}</div>
     ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
 
@@ -735,7 +739,7 @@ function renderOpen(){
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ bumpFreq(o.menuId); toast(memberById(b.dataset.id).name+"님과 같은 메뉴로 담았어요"); render(); } }));
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ bumpFreq(o.menuId); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
 }
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
@@ -756,7 +760,8 @@ function menuHasMilk(m){                                  // 우유 들어가는
   if(m.cat==="coldbrew" && /라떼|밀크/.test(m.name||"")) return true;  // 콜드브루 라떼/밀크
   return false;
 }
-function menuTakesDecaf(m){ return m.decaf!==false && (m.cat==="coffee" || m.cat==="latte"); }
+function cafeAllowsDecaf(){ return (CAFES[activeCafeId()]||{}).decaf !== false; }   // 카페별 디카페인 제공 여부(길카페: 없음)
+function menuTakesDecaf(m){ return cafeAllowsDecaf() && m.decaf!==false && (m.cat==="coffee" || m.cat==="latte"); }
 function deriveOptionGroups(m){                           // 명시 그룹 없을 때 자동 구성(범위 밖이면 null)
   const hasShot=menuHasShot(m), hasMilk=menuHasMilk(m);
   if(!hasShot && !hasMilk) return null;
@@ -797,7 +802,7 @@ function openOrderSheet(menuId, existing){
       }).join("");
       if(flatToggles.length) optionsHtml += `<div class="label">추가 옵션 (여러 개 가능)</div><div class="chips" id="extras">${flatToggles.map(x=>`<div class="chip ${extras.includes(x)?'sel':''}" role="button" tabindex="0" aria-pressed="${extras.includes(x)}" data-x="${esc(x)}">${esc(x)}</div>`).join("")}</div>`;
     } else {
-      const caf = m.decaf!==false && ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능(단, decaf:false 제외)
+      const caf = cafeAllowsDecaf() && m.decaf!==false && ["coffee","latte","coldbrew","handdrip"].includes(m.cat); // 커피 기반 = 디카페인 가능(카페가 제공 + decaf:false 제외)
       const isLatte = ["latte","tealatte","fruitlatte"].includes(m.cat) || /라떼|밀크/.test(m.name||""); // 라떼류 = 우유 조절
       const milkOpts = isLatte ? ["우유적게","우유많이"] : [];
       const iceOpts  = (temp==="ICE") ? ["얼음적게","얼음많이"] : [];   // 얼음은 ICE 주문일 때만
@@ -926,7 +931,7 @@ function renderClosed(){
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">✅</div>
       <h2>${SESSION.seq?SESSION.seq+"번째 섬김 ":""}주문 마감</h2>
-      <p>${host?`<span class="host-name">${esc(host.name)}</span>님이 섬깁니다 · `:``}총 ${countDrinks()}잔</p></div>
+      <p>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다 · `:``}총 ${countDrinks()}잔</p></div>
     ${dashboardHtml()}`;
   wireDashboard();
 }
@@ -967,7 +972,7 @@ function wireDashboard(){
   const t=document.getElementById("dashTabs"); if(t) t.querySelectorAll(".tab").forEach(el=> el.onclick=()=>{ dashTab=el.dataset.t; rerenderDash(); });
   const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요");
   const nd=document.getElementById("nudge"); if(nd) nd.onclick=()=>{ const names=MEMBERS.filter(m=>!ORDERS[m.id]).map(m=>m.name).join(", ");
-    const h=memberById(SESSION.hostId); const hostClause=h?`${h.name}님이 `:"";   // host가 구성원에서 빠져도 안전
+    const h=memberById(SESSION.hostId); const hostClause=h?`${hon(h.name)}이 `:"";   // host가 구성원에서 빠져도 안전
     copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${hostClause}오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
 }
 function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else renderHostView(); }
@@ -987,7 +992,7 @@ function renderHostView(){
   curView="host"; renderHeader();
   const host=memberById(SESSION.hostId);
   view().innerHTML=`<div class="row-between" style="margin-bottom:12px">
-      <div><b style="font-size:17px">${SESSION.seq?SESSION.seq+"번째 섬김 ":""}현황</b> <span class="muted">· 섬기는 분: ${host?esc(host.name)+"님":"—"}</span></div>
+      <div><b style="font-size:17px">${SESSION.seq?SESSION.seq+"번째 섬김 ":""}현황</b> <span class="muted">· 섬기는 분: ${host?esc(hon(host.name)):"—"}</span></div>
       <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
   document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
   wireDashboard(); renderBottom(true);
@@ -1025,7 +1030,7 @@ async function doStartServing(cafeId){   // 새 섬김 시작(순차: 열린 섬
   await guardWrite(async()=>{
     toast("시작하는 중…");
     try{ const seq=await Sync.startServing(ME, cafeId);
-      if(seq){ viewSeq=null; toast(meName()+"님이 "+seq+"번째 섬김을 시작했어요 🙏"); }
+      if(seq){ viewSeq=null; toast(hon(meName())+"이 "+seq+"번째 섬김을 시작했어요 🙏"); }
       else toast("이미 진행 중인 섬김이 있어요");
       render();
     }catch(e){ console.error(e); toast("시작 실패 — 다시 시도해주세요"); render(); }
@@ -1034,7 +1039,7 @@ async function doStartServing(cafeId){   // 새 섬김 시작(순차: 열린 섬
 async function doClaim(cafeId){   // 호스트 없는 열린 섬김 이어받기(인계)
   await guardWrite(async()=>{
     toast("저장 중…");
-    try{ const ok=await Sync.claim(ME, cafeId); viewSeq=null; toast(ok ? (meName()+"님이 이어서 섬겨요 🙏") : "앗, 방금 다른 분이 먼저 이어받으셨어요!"); render(); }
+    try{ const ok=await Sync.claim(ME, cafeId); viewSeq=null; toast(ok ? (hon(meName())+"이 이어서 섬겨요 🙏") : "앗, 방금 다른 분이 먼저 이어받으셨어요!"); render(); }
     catch(e){ console.error(e); toast("저장 실패 — 다시 시도해주세요"); render(); }
   });
 }
