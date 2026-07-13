@@ -105,6 +105,13 @@
   .sheet.has-foot { padding-bottom: 0; }
   .sheet-foot { position: sticky; bottom: 0; z-index: 3; background: var(--bg); margin: 16px -16px 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -10px 22px -12px rgba(40,28,16,.22); }
   .ord-sum { font-size: 13px; font-weight: 700; color: var(--brand); text-align: center; margin: 0 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 메뉴 바꾸기 — 기본 접힘. 시트 열리면 온도·옵션이 바로 보이도록(카톡 등 짧은 화면 대응) */
+  .menu-switch { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  .menu-switch > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 14px; font-weight: 700; color: var(--sub); display: flex; align-items: center; justify-content: space-between; }
+  .menu-switch > summary::-webkit-details-marker { display: none; }
+  .menu-switch > summary::after { content: "▾"; color: var(--gray); font-size: 12px; transition: transform .15s; }
+  .menu-switch[open] > summary::after { transform: rotate(180deg); }
+  .menu-switch > .grid { padding: 2px 12px 12px; }
   .chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
@@ -821,8 +828,7 @@ function openOrderSheet(menuId, existing){
     const prevScroll = keepScroll && sheetOpen ? $sheet.scrollTop : 0;   // 온도 전환 등 리렌더 시 스크롤 위치 유지
     openSheet(`
       <h3>${esc(m.emoji)} ${esc(m.name)}</h3>
-      <p class="muted" style="margin-top:0">다른 메뉴로 바꾸려면 아래에서 다시 선택</p>
-      <div class="grid">${gridTilesHtml(menuId)}</div>
+      <details class="menu-switch"><summary>🔄 다른 메뉴로 바꾸기</summary><div class="grid">${gridTilesHtml(menuId)}</div></details>
       ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
       ${optionsHtml}
       <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
