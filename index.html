@@ -1545,7 +1545,7 @@ async function openCellLogSheet(cell){
     <div style="height:10px"></div><button class="btn btn-ghost btn-close" id="lclose">닫기</button>`);
   document.getElementById("lclose").onclick=closeSheet;
 }
-// 섬김 정리(관리자) — 셀의 섬김 목록 + 특정 섬김 삭제(실수 데이터 정리)
+// 섬김 정리(관리자) — 셀의 섬김 목록 + 진행 중 섬김 마감/삭제
 async function openServingAdminSheet(cell){
   openSheet(`<h3>🧹 ${esc(cell.name)} · 섬김 정리</h3><p class="muted" style="margin-top:0">불러오는 중…</p>`);
   async function draw(){
@@ -1563,15 +1563,24 @@ async function openServingAdminSheet(cell){
           <div class="pname">${esc(s.dt)} · ${s.seq}번째 ${badge}</div>
           <div class="pmenu">주문 ${s.n_orders}건 · ${host}</div>
         </div>
-        <button class="btn btn-danger btn-sm servdel" data-d="${esc(s.dt)}" data-s="${s.seq}" style="flex:none">삭제</button>
+        <div style="display:flex;gap:6px;flex:none">
+          ${s.state==="open"?`<button class="btn btn-brand btn-sm servclose" data-d="${esc(s.dt)}" data-s="${s.seq}">주문 마감</button>`:""}
+          <button class="btn btn-danger btn-sm servdel" data-d="${esc(s.dt)}" data-s="${s.seq}">삭제</button>
+        </div>
       </div>`;
     }).join("") : '<p class="muted center" style="padding:14px 0">섬김 기록이 없어요.</p>';
     openSheet(`
       <h3>🧹 ${esc(cell.name)} · 섬김 정리</h3>
-      <p class="muted" style="margin-top:0">실수로 만들어진 섬김을 지웁니다. <b>그 섬김의 주문도 함께 삭제</b>되며 되돌릴 수 없어요.</p>
+      <p class="muted" style="margin-top:0">진행 중인 주문을 마감하거나 실수로 만들어진 섬김을 지웁니다. 삭제하면 <b>그 섬김의 주문도 함께 삭제</b>되며 되돌릴 수 없어요.</p>
       <div class="card" style="padding:2px 14px">${rows}</div>
       <div style="height:10px"></div><button class="btn btn-ghost btn-close" id="sclose">닫기</button>`);
     document.getElementById("sclose").onclick=closeSheet;
+    $sheet.querySelectorAll(".servclose").forEach(b=> b.onclick=async()=>{
+      if(!(await askConfirm(`${b.dataset.d} · ${b.dataset.s}번째 섬김의 주문을 마감할까요?`,{ok:"마감하기"}))) return;
+      const {error}=await Sync.client.rpc("admin_close_serving",{p_room:cell.roomId||cell.id,p_date:b.dataset.d,p_seq:+b.dataset.s});
+      if(error){ toast("마감 실패: "+(error.message||"")); return; }
+      toast("주문을 마감했어요"); draw();
+    });
     $sheet.querySelectorAll(".servdel").forEach(b=> b.onclick=async()=>{
       if(!(await askConfirm(`${b.dataset.d} · ${b.dataset.s}번째 섬김을 삭제할까요?\n이 섬김의 주문도 함께 지워집니다.`,{ok:"삭제",danger:true}))) return;
       const {error}=await Sync.client.rpc("admin_delete_serving",{p_room:cell.roomId||cell.id,p_date:b.dataset.d,p_seq:+b.dataset.s});

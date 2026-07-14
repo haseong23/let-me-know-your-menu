@@ -4,8 +4,9 @@
 -- 재실행 안전(idempotent). 스키마 변경 없음(정의자 RPC만 추가).
 --
 --   1) admin_list_servings(p_room)          : 셀의 섬김 목록(날짜/순번/상태/주문수)
---   2) admin_delete_serving(p_room,p_date,p_seq): 특정 섬김 + 그 주문 삭제(실수 데이터 정리)
---   3) admin_rename_cell(p_old,p_new)       : 셀 URL(id/room_id) 변경 + 데이터 전부 이관
+--   2) admin_close_serving(p_room,p_date,p_seq): 진행 중인 특정 섬김 주문 마감
+--   3) admin_delete_serving(p_room,p_date,p_seq): 특정 섬김 + 그 주문 삭제(실수 데이터 정리)
+--   4) admin_rename_cell(p_old,p_new)       : 셀 URL(id/room_id) 변경 + 데이터 전부 이관
 --
 -- 보안: 모두 authenticated(관리자)에게만 execute. 함수 안에서 auth.role() 재확인.
 -- ============================================================
@@ -30,7 +31,24 @@ end $$;
 revoke all on function public.admin_list_servings(text) from public, anon;
 grant execute on function public.admin_list_servings(text) to authenticated;
 
--- ── 2) 특정 섬김 삭제 (관리자) — 그 섬김의 주문까지 함께 제거 ─────
+-- ── 2) 특정 섬김 마감 (관리자) ───────────────────────────────
+drop function if exists public.admin_close_serving(text,text,int);
+create or replace function public.admin_close_serving(p_room text, p_date text, p_seq int)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.role() is distinct from 'authenticated' then raise exception 'admin only'; end if;
+  update public.sessions
+     set state = 'closed',
+         close_at = (extract(epoch from now())*1000)::bigint,
+         updated_at = now()
+   where room_id = p_room and date = p_date and seq = p_seq and state = 'open';
+  if not found then raise exception 'open serving not found'; end if;
+end $$;
+revoke all on function public.admin_close_serving(text,text,int) from public, anon;
+grant execute on function public.admin_close_serving(text,text,int) to authenticated;
+
+-- ── 3) 특정 섬김 삭제 (관리자) — 그 섬김의 주문까지 함께 제거
 drop function if exists public.admin_delete_serving(text,text,int);
 create or replace function public.admin_delete_serving(p_room text, p_date text, p_seq int)
 returns void
@@ -43,7 +61,7 @@ end $$;
 revoke all on function public.admin_delete_serving(text,text,int) from public, anon;
 grant execute on function public.admin_delete_serving(text,text,int) to authenticated;
 
--- ── 3) 셀 URL 변경 + 데이터 이관 (관리자) ───────────────────────
+-- ── 4) 셀 URL 변경 + 데이터 이관 (관리자) ───────────────────────
 --   id == room_id 전제(신규 셀 정책). 새 id 형식 검증 + 미사용 확인 후
 --   sessions/orders/member_logs 의 참조를 새 id로 전부 갱신. 함수=단일 트랜잭션(원자적).
 drop function if exists public.admin_rename_cell(text,text);
