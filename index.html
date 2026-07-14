@@ -71,6 +71,7 @@
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
   .label { font-size: 13px; font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
   input[type=text], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); }
+  input, textarea, select { max-width: 100%; min-width: 0; }
   input:focus, textarea:focus { outline: none; border-color: var(--brand); }
   .person { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
   .person:last-child { border-bottom: none; }
@@ -85,7 +86,7 @@
   .logchip.add { background: #e6f4ea; color: #1e7a37; }
   .logchip.rem { background: #fdeaea; color: #b3261e; }
   .logchip.ren { background: #eaeef6; color: #33415c; }
-  .pill { margin-left: auto; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill { margin-left: auto; flex: none; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
   .pill.ordered { background: #e7f4ec; color: var(--green); } .pill.skip { background: #f1eee9; color: var(--gray); } .pill.pending { background: #fbecdf; color: var(--accent); }
   .person.picksel { background: var(--brand-soft); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--brand); }
   .stats { display: flex; gap: 8px; margin-bottom: 6px; }
@@ -97,7 +98,7 @@
   .dash-period { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; margin: 0 0 14px; }
   .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
-  .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; }
+  .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
   .scrim { position: fixed; inset: 0; background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
   .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow-y: auto; }
   .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: 19px; }
@@ -129,7 +130,11 @@
   .reload { cursor: pointer; user-select: none; opacity: .8; padding: 0 2px; }
   .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; }
   .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
-  .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
+  .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; min-width:0; }
+  .row-between > :first-child { min-width:0; }
+  .inline-form { display:flex; gap:8px; min-width:0; }
+  .inline-form > input { flex:1; min-width:0; }
+  .header-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; min-width:0; }
   .banner-warn { background:#fbecdf; border:1px solid #f0d9c2; color:#8a5a1f; border-radius:12px; padding:10px 14px; font-size:13px; margin-bottom:14px; }
   .loading { text-align:center; padding:80px 20px; color:var(--sub); }
   .spinner { width:34px; height:34px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--brand); margin:0 auto 14px; animation:spin .8s linear infinite; }
@@ -137,31 +142,56 @@
   #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   #offline.show { display:block; }
   .demo-badge { display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
-  /* Galaxy S25 등 360px급 화면: 버튼·아이콘이 가로 밖으로 밀리지 않도록 간격/줄바꿈 보정 */
-  @media (max-width: 380px) {
-    #app { padding-left: 12px; padding-right: 12px; }
+  /* iPhone/Galaxy 공통 모바일 폭(320~440px): 글자·아이콘·버튼의 가로 밀림 방지 */
+  @media (max-width: 440px) {
+    #app { padding-left: 14px; padding-right: 14px; }
     header { padding-top: 12px; }
     .h-row { gap: 6px; }
-    .h-row > :first-child, .row-between > :first-child { min-width: 0; }
+    .h-row > :first-child { min-width: 0; overflow:hidden; }
+    .h-row > :last-child { flex-shrink:0; }
     .room-name { font-size: 17px; }
     .me-chip { max-width: 42vw; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
-    .card { padding: 14px; }
+    .card { padding: 15px; }
     .person { gap: 8px; padding-left: 2px; padding-right: 2px; }
     .avatar { width: 34px; height: 34px; font-size: 13px; }
-    .btn { min-width: 0; gap: 5px; padding: 14px 10px; font-size: 15px; line-height: 1.25; white-space: normal; }
+    .btn { min-width: 0; max-width:100%; gap: 5px; padding: 14px 10px; font-size: 15px; line-height: 1.25; white-space: normal; overflow-wrap:anywhere; }
     .btn-sm { padding: 8px 10px; font-size: 13px; border-radius: 9px; }
-    .bottombar { padding-left: 12px; padding-right: 12px; }
+    .bottombar { padding-left: 14px; padding-right: 14px; }
     .bottombar .inner { gap: 7px; }
-    .sheet { padding-left: 12px; padding-right: 12px; }
-    .sheet-foot { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
+    .sheet { padding-left: 14px; padding-right: 14px; }
+    .sheet-foot { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; }
     .sheet h3 { font-size: 18px; }
     .seg, .seg-temp, .row-between { gap: 6px; }
     .stats { gap: 5px; }
     .stat { padding-left: 5px; padding-right: 5px; }
     .tab { padding-left: 5px; padding-right: 5px; font-size: 13px; }
-    input, textarea, select { min-width: 0; }
     .serving-actions { gap: 4px !important; flex-wrap: wrap; justify-content: flex-end; max-width: 132px; }
     .serving-actions .btn-sm { padding-left: 8px; padding-right: 8px; }
+    .dash-card-head { align-items:flex-start; }
+    .dash-card-head .pill { max-width:44%; text-align:center; }
+    .menu-row > :first-child { flex:none; }
+  }
+  @media (max-width: 360px) {
+    #app { padding-left: 12px; padding-right: 12px; }
+    .card { padding: 13px; }
+    .bottombar { padding-left: 12px; padding-right: 12px; }
+    .sheet { padding-left: 12px; padding-right: 12px; }
+    .sheet-foot { margin-left:-12px; margin-right:-12px; padding-left:12px; padding-right:12px; }
+    .person { gap:6px; }
+    .pill { padding-left:8px; padding-right:8px; }
+    .inline-form { gap:6px; }
+    .inline-form .btn-sm { padding-left:8px; padding-right:8px; }
+    .serving-row { flex-wrap:wrap; }
+    .serving-row > :first-child { flex-basis:calc(100% - 42px); }
+    .serving-row .serving-actions { width:100%; max-width:none; justify-content:flex-end; }
+  }
+  @media (max-width: 330px) {
+    .room-name { font-size:16px; }
+    .date { font-size:11px; }
+    .btn { font-size:14px; padding-left:8px; padding-right:8px; }
+    .tab { font-size:12px; }
+    .row-between.mobile-stack { align-items:stretch; flex-direction:column; }
+    .row-between.mobile-stack > .btn { width:100%; }
   }
   /* 대시보드 */
   .usage-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0 2px; }
@@ -202,7 +232,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.48";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.49";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -656,7 +686,7 @@ function renderHeader(){
     <header><div class="h-row">
       <div style="min-width:0;overflow:hidden"><div class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</div>
         <div class="date">${prettyDate()} · ${connHtml}</div></div>
-      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <div class="header-actions">
         <div class="me-chip" id="meChip" role="button" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
         <button class="nav-link" id="gear" style="font-size:18px" aria-label="설정">⚙️</button>
       </div>
@@ -693,7 +723,7 @@ function renderPickMe(){
     <div class="date">먼저 <b>본인</b>을 선택해 주세요 (ㄱㄴㄷ순)</div></header>
     <div class="card" style="padding:8px 18px">${list}</div>
     <div class="label">내 이름이 목록에 없나요?</div>
-    <div style="display:flex;gap:8px"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력" style="flex:1;min-width:0"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
+    <div class="inline-form"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
   document.getElementById("addMeBtn").onclick=async()=>{
     const nm=document.getElementById("addMeName").value.trim().slice(0,40); if(!nm){ toast("이름을 입력해주세요"); return; }
@@ -1038,7 +1068,7 @@ function renderHostView(){
   projectServing(viewSeq!=null ? viewSeq : activeSeq);
   curView="host"; renderHeader();
   const host=memberById(SESSION.hostId);
-  view().innerHTML=`<div class="row-between" style="margin-bottom:12px">
+  view().innerHTML=`<div class="row-between mobile-stack" style="margin-bottom:12px">
       <div><b style="font-size:17px">${SESSION.seq?SESSION.seq+"번째 섬김 ":""}현황</b> <span class="muted">· 섬기는 분: ${host?esc(hon(host.name)):"—"}</span></div>
       <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
   document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
@@ -1255,7 +1285,7 @@ function openEditCellSheet(cell){
       <input type="text" id="ecName" maxlength="40" value="${esc(nameVal)}" />
       <div class="label">구성원 (이름을 고쳐도 주문 링크 유지)</div>
       <div class="card" style="padding:6px 14px">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
-      <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="ecNewM" maxlength="40" placeholder="구성원 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
+      <div class="inline-form" style="margin-top:8px"><input type="text" id="ecNewM" maxlength="40" placeholder="구성원 추가"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
       <div class="label">홈 카페 (기본 카페)</div>
       <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
       <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
@@ -1465,7 +1495,7 @@ function dashCardHtml(c, opts){ opts=opts||{};
   const used=c.used_days||0, servings=c.servings_total||0;
   const meta = opts.showCode ? ` · 초대코드 ${esc(c.cell_id)} · ${c.member_count||0}명` : ` · ${c.member_count||0}명`;
   return `<div class="card" style="padding:14px 16px 12px">
-    <div class="row-between" style="margin-bottom:6px">
+    <div class="row-between dash-card-head" style="margin-bottom:6px">
       <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
         <span class="muted" style="font-size:12px">${meta}</span></div>
       <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
@@ -1584,7 +1614,7 @@ async function openServingAdminSheet(cell){
     const rows = list.length ? list.map(s=>{
       const host = s.host_id ? esc((memInCell(cell,s.host_id))||s.host_id) : "호스트 없음";
       const badge = s.state==="open" ? '<span class="pill pending">진행중</span>' : '<span class="pill skip">마감</span>';
-      return `<div class="person" style="align-items:center">
+      return `<div class="person serving-row" style="align-items:center">
         <div style="flex:1;min-width:0">
           <div class="pname">${esc(s.dt)} · ${s.seq}번째 ${badge}</div>
           <div class="pmenu">주문 ${s.n_orders}건 · ${host}</div>
@@ -1726,7 +1756,7 @@ function openMembersSheet(){
       <h3>👥 ${esc(ROOM_NAME)} 구성원 편집</h3>
       <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. <b>이름을 고쳐도 기존 주문은 그대로 따라옵니다.</b></p>
       <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
-      <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가" style="flex:1"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
+      <div class="inline-form" style="margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="saveM">저장</button>
       <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="closeM">닫기</button>`);
