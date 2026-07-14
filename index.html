@@ -137,6 +137,32 @@
   #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   #offline.show { display:block; }
   .demo-badge { display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
+  /* Galaxy S25 등 360px급 화면: 버튼·아이콘이 가로 밖으로 밀리지 않도록 간격/줄바꿈 보정 */
+  @media (max-width: 380px) {
+    #app { padding-left: 12px; padding-right: 12px; }
+    header { padding-top: 12px; }
+    .h-row { gap: 6px; }
+    .h-row > :first-child, .row-between > :first-child { min-width: 0; }
+    .room-name { font-size: 17px; }
+    .me-chip { max-width: 42vw; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
+    .card { padding: 14px; }
+    .person { gap: 8px; padding-left: 2px; padding-right: 2px; }
+    .avatar { width: 34px; height: 34px; font-size: 13px; }
+    .btn { min-width: 0; gap: 5px; padding: 14px 10px; font-size: 15px; line-height: 1.25; white-space: normal; }
+    .btn-sm { padding: 8px 10px; font-size: 13px; border-radius: 9px; }
+    .bottombar { padding-left: 12px; padding-right: 12px; }
+    .bottombar .inner { gap: 7px; }
+    .sheet { padding-left: 12px; padding-right: 12px; }
+    .sheet-foot { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
+    .sheet h3 { font-size: 18px; }
+    .seg, .seg-temp, .row-between { gap: 6px; }
+    .stats { gap: 5px; }
+    .stat { padding-left: 5px; padding-right: 5px; }
+    .tab { padding-left: 5px; padding-right: 5px; font-size: 13px; }
+    input, textarea, select { min-width: 0; }
+    .serving-actions { gap: 4px !important; flex-wrap: wrap; justify-content: flex-end; max-width: 132px; }
+    .serving-actions .btn-sm { padding-left: 8px; padding-right: 8px; }
+  }
   /* 대시보드 */
   .usage-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0 2px; }
   .usage { display:inline-flex; gap:8px; align-items:flex-end; height:66px; min-width:100%; padding-bottom:2px; }
@@ -176,7 +202,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.47";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.48";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1563,7 +1589,7 @@ async function openServingAdminSheet(cell){
           <div class="pname">${esc(s.dt)} · ${s.seq}번째 ${badge}</div>
           <div class="pmenu">주문 ${s.n_orders}건 · ${host}</div>
         </div>
-        <div style="display:flex;gap:6px;flex:none">
+        <div class="serving-actions" style="display:flex;gap:6px;flex:none">
           ${s.state==="open"?`<button class="btn btn-brand btn-sm servclose" data-d="${esc(s.dt)}" data-s="${s.seq}">주문 마감</button>`:""}
           <button class="btn btn-danger btn-sm servdel" data-d="${esc(s.dt)}" data-s="${s.seq}">삭제</button>
         </div>
