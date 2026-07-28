@@ -939,13 +939,34 @@ function openOrderSheet(menuId, existing){
   draw();
 }
 
+// 편집거리(레벤슈타인) — 오타 허용 매칭용. 의존성 추가 없이 순수 JS로.
+function editDistance(a,b){ const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){ const cur=[i];
+    for(let j=1;j<=n;j++) cur[j] = a[i-1]===b[j-1] ? prev[j-1] : 1+Math.min(prev[j-1],prev[j],cur[j-1]);
+    prev=cur; }
+  return prev[n]; }
+// qn(입력)이 hay(후보명) 안 어딘가와 비슷한지 — hay가 더 길면 qn 길이만한 구간을 슬라이딩하며 최소 편집거리 계산
+// (예: "붐다버그"가 "번더버그 만다린" 뒷부분과는 안 비슷해도 앞부분 "번더버그"와는 비슷함을 잡아냄)
+function fuzzyDist(qn, hay){ if(qn.length>=hay.length) return editDistance(qn,hay);
+  let best=Infinity;
+  for(let i=0;i+qn.length<=hay.length;i++){ const d=editDistance(qn, hay.slice(i,i+qn.length)); if(d<best) best=d; if(!best) break; }
+  return best; }
+function typoThreshold(len){ return len<=3?1 : len<=5?2 : 3; }
+// 메뉴 대신 "주문완료/직접주문" 등을 적는 건 사실 오늘 생략 의사표시인 경우가 대부분 — 그쪽으로 자연스럽게 유도
+const DECLINE_WORDS=["주문완료","직접주문","따로주문","개별주문","생략","패스","스킵","노쇼"];
+
 function openCustomSheet(existing){
   let temp="ICE";
+  // 자동완성 후보 = 정식 메뉴 + 이 섬김에서 이미 다른 사람이 쓴 커스텀 메뉴(무분별한 중복 생성 방지)
+  const pool=[...MENUS, ...customMenusFromOrders()];
+  const norm=s=>(s||"").trim().toLowerCase().replace(/\s+/g,"");
   openSheet(`
     <h3>🥤 직접 입력</h3>
     <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
     <div class="label">메뉴 이름</div>
-    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" />
+    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" />
+    <div id="cSuggest"></div>
     <div class="label">온도</div>
     <div class="seg-temp" id="ctemp">
       <button class="tbtn ice on" data-t="ICE">🧊 ICE</button>
@@ -957,7 +978,41 @@ function openCustomSheet(existing){
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="cClose">닫기</button>`);
   document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(b=> b.onclick=()=>{ temp=b.dataset.t;
     document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(x=>x.classList.toggle("on", x.dataset.t===temp)); });
-  document.getElementById("cAdd").onclick=async()=>{ const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
+
+  const nameEl=document.getElementById("cname"), sugEl=document.getElementById("cSuggest"), addBtn=document.getElementById("cAdd");
+  let exactMatch=null, isDecline=false;
+  // 기존 메뉴로 자연스럽게 전환 — 알림창 대신 이미 쓰던 시트 전환(openFullMenuSheet의 메뉴 클릭과 동일한 방식)
+  function goToExisting(m){ openOrderSheet(m.id, existing); }
+  function goToSkip(){ guardWrite(async()=>{ forceGrid=false;
+    if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }); }
+  function matchesName(mn,qn){ return mn===qn || mn.includes(qn) || qn.includes(mn) || (qn.length>=2 && fuzzyDist(qn,mn)<=typoThreshold(qn.length)); }
+  function refreshSuggestions(){
+    const qn=norm(nameEl.value);
+    isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
+    exactMatch = (!isDecline && qn.length>=2) ? pool.find(m=>{ const mn=norm(m.name); return mn===qn || fuzzyDist(qn,mn)<=typoThreshold(qn.length); }) : null;
+    const matches = (!isDecline && qn && !exactMatch) ? pool.filter(m=>matchesName(norm(m.name),qn)).slice(0,4) : [];
+    sugEl.innerHTML = matches.length ? `<div class="card" style="padding:2px 12px;margin:6px 0 0">${
+      matches.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" style="cursor:pointer;padding:9px 2px">
+        <div style="font-size:19px;width:24px;text-align:center">${esc(m.emoji||"🥤")}</div>
+        <div class="pname" style="font-size:14px">${esc(m.name)}</div></div>`).join("")}</div>` : "";
+    if(isDecline){
+      addBtn.textContent = "🙅 오늘은 생략하시는 거죠? — 안 마실게요로 저장";
+      addBtn.classList.remove("btn-brand"); addBtn.classList.add("btn-soft");
+    } else if(exactMatch){
+      addBtn.textContent = `✋ 이미 있는 메뉴예요 — ${exactMatch.emoji||"🥤"} ${exactMatch.name}로 주문`;
+      addBtn.classList.remove("btn-brand"); addBtn.classList.add("btn-soft");
+    } else {
+      addBtn.textContent = "추가하고 주문";
+      addBtn.classList.remove("btn-soft"); addBtn.classList.add("btn-brand");
+    }
+  }
+  nameEl.addEventListener("input", refreshSuggestions);
+  sugEl.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(!r) return; const m=pool.find(x=>x.id===r.dataset.id); if(m) goToExisting(m); });
+
+  addBtn.onclick=async()=>{
+    if(isDecline){ goToSkip(); return; }
+    if(exactMatch){ goToExisting(exactMatch); return; }
+    const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
     if(!name){ toast("메뉴 이름을 입력해주세요"); return; }
     forceGrid=false;
     if(!(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note},SESSION.seq)))) return;
