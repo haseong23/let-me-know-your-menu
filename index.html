@@ -423,7 +423,10 @@ async function loadHist(){
       const nm=r.menu_name||r.menu_id; if(nm){ byName[mid]=byName[mid]||{}; byName[mid][nm]=(byName[mid][nm]||0)+1; }
     });
     H_byMemberId=byId; H_topName={};
-    Object.keys(byName).forEach(mid=>{ let top=null,c=-1; const o=byName[mid]; for(const k in o){ if(o[k]>c){c=o[k];top=k;} } H_topName[mid]={name:top,count:c}; });
+    // 최애 top-2: 빈도 desc 정렬(Array.sort는 stable이라 동률은 기존과 동일하게 먼저 나온 메뉴가 앞섬)
+    Object.keys(byName).forEach(mid=>{ const o=byName[mid];
+      const ranked=Object.keys(o).map(k=>({name:k,count:o[k]})).sort((a,b)=>b.count-a.count);
+      H_topName[mid]={first:ranked[0]||null, second:ranked[1]||null}; });
     HIST_ROOM=ROOM;
   }catch(e){ console.warn("hist fail",e); }
 }
@@ -711,10 +714,12 @@ function renderPickMe(){
     else if(o&&o.type==="skip") badge='<span class="pill skip">안마심</span>';
     if(m.id===pickSel) badge='<span class="pill" style="background:var(--brand);color:#fff">✓ 선택됨</span>';
     else if(m.id===ME && !badge) badge='<span class="pill ordered">나</span>';
-    const top=H_topName[m.id]&&H_topName[m.id].name;
+    const th=H_topName[m.id];
+    const favParts=[]; if(th&&th.first) favParts.push(`①${esc(th.first.name)}`); if(th&&th.second) favParts.push(`②${esc(th.second.name)}`);
+    const fav=favParts.join(" · ");
     return `<div class="person${m.id===pickSel?' picksel':''}" data-id="${esc(m.id)}" style="cursor:pointer">
       <div class="avatar">${esc(initials(m.name))}</div>
-      <div style="min-width:0"><div class="pname">${esc(m.name)}</div>${top?`<div class="pmenu">최애메뉴: ${esc(top)}</div>`:''}</div>${badge}</div>`;
+      <div style="min-width:0"><div class="pname">${esc(m.name)}</div>${fav?`<div class="pmenu">${fav}</div>`:''}</div>${badge}</div>`;
   }).join("");
   const sel = pickSel && memberById(pickSel);
   const selOrder = sel && ORDERS[pickSel];
