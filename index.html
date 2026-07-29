@@ -956,7 +956,7 @@ function typoThreshold(len){ return len<=3?1 : len<=5?2 : 3; }
 // 메뉴 대신 "주문완료/직접주문" 등을 적는 건 사실 오늘 생략 의사표시인 경우가 대부분 — 그쪽으로 자연스럽게 유도
 const DECLINE_WORDS=["주문완료","직접주문","따로주문","개별주문","생략","패스","스킵","노쇼"];
 
-function openCustomSheet(existing){
+function openCustomSheet(existing, prefillName){
   let temp="ICE";
   // 자동완성 후보 = 정식 메뉴 + 이 섬김에서 이미 다른 사람이 쓴 커스텀 메뉴(무분별한 중복 생성 방지)
   const pool=[...MENUS, ...customMenusFromOrders()];
@@ -965,7 +965,7 @@ function openCustomSheet(existing){
     <h3>🥤 직접 입력</h3>
     <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
     <div class="label">메뉴 이름</div>
-    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" />
+    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" value="${esc(prefillName||"")}" />
     <div id="cSuggest"></div>
     <div class="label">온도</div>
     <div class="seg-temp" id="ctemp">
@@ -1007,6 +1007,7 @@ function openCustomSheet(existing){
     }
   }
   nameEl.addEventListener("input", refreshSuggestions);
+  if(prefillName) refreshSuggestions();   // 검색창에서 넘어온 값도 바로 자동완성/오타매칭 판정
   sugEl.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(!r) return; const m=pool.find(x=>x.id===r.dataset.id); if(m) goToExisting(m); });
 
   addBtn.onclick=async()=>{
@@ -1021,7 +1022,7 @@ function openCustomSheet(existing){
     // (공유 카페로의 자동 승격은 익명 오염 방지를 위해 제거; 카페 공식 메뉴 추가는 관리자만)
     closeSheet(); toast("추가해서 담았어요 🙏"); render(); };
   document.getElementById("cClose").onclick=closeSheet;
-  setTimeout(()=>{ const el=document.getElementById("cname"); if(el) el.focus(); },60);
+  setTimeout(()=>{ const el=document.getElementById("cname"); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } },60);
 }
 
 function openFullMenuSheet(){
@@ -1057,7 +1058,7 @@ function openFullMenuSheet(){
   mq.addEventListener("input", applyFilter);
   // 클릭은 이벤트 위임 (재바인딩 없음)
   results.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(r) openOrderSheet(r.dataset.id,null); });
-  document.getElementById("freeInput").onclick=()=>openCustomSheet(null);
+  document.getElementById("freeInput").onclick=()=>openCustomSheet(null, mq.value);
   document.getElementById("mClose").onclick=closeSheet;
   document.getElementById("mCloseX").onclick=closeSheet;
   // 자동 포커스 안 함 — 키보드가 올라와 목록을 가리지 않도록(스크롤로 훑어보기 우선)
