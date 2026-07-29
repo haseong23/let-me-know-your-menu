@@ -807,7 +807,7 @@ function renderOpen(){
     ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
 
   const grid=document.getElementById("menuGrid");
-  if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null); else t.onclick=()=>openOrderSheet(t.dataset.id,null); });
+  if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
   const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
@@ -908,7 +908,7 @@ function openOrderSheet(menuId, existing){
         ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost btn-close" id="closeSheet">닫기</button>'}
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
-    $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>openFullMenuSheet(); } else if(t.dataset.custom){ t.onclick=()=>openCustomSheet(existing); } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
+    $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>{ const n=document.getElementById("note").value; openFullMenuSheet(menuId, n); }; } else if(t.dataset.custom){ t.onclick=()=>{ const n=document.getElementById("note").value; openCustomSheet(existing, null, n); }; } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(true); }; });
     // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
     // 제자리에서 .sel만 갱신 — 전체 리렌더/스크롤 리셋 없이(카톡·모바일에서 위로 튐 방지)
@@ -947,14 +947,17 @@ function fuzzyDist(qn, hay){ if(qn.length>=hay.length) return editDistance(qn,ha
   for(let i=0;i+qn.length<=hay.length;i++){ const d=editDistance(qn, hay.slice(i,i+qn.length)); if(d<best) best=d; if(!best) break; }
   return best; }
 function typoThreshold(len){ return len<=3?1 : len<=5?2 : 3; }
+function norm(s){ return (s||"").trim().toLowerCase().replace(/\s+/g,""); }
+// 이름 매칭: 정확/부분 일치 우선, 짧은 오타는 편집거리로 허용 — 전체메뉴판 검색·직접입력 공용
+function matchesName(mn,qn){ return mn===qn || mn.includes(qn) || qn.includes(mn) || (qn.length>=2 && fuzzyDist(qn,mn)<=typoThreshold(qn.length)); }
 // 메뉴 대신 "주문완료/직접주문" 등을 적는 건 사실 오늘 생략 의사표시인 경우가 대부분 — 그쪽으로 자연스럽게 유도
 const DECLINE_WORDS=["주문완료","직접주문","따로주문","개별주문","생략","패스","스킵","노쇼"];
 
-function openCustomSheet(existing, prefillName){
+function openCustomSheet(existing, prefillName, prefillNote){
   let temp="ICE";
   // 자동완성 후보 = 정식 메뉴 + 이 섬김에서 이미 다른 사람이 쓴 커스텀 메뉴(무분별한 중복 생성 방지)
   const pool=[...MENUS, ...customMenusFromOrders()];
-  const norm=s=>(s||"").trim().toLowerCase().replace(/\s+/g,"");
+  const noteVal = prefillNote!=null ? prefillNote : ((existing&&existing.note)||"");
   openSheet(`
     <h3>🥤 직접 입력</h3>
     <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
@@ -966,7 +969,7 @@ function openCustomSheet(existing, prefillName){
       <button class="tbtn ice on" data-t="ICE">🧊 ICE</button>
       <button class="tbtn hot" data-t="HOT">🔥 HOT</button>
     </div>
-    <div class="label" id="lbl-cnote">메모 (선택)</div><input type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" aria-labelledby="lbl-cnote" />
+    <div class="label" id="lbl-cnote">메모 (선택)</div><input type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" value="${esc(noteVal)}" aria-labelledby="lbl-cnote" />
     <div style="height:18px"></div>
     <button class="btn btn-brand" id="cAdd">추가하고 주문</button>
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="cClose">닫기</button>`);
@@ -979,7 +982,6 @@ function openCustomSheet(existing, prefillName){
   function goToExisting(m){ openOrderSheet(m.id, existing); }
   function goToSkip(){ guardWrite(async()=>{ forceGrid=false;
     if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }); }
-  function matchesName(mn,qn){ return mn===qn || mn.includes(qn) || qn.includes(mn) || (qn.length>=2 && fuzzyDist(qn,mn)<=typoThreshold(qn.length)); }
   function refreshSuggestions(){
     const qn=norm(nameEl.value);
     isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
@@ -1019,16 +1021,16 @@ function openCustomSheet(existing, prefillName){
   setTimeout(()=>{ const el=document.getElementById("cname"); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } },60);
 }
 
-function openFullMenuSheet(){
+function openFullMenuSheet(curId, carryNote){
   // 목록을 '한 번만' 그리고, 검색은 보이기/숨기기 토글만 → 덜컹임 없음
   const listHtml = CATEGORIES.map(c=>{
     const items=MENUS.filter(m=>m.cat===c.id);
     if(!items.length) return "";
     return `<div class="mcat"><div class="label" style="margin-top:14px">${c.label}</div><div class="card" style="padding:4px 14px">`+
-      items.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" data-name="${esc(m.name.toLowerCase())}" style="cursor:pointer" role="button" tabindex="0" aria-label="${esc(m.name)} 주문">
+      items.map(m=>`<div class="person menu-row${m.id===curId?' picksel':''}" data-id="${esc(m.id)}" data-name="${esc(norm(m.name))}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===curId}" aria-label="${esc(m.name)} 주문">
         <div style="font-size:21px;width:30px;text-align:center">${esc(m.emoji)}</div>
         <div class="pname">${esc(m.name)}</div>
-        <span class="pmenu" style="margin-left:auto">${m.temps.length?m.temps.join("/"):"·"}</span></div>`).join("")+`</div></div>`;
+        <span class="pmenu" style="margin-left:auto">${m.id===curId?'현재 선택 · ':''}${m.temps.length?m.temps.join("/"):"·"}</span></div>`).join("")+`</div></div>`;
   }).join("");
   openSheet(`
     <div style="position:sticky;top:0;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
@@ -1040,19 +1042,20 @@ function openFullMenuSheet(){
     <button class="btn btn-soft" id="freeInput">목록에 없어요 — 직접 입력</button>
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="mClose">닫기</button>`);
   const mq=document.getElementById("mq"), results=document.getElementById("mResults"), empty=document.getElementById("mEmpty");
+  // 오타 허용 검색: 직접입력과 같은 matchesName 기준 — "아메리카노"를 "아메리카노"로 오타쳐도 목록에서 바로 찾힘
   function applyFilter(){
-    const ql=mq.value.trim().toLowerCase(); let any=false;
+    const ql=norm(mq.value); let any=false;
     results.querySelectorAll(".mcat").forEach(cat=>{
       let catVisible=false;
-      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=!ql||r.dataset.name.includes(ql); r.style.display=hit?"":"none"; if(hit) catVisible=true; });
+      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=!ql||matchesName(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit) catVisible=true; });
       cat.style.display=catVisible?"":"none"; if(catVisible) any=true;
     });
     empty.style.display=any?"none":"";
   }
   mq.addEventListener("input", applyFilter);
-  // 클릭은 이벤트 위임 (재바인딩 없음)
-  results.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(r) openOrderSheet(r.dataset.id,null); });
-  document.getElementById("freeInput").onclick=()=>openCustomSheet(null, mq.value);
+  // 클릭은 이벤트 위임 (재바인딩 없음) — 메모는 넘겨받은 그대로 새 메뉴에 이어감
+  results.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(r) openOrderSheet(r.dataset.id, carryNote?{note:carryNote}:null); });
+  document.getElementById("freeInput").onclick=()=>openCustomSheet(null, mq.value, carryNote);
   document.getElementById("mClose").onclick=closeSheet;
   document.getElementById("mCloseX").onclick=closeSheet;
   // 자동 포커스 안 함 — 키보드가 올라와 목록을 가리지 않도록(스크롤로 훑어보기 우선)
