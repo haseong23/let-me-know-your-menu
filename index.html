@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -34,7 +34,7 @@
   #app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 0 16px 120px; }
   header { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 14px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .h-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .room-name { font-size: 18px; font-weight: 800; letter-spacing: -.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .room-name { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .date { font-size: 12px; color: var(--sub); margin-top: 1px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
   .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
   .dot.on { background: var(--green); } .dot.off { background: var(--accent); }
@@ -87,7 +87,7 @@
   .logchip.rem { background: #fdeaea; color: #b3261e; }
   .logchip.ren { background: #eaeef6; color: #33415c; }
   .pill { margin-left: auto; flex: none; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
-  .pill.ordered { background: #e7f4ec; color: var(--green); } .pill.skip { background: #f1eee9; color: var(--gray); } .pill.pending { background: #fbecdf; color: var(--accent); }
+  .pill.ordered { background: #e7f4ec; color: #1e7a37; } .pill.skip { background: #f1eee9; color: var(--sub); } .pill.pending { background: #fbecdf; color: #8a5a1f; }
   .person.picksel { background: var(--brand-soft); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--brand); }
   .stats { display: flex; gap: 8px; margin-bottom: 6px; }
   .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 8px; text-align: center; }
@@ -122,12 +122,11 @@
   /* 닫기·취소 버튼 — 붉은 계열로 통일해 직관적으로(파괴적 액션인 danger 버튼은 이미 붉음) */
   .btn-close { color: var(--red); border-color: #f0d4c8; }
   .sheet-x { background: none; border: none; font-size: 19px; line-height: 1; cursor: pointer; padding: 6px 4px; margin: -6px -4px -6px 0; flex: none; }
-  .chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .chip:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
   .cdialog .cmsg { font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
   .cdialog .crow { display: flex; gap: 8px; } .cdialog .crow .btn { flex: 1; margin: 0; }
-  .reload { cursor: pointer; user-select: none; opacity: .8; padding: 0 2px; }
   .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; }
   .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; min-width:0; }
@@ -232,7 +231,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.49";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.50";  // 배포 확인용 — 푸터/콘솔에 표시
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -444,8 +443,8 @@ function gridTilesHtml(selId){
   if(sel) items = [sel, ...items.filter(m=>m.id!==sel.id)];   // 현재 선택을 맨 앞에(중복 제거)
   items = items.slice(0,3);                                    // 사람마다 3개
   const addTile = activeCafe().freeform
-    ? `<div class="menu-tile add" data-custom="1"><span class="em">📝</span>직접 입력</div>`
-    : `<div class="menu-tile add" data-full="1"><span class="em">📋</span>전체 메뉴판</div>`;
+    ? `<div class="menu-tile add" data-custom="1" role="button" tabindex="0"><span class="em">📝</span>직접 입력</div>`
+    : `<div class="menu-tile add" data-full="1" role="button" tabindex="0"><span class="em">📋</span>전체 메뉴판</div>`;
   return items.map(m=>tileHtml(m,selId)).join("") + addTile;
 }
 function memberById(id){ return MEMBERS.find(m=>m.id===id); }
@@ -473,7 +472,7 @@ function orderDisplay(o){ // {emoji,name}
 function myMenuCount(id){ return (ME && H_byMemberId[ME] && H_byMemberId[ME][id]) || 0; }
 function bumpFreq(menuId){ /* 오늘 주문은 횟수에 즉시 반영하지 않음 — 마감 후 익일에 loadHist로 +1 */ }
 function tileHtml(m, selId){ const c=myMenuCount(m.id);
-  return `<div class="menu-tile ${m.id===selId?'sel':''}" data-id="${esc(m.id)}"><span class="ck">✓</span><span class="em">${esc(m.emoji)}</span>${esc(m.name)}${c?`<span class="cnt">총 ${c}회 주문</span>`:''}</div>`; }
+  return `<div class="menu-tile ${m.id===selId?'sel':''}" data-id="${esc(m.id)}" role="button" tabindex="0" aria-pressed="${m.id===selId}"><span class="ck">✓</span><span class="em">${esc(m.emoji)}</span>${esc(m.name)}${c?`<span class="cnt">총 ${c}회 주문</span>`:''}</div>`; }
 
 /* ===================== 공통 유틸 ===================== */
 let ME = null; // 셀별 스코프 — enterCell()에서 loadMe()로 채움
@@ -529,7 +528,7 @@ function setServings(list){
 function servingLabel(seq){ return seq ? (seq + "번째 섬김") : ""; }
 function servingDrinks(s){ let n=0; const o=s&&s.orders||{}; for(const k in o){ if(o[k].type==="drink") n++; } return n; }
 
-// 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시 + 수동 새로고침)
+// 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시)
 let lastSyncAt=0;
 function syncAgoText(){ if(!lastSyncAt) return "연결 중"; const s=Math.floor((Date.now()-lastSyncAt)/1000); if(s<5) return "방금"; if(s<60) return s+"초 전"; return Math.floor(s/60)+"분 전"; }
 setInterval(()=>{ try{ const el=document.getElementById("syncAgo"); if(el) el.textContent=syncAgoText(); }catch(e){} }, 10000);
@@ -565,7 +564,7 @@ const SupabaseSync = () => {
   function nowIso(){ return new Date().toISOString(); }
   // 엄격 모드: anon 직접 SELECT 차단 → 폴링으로 갱신(실시간 미사용)
   let pollTimer=null;
-  function startPolling(){ stopPolling(); pollTimer=setInterval(async()=>{ if(document.hidden) return; try{ await reload(); onChange(); }catch(e){} }, 12000); }
+  function startPolling(){ stopPolling(); pollTimer=setInterval(async()=>{ if(document.hidden) return; try{ await reload(); onChange(); }catch(e){} }, 10000); }
   function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
   async function reload(){
     // 하루 전체 섬김을 1회 조회(열거 불가 RPC). get_day 없으면 옛 get_room_day로 폴백(단일 섬김).
@@ -658,7 +657,7 @@ function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $sheet.cla
 function closeSheet(){ $scrim.classList.remove("show"); sheetOpen=false; }  // history 항목은 다음 뒤로가기/열기가 소비·재사용
 $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
 // 칩 키보드 접근성: 포커스된 칩(tabindex=0)에서 Enter/Space → 클릭(키보드·스크린리더 사용자)
-document.addEventListener("keydown",e=>{ const t=e.target; if((e.key==="Enter"||e.key===" "||e.key==="Spacebar")&&t&&t.classList&&t.classList.contains("chip")&&t.getAttribute("tabindex")==="0"){ e.preventDefault(); t.click(); } });
+document.addEventListener("keydown",e=>{ const t=e.target; if((e.key==="Enter"||e.key===" "||e.key==="Spacebar")&&t&&t.getAttribute&&t.getAttribute("tabindex")==="0"&&(t.getAttribute("role")==="button"||(t.classList&&t.classList.contains("chip")))){ e.preventDefault(); t.click(); } });
 window.addEventListener("popstate",()=>{
   if(ignorePop){ ignorePop=false; return; }   // 버튼으로 확인창 닫을 때의 history.back() 무시
   if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
@@ -684,24 +683,19 @@ function render(){
 function view(){ return document.getElementById("view"); }
 
 function renderHeader(){
-  const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span> <span class="reload" id="refreshBtn" role="button" aria-label="새로고침" title="새로고침">↻</span>` : `<span class="dot off"></span>이 기기 전용`;
+  const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span>` : `<span class="dot off"></span>이 기기 전용`;
   $app.innerHTML = `
     <header><div class="h-row">
-      <div style="min-width:0;overflow:hidden"><div class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</div>
+      <div style="min-width:0;overflow:hidden"><h1 class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</h1>
         <div class="date">${prettyDate()} · ${connHtml}</div></div>
       <div class="header-actions">
-        <div class="me-chip" id="meChip" role="button" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
+        <div class="me-chip" id="meChip" role="button" tabindex="0" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
         <button class="nav-link" id="gear" style="font-size:18px" aria-label="설정">⚙️</button>
       </div>
     </div></header>
     <div id="view"></div>`;
   document.getElementById("meChip").onclick=renderPickMe;
   document.getElementById("gear").onclick=()=>openSettings();
-  const rb=document.getElementById("refreshBtn");
-  if(rb) rb.onclick=async()=>{ rb.style.opacity=".35"; let ok=true;
-    try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } await Sync.reload(); }catch(e){ ok=false; }
-    if(curView==="host") renderHostView(); else render();
-    toast(ok?"최신 상태로 업데이트했어요":"새로고침 실패 — 네트워크 확인"); };
 }
 
 function renderPickMe(){
@@ -717,7 +711,7 @@ function renderPickMe(){
     const th=H_topName[m.id];
     const favParts=[]; if(th&&th.first) favParts.push(`①${esc(th.first.name)}`); if(th&&th.second) favParts.push(`②${esc(th.second.name)}`);
     const fav=favParts.join(" · ");
-    return `<div class="person${m.id===pickSel?' picksel':''}" data-id="${esc(m.id)}" style="cursor:pointer">
+    return `<div class="person${m.id===pickSel?' picksel':''}" data-id="${esc(m.id)}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===pickSel}" aria-label="${esc(m.name)}">
       <div class="avatar">${esc(initials(m.name))}</div>
       <div style="min-width:0"><div class="pname">${esc(m.name)}</div>${fav?`<div class="pmenu">${fav}</div>`:''}</div>${badge}</div>`;
   }).join("");
@@ -727,8 +721,8 @@ function renderPickMe(){
     <header><div class="room-name" style="padding-top:6px">☕ ${esc(ROOM_NAME)}</div>
     <div class="date">먼저 <b>본인</b>을 선택해 주세요 (ㄱㄴㄷ순)</div></header>
     <div class="card" style="padding:8px 18px">${list}</div>
-    <div class="label">내 이름이 목록에 없나요?</div>
-    <div class="inline-form"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
+    <div class="label" id="lbl-addMeName">내 이름이 목록에 없나요?</div>
+    <div class="inline-form"><input type="text" id="addMeName" maxlength="40" placeholder="이름 입력" aria-labelledby="lbl-addMeName"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
   document.getElementById("addMeBtn").onclick=async()=>{
     const nm=document.getElementById("addMeName").value.trim().slice(0,40); if(!nm){ toast("이름을 입력해주세요"); return; }
@@ -905,7 +899,7 @@ function openOrderSheet(menuId, existing){
       <div class="order-opts">
         ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
         ${optionsHtml}
-        <div class="label">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" />
+        <div class="label" id="lbl-note">메모 (선택)</div><input type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" aria-labelledby="lbl-note" />
       </div>
       <div class="sheet-foot">
         <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
@@ -964,15 +958,15 @@ function openCustomSheet(existing, prefillName){
   openSheet(`
     <h3>🥤 직접 입력</h3>
     <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
-    <div class="label">메뉴 이름</div>
-    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" value="${esc(prefillName||"")}" />
+    <div class="label" id="lbl-cname">메뉴 이름</div>
+    <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" value="${esc(prefillName||"")}" aria-labelledby="lbl-cname" />
     <div id="cSuggest"></div>
     <div class="label">온도</div>
     <div class="seg-temp" id="ctemp">
       <button class="tbtn ice on" data-t="ICE">🧊 ICE</button>
       <button class="tbtn hot" data-t="HOT">🔥 HOT</button>
     </div>
-    <div class="label">메모 (선택)</div><input type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" />
+    <div class="label" id="lbl-cnote">메모 (선택)</div><input type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" aria-labelledby="lbl-cnote" />
     <div style="height:18px"></div>
     <button class="btn btn-brand" id="cAdd">추가하고 주문</button>
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="cClose">닫기</button>`);
@@ -992,7 +986,7 @@ function openCustomSheet(existing, prefillName){
     exactMatch = (!isDecline && qn.length>=2) ? pool.find(m=>{ const mn=norm(m.name); return mn===qn || fuzzyDist(qn,mn)<=typoThreshold(qn.length); }) : null;
     const matches = (!isDecline && qn && !exactMatch) ? pool.filter(m=>matchesName(norm(m.name),qn)).slice(0,4) : [];
     sugEl.innerHTML = matches.length ? `<div class="card" style="padding:2px 12px;margin:6px 0 0">${
-      matches.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" style="cursor:pointer;padding:9px 2px">
+      matches.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" style="cursor:pointer;padding:9px 2px" role="button" tabindex="0" aria-label="${esc(m.name)}로 전환">
         <div style="font-size:19px;width:24px;text-align:center">${esc(m.emoji||"🥤")}</div>
         <div class="pname" style="font-size:14px">${esc(m.name)}</div></div>`).join("")}</div>` : "";
     if(isDecline){
@@ -1031,7 +1025,7 @@ function openFullMenuSheet(){
     const items=MENUS.filter(m=>m.cat===c.id);
     if(!items.length) return "";
     return `<div class="mcat"><div class="label" style="margin-top:14px">${c.label}</div><div class="card" style="padding:4px 14px">`+
-      items.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" data-name="${esc(m.name.toLowerCase())}" style="cursor:pointer">
+      items.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" data-name="${esc(m.name.toLowerCase())}" style="cursor:pointer" role="button" tabindex="0" aria-label="${esc(m.name)} 주문">
         <div style="font-size:21px;width:30px;text-align:center">${esc(m.emoji)}</div>
         <div class="pname">${esc(m.name)}</div>
         <span class="pmenu" style="margin-left:auto">${m.temps.length?m.temps.join("/"):"·"}</span></div>`).join("")+`</div></div>`;
@@ -1039,7 +1033,7 @@ function openFullMenuSheet(){
   openSheet(`
     <div style="position:sticky;top:0;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
       <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기">✕</button></div>
-      <input type="text" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" />
+      <input type="text" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" aria-label="메뉴 검색" />
     </div>
     <div id="mResults">${listHtml}<p class="muted center" id="mEmpty" style="margin-top:24px;display:none">검색 결과가 없어요</p></div>
     <div style="height:14px"></div>
@@ -1095,7 +1089,7 @@ function dashboardHtml(){
         pill=`<span class="pill ordered">주문</span>`; }
       else if(kind==="skip"){ menu="오늘은 안 마심"; pill=`<span class="pill skip">안마심</span>`; }
       else { menu="아직 응답 없음"; pill=`<span class="pill pending">미응답</span>`; }
-      return `<div class="person"><div class="avatar" style="${kind==='pending'?'background:var(--gray)':kind==='skip'?'background:#cbbfae':''}">${esc(initials(m.name))}</div>
+      return `<div class="person"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
         <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
     body=`<div class="card" style="padding:6px 18px">${ordered.map(m=>row(m,"ordered")).join("")}${skipped.map(m=>row(m,"skip")).join("")}${pending.map(m=>row(m,"pending")).join("")}</div>`;
     if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
@@ -1283,7 +1277,7 @@ function renderCellPicker(){
     + '사용 중 불편한 점이나 개선 아이디어가 있으시면 언제든 아래 이메일로 알려주세요.\n\n'
     + '감사합니다.\n\n표하성 드림';
   $app.innerHTML=`
-    <header><div class="room-name" style="padding-top:6px">☕ 오늘은 제가 섬기겠습니다</div></header>
+    <header><h1 class="room-name" style="padding-top:6px">☕ 오늘은 제가 섬기겠습니다</h1></header>
     <div class="card">
       <p style="margin:0;line-height:1.75;white-space:pre-line">${esc(msg)}</p>
       <p style="margin:12px 0 0">📧 <a href="mailto:tempyo42@gmail.com" style="color:var(--brand);font-weight:600">tempyo42@gmail.com</a></p>
@@ -1303,10 +1297,10 @@ function openCreateCellSheet(){
   let cafeId="gil";
   openSheet(`
     <h3>➕ 새 셀 만들기</h3>
-    <div class="label">셀 이름</div>
-    <input type="text" id="newName" maxlength="40" placeholder="예: 청년1부 2셀" />
-    <div class="label">구성원 (쉼표 또는 줄바꿈으로 구분)</div>
-    <textarea id="newMembers" rows="5" placeholder="김요셉, 이다니엘, 박사무엘" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)"></textarea>
+    <div class="label" id="lbl-newName">셀 이름</div>
+    <input type="text" id="newName" maxlength="40" placeholder="예: 청년1부 2셀" aria-labelledby="lbl-newName" />
+    <div class="label" id="lbl-newMembers">구성원 (쉼표 또는 줄바꿈으로 구분)</div>
+    <textarea id="newMembers" rows="5" placeholder="김요셉, 이다니엘, 박사무엘" aria-labelledby="lbl-newMembers" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink)"></textarea>
     <div class="label">홈 카페 (기본 카페)</div>
     <div class="chips" id="newCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
     <div style="height:16px"></div>
@@ -1342,11 +1336,11 @@ function openEditCellSheet(cell){
   function draw(){
     openSheet(`
       <h3>✏️ 셀 수정</h3>
-      <div class="label">셀 이름</div>
-      <input type="text" id="ecName" maxlength="40" value="${esc(nameVal)}" />
-      <div class="label">구성원 (이름을 고쳐도 주문 링크 유지)</div>
-      <div class="card" style="padding:6px 14px">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
-      <div class="inline-form" style="margin-top:8px"><input type="text" id="ecNewM" maxlength="40" placeholder="구성원 추가"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
+      <div class="label" id="lbl-ecName">셀 이름</div>
+      <input type="text" id="ecName" maxlength="40" value="${esc(nameVal)}" aria-labelledby="lbl-ecName" />
+      <div class="label" id="lbl-ecMembers">구성원 (이름을 고쳐도 주문 링크 유지)</div>
+      <div class="card" style="padding:6px 14px" aria-labelledby="lbl-ecMembers">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
+      <div class="inline-form" style="margin-top:8px"><input type="text" id="ecNewM" maxlength="40" placeholder="구성원 추가" aria-label="구성원 추가"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
       <div class="label">홈 카페 (기본 카페)</div>
       <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
       <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
@@ -1420,8 +1414,8 @@ function renderAdminLogin(){
     <header><div class="room-name" style="padding-top:6px">🔒 관리자</div>
     <div class="date">로그인이 필요합니다</div></header>
     <div class="card">
-      <div class="label">이메일</div><input type="email" id="admEmail" autocomplete="username" placeholder="admin@example.com" />
-      <div class="label">비밀번호</div><input type="password" id="admPw" autocomplete="current-password" placeholder="비밀번호" />
+      <div class="label" id="lbl-admEmail">이메일</div><input type="email" id="admEmail" autocomplete="username" placeholder="admin@example.com" aria-labelledby="lbl-admEmail" />
+      <div class="label" id="lbl-admPw">비밀번호</div><input type="password" id="admPw" autocomplete="current-password" placeholder="비밀번호" aria-labelledby="lbl-admPw" />
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="admLogin">로그인</button>
     </div>
@@ -1716,9 +1710,9 @@ function openRenameCellSheet(cell){
     <h3>🔗 주소(초대코드) 변경</h3>
     <p class="muted" style="margin-top:0"><b>${esc(cell.name)}</b>의 링크를 바꿉니다. 기존 주문·섬김·출석(대시보드)·수정내역이 <b>새 주소로 모두 이관</b>돼요.</p>
     <div class="banner-warn" style="margin:0 0 10px">⚠️ 예전 링크(<b>${esc(old)}</b>)는 더 이상 열리지 않습니다. 바꾼 뒤 <b>새 링크를 다시 공유</b>하세요.</div>
-    <div class="label">새 초대코드</div>
-    <input type="text" id="newid" maxlength="40" value="${esc(old)}" placeholder="영문 소문자·숫자·하이픈(-)" autocapitalize="off" autocomplete="off" spellcheck="false" />
-    <p class="muted" style="font-size:12px;margin:6px 0 0">2~40자, 소문자/숫자/하이픈만. 새 링크: <span id="prev" style="word-break:break-all;color:var(--brand)"></span></p>
+    <div class="label" id="lbl-newid">새 초대코드</div>
+    <input type="text" id="newid" maxlength="40" value="${esc(old)}" placeholder="영문 소문자·숫자·하이픈(-)" autocapitalize="off" autocomplete="off" spellcheck="false" aria-labelledby="lbl-newid" />
+    <p class="muted" style="font-size:12px;margin:6px 0 0">3~40자, 소문자/숫자/하이픈만. 새 링크: <span id="prev" style="word-break:break-all;color:var(--brand)"></span></p>
     <div style="height:16px"></div>
     <button class="btn btn-brand" id="dorename">주소 변경 + 데이터 이관</button>
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="rclose">닫기</button>`);
@@ -1729,7 +1723,7 @@ function openRenameCellSheet(cell){
   document.getElementById("rclose").onclick=closeSheet;
   document.getElementById("dorename").onclick=()=>guardWrite(async()=>{
     const nid=norm(inp.value);
-    if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(nid)){ toast("초대코드 형식을 확인해주세요(2~40자, 소문자/숫자/-)"); return; }
+    if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(nid)){ toast("초대코드 형식을 확인해주세요(3~40자, 소문자/숫자/-)"); return; }
     if(nid===old){ toast("기존과 다른 주소를 입력해주세요"); return; }
     if(cellById(nid)){ toast("이미 사용 중인 초대코드예요"); return; }
     if(!(await askConfirm(`주소를 '${old}' → '${nid}' 로 바꾸고 데이터를 이관할까요?\n예전 링크는 열리지 않게 됩니다.`,{ok:"변경",danger:true}))) return;
@@ -1760,7 +1754,7 @@ async function openCafeMenuAdmin(cafeId){
       <div style="font-size:20px;width:26px;text-align:center">${esc(m.emoji||"🥤")}</div>
       <div style="flex:1;min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(CAT_LABEL[m.cat]||m.cat||"기타")} · ${esc((m.temps||[]).join("/")||"-")}</div></div>
       <button class="btn btn-sm ${m.popular?'btn-brand':'btn-soft'} mpop" data-id="${esc(m.id)}" style="flex:none">${m.popular?'⭐인기':'인기'}</button>
-      <button class="mdel2" data-id="${esc(m.id)}" style="background:none;border:none;color:var(--red);font-size:18px;flex:none;cursor:pointer">✕</button>
+      <button class="mdel2" data-id="${esc(m.id)}" aria-label="메뉴 삭제" style="background:none;border:none;color:var(--red);font-size:18px;flex:none;cursor:pointer;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button>
     </div>`).join("") || '<p class="muted">메뉴가 없어요. 아래 "기본 메뉴 불러오기"로 시작하세요.</p>';
   $app.innerHTML=`
     <header><div class="h-row"><div><div class="room-name">🍽️ 카페길 메뉴</div><div class="date">${menus.length}개 · 관리자</div></div>
@@ -1790,10 +1784,10 @@ function openMenuEditSheet(cafeId, existing){
   function tchip(t){ return `<div class="chip ${temps.includes(t)?'sel':''}" data-t="${t}">${t}</div>`; }
   openSheet(`
     <h3>${existing?'메뉴 수정':'메뉴 추가'}</h3>
-    <div class="label">이름</div><input type="text" id="mname" maxlength="40" value="${esc(existing?existing.name:'')}" placeholder="예: 흑임자라떼"/>
-    <div class="label">이모지(선택)</div><input type="text" id="memoji" maxlength="4" value="${esc(existing?(existing.emoji||''):'')}" placeholder="🥤"/>
-    <div class="label">분류</div>
-    <select id="mcat" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;background:#fff">${CAT_ORDER.map(c=>`<option value="${c}" ${c===cat?'selected':''}>${CAT_LABEL[c]}</option>`).join("")}</select>
+    <div class="label" id="lbl-mname">이름</div><input type="text" id="mname" maxlength="40" value="${esc(existing?existing.name:'')}" placeholder="예: 흑임자라떼" aria-labelledby="lbl-mname"/>
+    <div class="label" id="lbl-memoji">이모지(선택)</div><input type="text" id="memoji" maxlength="4" value="${esc(existing?(existing.emoji||''):'')}" placeholder="🥤" aria-labelledby="lbl-memoji"/>
+    <div class="label" id="lbl-mcat">분류</div>
+    <select id="mcat" aria-labelledby="lbl-mcat" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;background:#fff">${CAT_ORDER.map(c=>`<option value="${c}" ${c===cat?'selected':''}>${CAT_LABEL[c]}</option>`).join("")}</select>
     <div class="label">온도</div><div class="chips" id="mtemps">${tchip("ICE")}${tchip("HOT")}</div>
     <div style="height:14px"></div>
     <button class="btn btn-brand" id="msave">${existing?'수정':'추가'}</button>
@@ -1816,8 +1810,8 @@ function openMembersSheet(){
     openSheet(`
       <h3>👥 ${esc(ROOM_NAME)} 구성원 편집</h3>
       <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. <b>이름을 고쳐도 기존 주문은 그대로 따라옵니다.</b></p>
-      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
-      <div class="inline-form" style="margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
+      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
+      <div class="inline-form" style="margin-top:10px"><input type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가" aria-label="구성원 이름 추가"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
       <button class="btn btn-brand" id="saveM">저장</button>
       <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="closeM">닫기</button>`);
