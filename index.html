@@ -37,6 +37,9 @@
     /* --accent(#c98a3a)는 흰 배경 대비 2.92:1 이라 글자에 못 쓴다. 칠(배지·점)에만 쓰고 글자는 --accent-ink.
        --gray(2.05:1)도 글자 금지 — 보조문구는 --sub(5.27:1). */
     --accent-ink: #96631f;
+    /* 차트 마크 전용. --brand 는 채도 0.057 이라 데이터 막대로 쓰면 회색으로 읽힌다(UI 색으로는 문제없음).
+       #94520c 는 채도 0.104 로 floor 통과 + 흰 배경 대비 3:1 이상. */
+    --data-1: #94520c;
   }
   /* 움직임 최소화 설정을 켠 사용자에게는 전환을 끈다 */
   @media (prefers-reduced-motion: reduce) {
@@ -116,9 +119,8 @@
   .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 8px; text-align: center; }
   .stat .num { font-size: 24px; font-weight: 900; letter-spacing: -1px; } .stat .lbl { font-size: 12px; color: var(--sub); margin-top: 2px; } .stat.total .num { color: var(--brand); }
   .tabs { display: flex; gap: 6px; background: var(--brand-soft); padding: 5px; border-radius: 12px; margin-bottom: 14px; }
-  .tab { flex: 1; text-align: center; padding: 9px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-  /* 대시보드 조회기간 표시(7/30 토글 통합 → 최근 30일 고정) */
-  .dash-period { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; margin: 0 0 14px; }
+  /* div·button 둘 다로 쓰인다 — button 의 UA 기본 배경을 지우고 탭 영역 44px 을 보장한다 */
+  .tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; padding: 9px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); background: none; } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
   .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
   .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
@@ -230,7 +232,35 @@
   .usage { display:inline-flex; gap:8px; align-items:flex-end; height:66px; min-width:100%; padding-bottom:2px; }
   .ubar { flex:0 0 auto; width:38px; display:flex; flex-direction:column; align-items:center; gap:3px; }
   .ubar-n { font-size:11px; font-weight:800; color:var(--ink); line-height:1; }
-  .ubar-b { width:24px; border-radius:5px 5px 0 0; }
+  /* 막대는 한 색. 마감/진행중은 채움 vs 윤곽으로 구분한다(색만으로 상태를 나누지 않는다) */
+  .ubar-b { width:24px; border-radius:5px 5px 0 0; background:var(--data-1); }
+  .ubar-b.open { background:transparent; border:2px solid var(--data-1); }
+  .legend { display:flex; gap:11px; align-items:center; font-size:11px; color:var(--sub); font-weight:700; flex:none; }
+  .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; vertical-align:-1px; margin-right:4px; background:var(--data-1); }
+  .legend i.open { background:transparent; border:2px solid var(--data-1); }
+  /* ① 히어로 + KPI */
+  .hero { text-align:center; padding:8px 0 2px; }
+  .hero-n { font-size:46px; font-weight:900; letter-spacing:-2px; color:var(--ink); line-height:1.02; }
+  .hero-l { font-size:13px; color:var(--sub); font-weight:700; margin-top:3px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0 10px; }
+  .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
+  .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
+  .kpi .l { font-size:11px; color:var(--sub); font-weight:700; margin-top:2px; }
+  .dash-filter { margin:0 0 14px; }
+  /* ③ 사람별 참여 — 세로 목록이라 가로 스크롤이 없다 */
+  .prow { padding:8px 2px; border-top:1px solid var(--line); }
+  .prow-n { font-weight:700; font-size:13px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .meter { height:7px; border-radius:99px; background:var(--brand-soft); overflow:hidden; }
+  .meter > i { display:block; height:100%; background:var(--data-1); border-radius:99px; }
+  /* ④ 메뉴 Top — 가로 막대 */
+  .hbar { padding:6px 0 2px; }
+  .hbar-name { font-size:13px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hbar-n { font-size:12px; font-weight:800; color:var(--sub); flex:none; }
+  .hbar-track { height:8px; border-radius:99px; background:var(--brand-soft); margin-top:4px; }
+  .hbar-track > i { display:block; height:100%; background:var(--data-1); border-radius:99px; }
+  /* title= 은 모바일에서 안 뜬다. 탭·호버 모두 되는 툴팁 하나를 문서에 띄운다 */
+  .tip { position:fixed; z-index:80; background:#2b2118; color:#fff; font-size:12px; font-weight:600; line-height:1.45; padding:7px 10px; border-radius:9px; max-width:min(78vw,270px); pointer-events:none; opacity:0; transition:opacity .12s; box-shadow:0 6px 18px rgba(40,28,16,.28); }
+  .tip.show { opacity:1; }
   .ubar-d { font-size:11px; color:var(--sub); line-height:1.2; text-align:center; white-space:nowrap; }
   .ubar-d .wk { color:var(--sub); }
   .mx-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -264,7 +294,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.55";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.60";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1553,64 +1583,128 @@ async function renderAdminDash(){
     toast("삭제됨"); renderAdminDash(); });
 }
 
-/* ---------- 관리자 대시보드: 셀별 사용 빈도 + 섬김 랭킹 + 출석 타임라인 ---------- */
-const dashDays = 30;   // 조회 기간(일) — 최근 30일 고정(7/30 토글 통합)
+/* ---------- 관리자 대시보드 ----------
+   위계: ① 히어로+KPI ② 추세(단일 색 막대) ③ 사람별 참여(미터) ④ 많이 마신 메뉴.
+   원칙 두 가지 —
+   (a) 상태를 색만으로 구분하지 않는다. 마감/진행중은 채움 vs 윤곽 + 라벨 범례.
+       (--brand #6f4e37 와 --accent-ink #96631f 는 정상 시야 ΔE 10.2 로 기준 15 미달이었다)
+   (b) 값 라벨은 최댓값·마지막만. 모든 막대에 숫자를 붙이지 않는다. */
+let dashDays = 30;      // 조회 기간(일) — 화면의 7/30/90 필터가 바꾼다
+let dashReload = null;  // 기간을 바꿨을 때 다시 부를 렌더 함수(화면마다 다름)
+const DASH_CELLS = {};  // 드릴다운 시트가 참조할 셀 원본. dashCardHtml 이 채운다
+let dashSeq = 0;
+
 // 'YYYY-MM-DD' → "7/12<br>(토)" (2줄). UTC 파싱으로 타임존 드리프트 방지.
 function dashColLabel(dateStr){
   const [y,m,d]=dateStr.split("-").map(Number); const dt=new Date(Date.UTC(y,m-1,d));
   const wk=["일","월","화","수","목","금","토"][dt.getUTCDay()];
   return `${m}/${d}<br><span class="wk">${wk}</span>`;
 }
-// 사용 빈도 막대 — 데이터(섬김)가 있는 날짜만 나열(빈 날 미표시 → 라벨 잘림 없음). 많으면 가로 스크롤.
+// 기간 필터 — 차트 위 한 줄. 누르면 해당 화면을 다시 집계한다.
+function dashPeriodHtml(){
+  return `<div class="tabs dash-filter">${[7,30,90].map(d=>
+    `<button class="tab${dashDays===d?' on':''}" data-days="${d}">최근 ${d}일</button>`).join("")}</div>`;
+}
+// ① 리드 숫자 하나 + KPI 4칸. 이전에는 "N일 · N회" pill 안에 파묻혀 있었다.
+function dashHeroHtml(c){
+  const servings=c.servings_total||0, used=c.used_days||0;
+  const closed=(c.days||[]).filter(d=>(d.closed||0)>0).length;
+  const cups=(c.members||[]).reduce((s,m)=>s+(m.menus||[]).reduce((a,x)=>a+(x.count||0),0),0);
+  const rate=used?Math.round(closed/used*100):0;
+  return `<div class="hero"><div class="hero-n">${servings}</div><div class="hero-l">이 기간 섬김 횟수</div></div>
+    <div class="kpis">
+      <div class="kpi" data-tip="섬김을 연 날 수(최근 ${dashDays}일)"><div class="n">${used}</div><div class="l">활동한 날</div></div>
+      <div class="kpi"><div class="n">${c.member_count||0}</div><div class="l">구성원</div></div>
+      <div class="kpi" data-tip="이 기간 주문된 음료 총 잔 수"><div class="n">${cups}</div><div class="l">총 잔</div></div>
+      <div class="kpi" data-tip="활동한 ${used}일 중 ${closed}일 마감"><div class="n">${rate}<span style="font-size:12px">%</span></div><div class="l">마감률</div></div>
+    </div>`;
+}
+// ② 사용 빈도 — 한 색. 마감=채움 / 진행중=윤곽. 데이터가 있는 날만 나열(빈 날 미표시).
 function usageBarsHtml(days){
   const list=(days||[]).slice().sort((a,b)=> a.date<b.date?-1:1);
-  if(!list.length) return `<div class="muted" style="font-size:12px;padding:6px 0">이 기간 섬김 기록이 없어요</div>`;
-  const max=Math.max(1, ...list.map(x=>x.servings));
-  return `<div class="usage-wrap"><div class="usage">${list.map(x=>{
+  const head=`<div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">☕ 사용 빈도</b>
+    <span class="legend"><span><i></i>마감</span><span><i class="open"></i>진행중</span></span></div>`;
+  if(!list.length) return head+`<div class="muted" style="font-size:12px;padding:6px 0">이 기간 섬김 기록이 없어요</div>`;
+  const max=Math.max(1, ...list.map(x=>x.servings)), lastI=list.length-1;
+  return head+`<div class="usage-wrap"><div class="usage">${list.map((x,i)=>{
     const h=Math.max(8,Math.round(x.servings/max*54));
-    const col=x.closed>0?"var(--brand)":"var(--accent-ink)";
-    return `<div class="ubar" title="${esc(x.date)} · 섬김 ${x.servings}회${x.closed?` (마감 ${x.closed})`:''}">
-      <div class="ubar-n">${x.servings}</div>
-      <div class="ubar-b" style="height:${h}px;background:${col}"></div>
+    const open=!(x.closed>0);
+    const show = x.servings===max || i===lastI;   // 값 라벨은 최댓값·마지막만
+    return `<div class="ubar" data-tip="${esc(x.date)} · 섬김 ${x.servings}회 · ${open?'진행중':'마감 '+x.closed+'회'}">
+      <div class="ubar-n"${show?'':' style="visibility:hidden"'}>${x.servings}</div>
+      <div class="ubar-b${open?' open':''}" style="height:${h}px"></div>
       <div class="ubar-d">${dashColLabel(x.date)}</div></div>`;
   }).join("")}</div></div>`;
+}
+// ③ 사람별 참여 — 세로로 읽히는 목록이라 가로 스크롤이 없다. 날짜별 매트릭스는 드릴다운으로.
+function peopleListHtml(c, key){
+  const used=c.used_days||0;
+  const rows=(c.members||[]).map(m=>({ name:m.name, a:(m.dates||[]).length,
+      s:(m.serve_dates||[]).length, t:m.attend_total||0 }))
+    .sort((x,y)=> y.a-x.a || y.s-x.s || x.name.localeCompare(y.name,"ko"));
+  const head=`<div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🙌 사람별 참여</b>
+    <button class="nav-link" data-mx="${key}" style="font-size:12px">날짜별 보기</button></div>`;
+  if(!rows.length) return head+`<p class="muted center" style="padding:8px 0">구성원이 없어요</p>`;
+  return head+rows.map(r=>{
+    const pct=used?Math.round(r.a/used*100):0;
+    return `<div class="prow" data-tip="${esc(r.name)} · 활동한 ${used}일 중 ${r.a}일 출석 (${pct}%) · 섬김 ${r.s}회 · 누적 출석 ${r.t}일">
+      <div class="row-between" style="margin-bottom:5px">
+        <span class="prow-n">${esc(r.name)}</span>
+        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${used}${r.s?` · ☕${r.s}`:''} · 누적 ${r.t}</span></div>
+      <div class="meter"><i style="width:${pct}%"></i></div></div>`;
+  }).join("");
+}
+// ④ 많이 마신 메뉴 — 가로 막대 Top 8. 나머지는 묶어서 개수를 밝힌다(조용히 자르지 않는다).
+function menuTopHtml(c, key){
+  const agg={};
+  (c.members||[]).forEach(m=>(m.menus||[]).forEach(x=>{ agg[x.name]=(agg[x.name]||0)+(x.count||0); }));
+  const list=Object.keys(agg).map(k=>({name:k,n:agg[k]})).sort((a,b)=> b.n-a.n || a.name.localeCompare(b.name,"ko"));
+  if(!list.length) return "";
+  const top=list.slice(0,8), rest=list.slice(8);
+  const max=Math.max(1,...top.map(x=>x.n));
+  const rows=top.map(x=>`<div class="hbar" data-tip="${esc(x.name)} · ${x.n}잔">
+      <div class="row-between"><span class="hbar-name">${esc(x.name)}</span><span class="hbar-n">${x.n}</span></div>
+      <div class="hbar-track"><i style="width:${Math.round(x.n/max*100)}%"></i></div></div>`).join("");
+  const more = rest.length
+    ? `<div class="muted" style="font-size:11.5px;padding:6px 2px 0">그 외 ${rest.length}종 ${rest.reduce((s,x)=>s+x.n,0)}잔</div>` : "";
+  return `<div style="height:12px"></div>
+    <div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🥤 많이 마신 메뉴</b>
+      <button class="nav-link" data-mbm="${key}" style="font-size:12px">사람별로 보기</button></div>${rows}${more}`;
 }
 // 누가 자주 섬겼는지 — 이 기간 섬김(호스트) 횟수 랭킹 칩
 function serveRankHtml(c){
   const ranked=(c.members||[]).map(m=>({name:m.name, ct:(m.serve_dates||[]).length}))
     .filter(x=>x.ct>0).sort((a,b)=> b.ct-a.ct || a.name.localeCompare(b.name,"ko"));
-  const body = ranked.length
-    ? ranked.map((r,i)=>`<span class="logchip ${i===0?'add':''}" style="font-size:12px">${i===0?'👑 ':''}${esc(r.name)} <b>${r.ct}회</b></span>`).join("")
-    : '<span class="muted" style="font-size:12px">이 기간 섬긴 사람이 없어요</span>';
-  return `<div class="muted" style="font-size:12px;margin:2px 0 4px">🙌 이 기간 누가 섬겼나</div>
-    <div class="logchips" style="margin-bottom:8px">${body}</div>`;
+  if(!ranked.length) return "";
+  return `<div class="muted" style="font-size:12px;margin:10px 0 4px">👑 이 기간 누가 섬겼나</div>
+    <div class="logchips" style="margin-bottom:2px">${ranked.map((r,i)=>
+      `<span class="logchip ${i===0?'add':''}" style="font-size:12px">${i===0?'👑 ':''}${esc(r.name)} <b>${r.ct}회</b></span>`).join("")}</div>`;
 }
-// 누가 언제 출석했는지 — 구성원 × (데이터 있는)날짜 매트릭스. ☕=섬김 / ●=출석 / ·=없음.
+// 드릴다운 A: 구성원 × 날짜 매트릭스. ☕=섬김 / ●=출석 / ·=없음.
 function attendMatrixHtml(c){
   const members=c.members||[];
   const colSet={}; (c.days||[]).forEach(d=>colSet[d.date]=1);
   members.forEach(m=>{ (m.dates||[]).forEach(d=>colSet[d]=1); (m.serve_dates||[]).forEach(d=>colSet[d]=1); });
   const cols=Object.keys(colSet).sort();
-  const title=`<div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">📅 누가 언제 출석했나</b>
-    <span class="muted" style="font-size:11px">☕섬김 · ●출석</span></div>`;
-  if(!cols.length) return title+`<p class="muted center" style="padding:8px 0">이 기간 출석 기록이 없어요</p>`;
+  if(!cols.length) return `<p class="muted center" style="padding:8px 0">이 기간 출석 기록이 없어요</p>`;
   const head=`<tr><th class="mx-name">구성원</th>${cols.map(d=>`<th class="mx-date">${dashColLabel(d)}</th>`).join("")}<th class="mx-sum">출석·섬김</th></tr>`;
   const rows=members.length ? members.map(m=>{
     const att={}; (m.dates||[]).forEach(d=>att[d]=1);
     const srv={}; (m.serve_dates||[]).forEach(d=>srv[d]=1);
-    const cells=cols.map(d=> srv[d] ? `<td class="mx-cell srv" title="${esc(d)} 섬김">☕</td>`
-      : att[d] ? `<td class="mx-cell att" title="${esc(d)} 출석">●</td>`
+    const cells=cols.map(d=> srv[d] ? `<td class="mx-cell srv" data-tip="${esc(m.name)} · ${esc(d)} 섬김">☕</td>`
+      : att[d] ? `<td class="mx-cell att" data-tip="${esc(m.name)} · ${esc(d)} 출석">●</td>`
       : `<td class="mx-cell">·</td>`).join("");
     const aCt=(m.dates||[]).length, sCt=(m.serve_dates||[]).length, at=m.attend_total||0;
-    return `<tr><td class="mx-name" title="${esc(m.name)}">${esc(m.name)}</td>${cells}<td class="mx-sum" title="이 기간 출석 ${aCt} · 섬김 ${sCt} · 누적 출석 ${at}">${aCt}<span class="muted" style="font-weight:600">·</span>☕${sCt}<span class="muted" style="font-weight:600;font-size:11px"> · 누적${at}</span></td></tr>`;
+    return `<tr><td class="mx-name">${esc(m.name)}</td>${cells}<td class="mx-sum" data-tip="이 기간 출석 ${aCt} · 섬김 ${sCt} · 누적 출석 ${at}">${aCt}<span class="muted" style="font-weight:600">·</span>☕${sCt}<span class="muted" style="font-weight:600;font-size:11px"> · 누적${at}</span></td></tr>`;
   }).join("") : `<tr><td class="mx-name">—</td><td class="mx-cell" colspan="${cols.length+1}">구성원이 없어요</td></tr>`;
-  return title+`<div class="mx-wrap"><table class="mx"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+  return `<p class="muted" style="margin:0 0 6px;font-size:12px">☕ 섬김 · ● 출석 · · 기록 없음</p>
+    <div class="mx-wrap"><table class="mx"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
-// 사람별로 어떤 메뉴를 몇 번 주문했는지 — 이 기간 기준
+// 드릴다운 B: 사람별로 어떤 메뉴를 몇 번 주문했는지
 function menuByMemberHtml(c){
   const members=(c.members||[]).filter(m=>(m.menus||[]).length);
-  if(!members.length) return "";
-  const rows=members.map(m=>{
+  if(!members.length) return `<p class="muted center" style="padding:8px 0">이 기간 주문 기록이 없어요</p>`;
+  return members.map(m=>{
     const tot=(m.menus||[]).reduce((s,x)=>s+(x.count||0),0);
     const chips=(m.menus||[]).map(x=>`<span class="logchip" style="font-size:12px">${esc(x.name)} <b>${x.count}</b></span>`).join("");
     return `<div style="padding:8px 2px;border-bottom:1px solid var(--line)">
@@ -1618,28 +1712,57 @@ function menuByMemberHtml(c){
         <span class="muted" style="font-size:11px">총 ${tot}잔</span></div>
       <div class="logchips">${chips}</div></div>`;
   }).join("");
-  return `<div style="height:10px"></div>
-    <div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🥤 사람별 메뉴</b>
-      <span class="muted" style="font-size:11px">이 기간 주문 횟수</span></div>${rows}`;
 }
 // 셀 카드 1개 (관리자 대시보드·셀 단위 대시보드 공용)
 function dashCardHtml(c, opts){ opts=opts||{};
-  const used=c.used_days||0, servings=c.servings_total||0;
+  const key="d"+(++dashSeq); DASH_CELLS[key]=c;
   const meta = opts.showCode ? ` · 초대코드 ${esc(c.cell_id)} · ${c.member_count||0}명` : ` · ${c.member_count||0}명`;
   return `<div class="card" style="padding:14px 16px 12px">
-    <div class="row-between dash-card-head" style="margin-bottom:6px">
+    <div class="row-between dash-card-head" style="margin-bottom:2px">
       <div style="min-width:0"><b style="font-size:16px">${esc(c.name)}</b>
         <span class="muted" style="font-size:12px">${meta}</span></div>
-      <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
     </div>
-    <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--sub)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent-ink)">진행중</span>)</span></div>
+    ${dashHeroHtml(c)}
     ${usageBarsHtml(c.days)}
-    <div style="height:10px"></div>
     ${serveRankHtml(c)}
-    ${attendMatrixHtml(c)}
-    ${menuByMemberHtml(c)}
+    <div style="height:12px"></div>
+    ${peopleListHtml(c, key)}
+    ${menuTopHtml(c, key)}
   </div>`;
 }
+// 드릴다운 시트 + 기간 필터 — 문서에 한 번만 거는 위임 핸들러
+document.addEventListener("click", e=>{
+  const d=e.target.closest("[data-days]");
+  if(d){ const n=+d.dataset.days; if(n!==dashDays){ dashDays=n; if(dashReload) dashReload(); } return; }
+  const mx=e.target.closest("[data-mx]");
+  if(mx){ const c=DASH_CELLS[mx.dataset.mx];
+    if(c) openSheet(`<h3>📅 ${esc(c.name)} · 날짜별 출석</h3>
+      <div class="sheet-scroll">${attendMatrixHtml(c)}</div>
+      <div class="sheet-foot"><button class="btn btn-ghost btn-close" id="dxClose">닫기</button></div>`);
+    const b1=document.getElementById("dxClose"); if(b1) b1.onclick=closeSheet; return; }
+  const mb=e.target.closest("[data-mbm]");
+  if(mb){ const c=DASH_CELLS[mb.dataset.mbm];
+    if(c) openSheet(`<h3>🥤 ${esc(c.name)} · 사람별 메뉴</h3>
+      <div class="sheet-scroll">${menuByMemberHtml(c)}</div>
+      <div class="sheet-foot"><button class="btn btn-ghost btn-close" id="dmClose">닫기</button></div>`);
+    const b2=document.getElementById("dmClose"); if(b2) b2.onclick=closeSheet; }
+});
+// 탭 툴팁 — title= 은 터치에서 아예 안 뜬다. [data-tip] 을 누르면 화면 안쪽으로 물려 띄운다.
+(function tipLayer(){
+  let $tip=null;
+  const hide=()=>{ if($tip) $tip.classList.remove("show"); };
+  const show=el=>{
+    const t=el.getAttribute("data-tip"); if(!t) return hide();
+    if(!$tip){ $tip=document.createElement("div"); $tip.className="tip"; document.body.appendChild($tip); }
+    $tip.textContent=t; $tip.classList.add("show");
+    const r=el.getBoundingClientRect(), b=$tip.getBoundingClientRect();
+    $tip.style.left=Math.max(8, Math.min(r.left+r.width/2-b.width/2, window.innerWidth-b.width-8))+"px";
+    $tip.style.top=(r.top-b.height-8 < 8 ? r.bottom+8 : r.top-b.height-8)+"px";
+  };
+  document.addEventListener("click", e=>{ const el=e.target.closest("[data-tip]"); el?show(el):hide(); });
+  document.addEventListener("scroll", hide, true);
+  window.addEventListener("resize", hide);
+})();
 // 셀 단위 대시보드 — ?cell=<id>&view=dashboard (관리자 로그인 없이 그 셀만)
 async function renderCellDashboard(cellId){
   inPicker=false; adminMode=false; curView="celldash"; $bottom.innerHTML="";
@@ -1668,12 +1791,13 @@ async function renderCellDashboard(cellId){
       <p class="center" style="margin-top:12px"><a href="${esc(location.pathname)}" class="nav-link">← 처음으로</a></p>`;
     return;
   }
+  dashReload=()=>renderCellDashboard(cellId);
   const c=payload.cell, today=(payload&&payload.today)||todayKey();
   $app.innerHTML=`
     <header><div class="h-row"><div style="min-width:0"><div class="room-name">📊 ${esc(c.name)}</div>
       <div class="date">${esc(today)} 기준 · 우리 셀 현황</div></div>
       <a href="${cellLink}" class="nav-link" style="font-size:14px">← 셀로</a></div></header>
-    <div class="dash-period">📅 최근 30일 기준</div>
+    ${dashPeriodHtml()}
     ${dashCardHtml(c,{showCode:false})}
     <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
 }
@@ -1700,6 +1824,7 @@ async function renderAdminDashboard(){
     back(); return;
   }
 
+  dashReload=renderAdminDashboard;
   const cells=(payload&&payload.cells)||[];
   const today=(payload&&payload.today)||todayKey();
   const cardsHtml = cells.length ? cells.map(c=>dashCardHtml(c,{showCode:true})).join("")
@@ -1709,9 +1834,9 @@ async function renderAdminDashboard(){
     <header><div class="h-row"><div><div class="room-name">📊 대시보드</div>
       <div class="date">셀 ${cells.length}개 · ${esc(today)} 기준</div></div>
       <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
-    <div class="dash-period">📅 최근 30일 기준</div>
+    ${dashPeriodHtml()}
     ${cardsHtml}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 매트릭스의 표시 기간과 무관하게 전체</p>`;
+    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
   back();
 }
 
