@@ -294,7 +294,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.60";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.61";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1125,7 +1125,7 @@ function openFullMenuSheet(curId, carryNote){
   openSheet(`
     <div style="flex:none;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
       <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기">✕</button></div>
-      <input type="search" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" aria-label="메뉴 검색" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+      <input type="search" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, ㅇㅁㄹ)" aria-label="메뉴 검색 — 초성으로도 찾을 수 있어요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
     </div>
     <div class="sheet-scroll">
       <div class="sheet-count" id="mCount"></div>
@@ -1152,9 +1152,11 @@ function openFullMenuSheet(curId, carryNote){
       cat.style.display=catVisible?"":"none"; if(catVisible) any=true;
     });
     empty.style.display=any?"none":"";
-    count.textContent = ql ? ("검색 결과 "+n+"개") : "";
+    // 검색 전에는 같은 자리에 초성 검색 힌트를 보여준다 — 줄을 새로 만들지 않아 세로 공간이 안 든다
+    count.textContent = ql ? ("검색 결과 "+n+"개") : "💡 초성으로도 찾아요 — ㅇㅁㄹ → 아메리카노";
   }
   mq.addEventListener("input", applyFilter);
+  applyFilter();   // 시트를 열자마자 초성 힌트가 보이도록 한 번 실행(빈 질의라 목록은 그대로)
   // 검색 키를 누르면 키보드를 내려 목록 전체를 보여준다(보낼 폼이 없으므로 제출은 무의미)
   mq.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); mq.blur(); } });
   // 클릭은 이벤트 위임 (재바인딩 없음) — 메모는 넘겨받은 그대로 새 메뉴에 이어감
