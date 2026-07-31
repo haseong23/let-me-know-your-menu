@@ -233,8 +233,10 @@
   .ubar { flex:0 0 auto; width:38px; display:flex; flex-direction:column; align-items:center; gap:3px; }
   .ubar-n { font-size:11px; font-weight:800; color:var(--ink); line-height:1; }
   /* 막대는 한 색. 마감/진행중은 채움 vs 윤곽으로 구분한다(색만으로 상태를 나누지 않는다) */
-  .ubar-b { width:24px; border-radius:5px 5px 0 0; background:var(--data-1); }
-  .ubar-b.open { background:transparent; border:2px solid var(--data-1); }
+  .ubar-b { width:24px; border-radius:5px 5px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; gap:2px; }
+  .ubar-b > i { display:block; width:100%; box-sizing:border-box; }
+  .ubar-b > i.cl { background:var(--data-1); }
+  .ubar-b > i.op { background:transparent; border:2px solid var(--data-1); }
   .legend { display:flex; gap:11px; align-items:center; font-size:11px; color:var(--sub); font-weight:700; flex:none; }
   .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; vertical-align:-1px; margin-right:4px; background:var(--data-1); }
   .legend i.open { background:transparent; border:2px solid var(--data-1); }
@@ -242,6 +244,7 @@
   .hero { text-align:center; padding:8px 0 2px; }
   .hero-n { font-size:46px; font-weight:900; letter-spacing:-2px; color:var(--ink); line-height:1.02; }
   .hero-l { font-size:13px; color:var(--sub); font-weight:700; margin-top:3px; }
+  .hero-sub { font-size:12px; color:var(--sub); margin-top:3px; }
   .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0 10px; }
   .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
   .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
@@ -294,7 +297,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.61";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.62";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1604,21 +1607,27 @@ function dashColLabel(dateStr){
 }
 // 기간 필터 — 차트 위 한 줄. 누르면 해당 화면을 다시 집계한다.
 function dashPeriodHtml(){
-  return `<div class="tabs dash-filter">${[7,30,90].map(d=>
+  // 서버 RPC 가 p_days 를 1~31 로 자른다 — 그 위 값을 넣으면 조용히 31일이 된다
+  return `<div class="tabs dash-filter">${[7,14,30].map(d=>
     `<button class="tab${dashDays===d?' on':''}" data-days="${d}">최근 ${d}일</button>`).join("")}</div>`;
 }
 // ① 리드 숫자 하나 + KPI 4칸. 이전에는 "N일 · N회" pill 안에 파묻혀 있었다.
 function dashHeroHtml(c){
+  const days=c.days||[];
   const servings=c.servings_total||0, used=c.used_days||0;
-  const closed=(c.days||[]).filter(d=>(d.closed||0)>0).length;
+  const closed=days.reduce((a,d)=>a+(d.closed||0),0);
+  const multi=days.filter(d=>(d.servings||0)>=2).length;      // 하루 2회 이상 섬긴 날
   const cups=(c.members||[]).reduce((s,m)=>s+(m.menus||[]).reduce((a,x)=>a+(x.count||0),0),0);
-  const rate=used?Math.round(closed/used*100):0;
-  return `<div class="hero"><div class="hero-n">${servings}</div><div class="hero-l">이 기간 섬김 횟수</div></div>
+  const avg=used?(servings/used):0;
+  const rate=servings?Math.round(closed/servings*100):0;      // 날이 아니라 '섬김' 기준 마감률
+  return `<div class="hero"><div class="hero-n">${servings}</div>
+    <div class="hero-l">이 기간 섬김 횟수</div>
+    <div class="hero-sub">${used}일 동안 · 하루 평균 ${avg.toFixed(1)}회</div></div>
     <div class="kpis">
-      <div class="kpi" data-tip="섬김을 연 날 수(최근 ${dashDays}일)"><div class="n">${used}</div><div class="l">활동한 날</div></div>
-      <div class="kpi"><div class="n">${c.member_count||0}</div><div class="l">구성원</div></div>
-      <div class="kpi" data-tip="이 기간 주문된 음료 총 잔 수"><div class="n">${cups}</div><div class="l">총 잔</div></div>
-      <div class="kpi" data-tip="활동한 ${used}일 중 ${closed}일 마감"><div class="n">${rate}<span style="font-size:12px">%</span></div><div class="l">마감률</div></div>
+      <div class="kpi" data-tip="섬김을 연 날 수(중복 없이)"><div class="n">${used}</div><div class="l">활동한 날</div></div>
+      <div class="kpi" data-tip="하루에 2번 이상 섬긴 날 — 이 앱은 하루 여러 번 섬김을 지원한다"><div class="n">${multi}</div><div class="l">2회+ 인 날</div></div>
+      <div class="kpi" data-tip="이 기간 주문된 음료 총 잔 수(섬김마다 따로 셈)"><div class="n">${cups}</div><div class="l">총 잔</div></div>
+      <div class="kpi" data-tip="섬김 ${servings}회 중 ${closed}회 마감"><div class="n">${rate}<span style="font-size:12px">%</span></div><div class="l">마감률</div></div>
     </div>`;
 }
 // ② 사용 빈도 — 한 색. 마감=채움 / 진행중=윤곽. 데이터가 있는 날만 나열(빈 날 미표시).
@@ -1629,12 +1638,17 @@ function usageBarsHtml(days){
   if(!list.length) return head+`<div class="muted" style="font-size:12px;padding:6px 0">이 기간 섬김 기록이 없어요</div>`;
   const max=Math.max(1, ...list.map(x=>x.servings)), lastI=list.length-1;
   return head+`<div class="usage-wrap"><div class="usage">${list.map((x,i)=>{
-    const h=Math.max(8,Math.round(x.servings/max*54));
-    const open=!(x.closed>0);
-    const show = x.servings===max || i===lastI;   // 값 라벨은 최댓값·마지막만
-    return `<div class="ubar" data-tip="${esc(x.date)} · 섬김 ${x.servings}회 · ${open?'진행중':'마감 '+x.closed+'회'}">
-      <div class="ubar-n"${show?'':' style="visibility:hidden"'}>${x.servings}</div>
-      <div class="ubar-b${open?' open':''}" style="height:${h}px"></div>
+    const n=x.servings||0, cl=Math.min(x.closed||0, n), op=n-cl;
+    const h=Math.max(8,Math.round(n/max*54));
+    // 하루에 여러 번 섬길 수 있으므로 막대 하나를 마감/진행중으로 쪼갠다.
+    // 예전엔 closed>0 이면 통째로 '마감'이라 2회 중 1회만 마감한 날이 잘못 보였다.
+    const gap=(cl&&op)?2:0;                       // 두 구간 사이 2px — 총 높이에서 미리 빼야 안 잘린다
+    const hc=n?Math.round((h-gap)*cl/n):0, ho=h-gap-hc;
+    const seg=(cl?`<i class="cl" style="height:${hc}px"></i>`:"")+(op?`<i class="op" style="height:${ho}px"></i>`:"");
+    const show = n===max || i===lastI;   // 값 라벨은 최댓값·마지막만
+    return `<div class="ubar" data-tip="${esc(x.date)} · 섬김 ${n}회${n>=2?' (하루 여러 번)':''} — 마감 ${cl} · 진행중 ${op}">
+      <div class="ubar-n"${show?'':' style="visibility:hidden"'}>${n}</div>
+      <div class="ubar-b" style="height:${h}px">${seg}</div>
       <div class="ubar-d">${dashColLabel(x.date)}</div></div>`;
   }).join("")}</div></div>`;
 }
@@ -1649,10 +1663,10 @@ function peopleListHtml(c, key){
   if(!rows.length) return head+`<p class="muted center" style="padding:8px 0">구성원이 없어요</p>`;
   return head+rows.map(r=>{
     const pct=used?Math.round(r.a/used*100):0;
-    return `<div class="prow" data-tip="${esc(r.name)} · 활동한 ${used}일 중 ${r.a}일 출석 (${pct}%) · 섬김 ${r.s}회 · 누적 출석 ${r.t}일">
+    return `<div class="prow" data-tip="${esc(r.name)} · 활동한 ${used}일 중 ${r.a}일 출석 (${pct}%) · 섬긴 날 ${r.s}일 · 누적 출석 ${r.t}일 — 하루에 여러 번 섬겨도 날 기준으로 셉니다">
       <div class="row-between" style="margin-bottom:5px">
         <span class="prow-n">${esc(r.name)}</span>
-        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${used}${r.s?` · ☕${r.s}`:''} · 누적 ${r.t}</span></div>
+        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${used}일${r.s?` · ☕${r.s}일`:''} · 누적 ${r.t}</span></div>
       <div class="meter"><i style="width:${pct}%"></i></div></div>`;
   }).join("");
 }
