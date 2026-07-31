@@ -1633,11 +1633,17 @@ function playLadder(roster, winner){
   bind("gvCancel",closeGame);
 
   const DUR = lessMotion() ? 10 : 2400, STAG = lessMotion() ? 0 : 130;
+  // 선이 위에서 아래로 그려지는 애니메이션. 두 가지를 지켜야 실제로 움직인다:
+  //   ① 길이에 단위를 붙인다 — CSS 의 stroke-dashoffset 은 <length> 라 단위 없는 숫자는 0 으로 떨어진다.
+  //   ② 시작값을 브라우저가 한 번 반영한 뒤에 끝값을 준다 — 안 그러면 두 값이 같은 스타일 재계산에
+  //      묶여 보간할 구간이 없고 그냥 완성된 채로 나타난다(rAF 한 번으로는 부족하다).
   const els=[...$gv().querySelectorAll(".lpath")];
   els.forEach(p=>{ const len=p.getTotalLength();
-    p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
-    p.style.transition="stroke-dashoffset "+DUR+"ms cubic-bezier(.45,.05,.25,1)"; });
-  requestAnimationFrame(()=> els.forEach(p=> p.style.strokeDashoffset=0));
+    p.style.transition="none";
+    p.style.strokeDasharray=len+"px"; p.style.strokeDashoffset=len+"px"; });
+  void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
+  els.forEach(p=>{ p.style.transition="stroke-dashoffset "+DUR+"ms cubic-bezier(.45,.05,.25,1)";
+                   p.style.strokeDashoffset="0px"; });
 
   const boxes=[...$gv().querySelectorAll(".lbox")];
   const openBox=(c,hit)=>{ const g=boxes[c]; if(!g) return;
