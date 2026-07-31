@@ -59,7 +59,7 @@
   .room-name { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .date { font-size: 12px; color: var(--sub); margin-top: 1px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
   .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
-  .dot.on { background: var(--green); } .dot.off { background: var(--accent); }
+  .dot.off { background: var(--accent); }
   .me-chip { font-size: 13px; font-weight: 600; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
   .me-chip small { color: var(--sub); font-weight: 500; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
@@ -329,6 +329,28 @@
   /* 사다리·돌림판은 세로가 긴 화면에서 잘리지 않도록 뷰포트 높이로도 폭을 묶는다 */
   .game-stage { width:100%; max-width:min(400px, 50vh); }
   .game-stage svg { display:block; width:100%; height:auto; }
+  /* 번호–색–이름 범례 (R9-5, R10-2). 11명을 넘으면 사다리·돌림판 라벨이 번호로 바뀌므로,
+     번호와 사람을 잇는 표가 같은 화면에 없으면 그림을 읽을 방법이 사라진다.
+     한 줄에 한 명씩 두면 24명이 500px 을 넘어 결과 블록을 화면 밖으로 밀어낸다 — 칩을 흘려 담아
+     폭을 다 쓰게 하면 340px 화면에서 6줄 남짓으로 접힌다. 자리는 .game-body 안이라 SVG·결과와
+     같은 스크롤에 실린다(바깥에 두면 세로가 넘칠 때 잘려서 안 보인다).
+     max-width 는 .game-stage 와 같은 400px 로 맞춰 그림 폭에서 벗어나지 않게 한다. 다만 50vh
+     상한은 두지 않는다 — 창이 낮을 때 폭까지 좁아지면 줄 수만 늘어난다. */
+  .game-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 6px; width:100%; max-width:400px; margin-top:10px; }
+  .game-legend .gl-it { display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%;
+    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:3px 7px;
+    font-size:11px; font-weight:700; color:var(--ink); line-height:1.35; }
+  .game-legend .gl-sw { flex:none; width:9px; height:9px; border-radius:3px; }
+  .game-legend .gl-no { flex:none; color:var(--sub); font-weight:800; font-variant-numeric:tabular-nums; }
+  /* 긴 이름은 칩 안에서 접는다. 잘라내면 '잘린 이름을 온전히 읽는 자리'라는 범례의 존재 이유가 없어진다. */
+  .game-legend .gl-nm { min-width:0; overflow-wrap:anywhere; }
+  /* 게임 도중 명단이 바뀐 것을 알리는 배너 (R17-2). 자리는 #gvWin 안, 당첨자 블록 바로 위다 —
+     결과와 같은 role="status" 에 실려 한 번에 읽히고, 스크롤도 결과와 함께 움직인다.
+     실패(--red)가 아니라 주의라서 --accent 계열을 쓴다. 글자는 흰 배경 대비 2.92:1 인 --accent 가
+     아니라 --accent-ink 로 — 배지가 아니라 읽어야 하는 문장이다. */
+  .game-warn { max-width:340px; margin:6px auto 0; background:#fdf4e6; border:1px solid var(--accent);
+    border-radius:12px; padding:8px 11px; font-size:13px; font-weight:700; line-height:1.45;
+    color:var(--accent-ink); text-align:center; word-break:keep-all; }
   .game-win { text-align:center; margin-top:12px; }
   .game-win .we { font-size:38px; line-height:1.15; }
   .game-win .wn { font-size:25px; font-weight:900; letter-spacing:-.6px; color:var(--brand); margin-top:2px; word-break:keep-all; }
@@ -339,6 +361,51 @@
   .game-pick .gp-em { font-size:26px; flex:none; }
   .game-pick b { display:block; font-size:15px; color:var(--ink); }
   .game-pick small { display:block; font-size:12px; color:var(--sub); margin-top:1px; }
+  /* 인원 상한을 넘어 막힌 게임 (R10-4). 눌리지 않는 것은 disabled 속성이 하고, 여기서는 '눌러도
+     안 된다'를 보이게만 만든다 — 살아 있는 버튼과 똑같이 보이면 사용자는 자기 탭이 씹혔다고 읽는다.
+     :active 의 scale 도 되돌린다(disabled 라 뜨지 않지만 규칙이 남아 있으면 나중에 되살아난다).
+     opacity 는 버튼 전체를 한 겹으로 합성하므로 흰 카드(--card)도 시트 배경(--bg #f6f1ea)과 섞여
+     #fbf9f6 이 된다. 그 위에서 팔레트 색을 그대로 .55 로 깔면 이름(--ink) 3.76:1 · 사유(--sub)
+     2.38:1 로 AA(4.5:1)를 못 넘긴다. .gs-off 와 같은 처방으로 색을 미리 낮춰 #000 을 깔면
+     합성 결과가 양쪽 다 4.93:1 이라 기준을 넘는다 — 크기·굵기 차이가 위계를 대신 맡는다. */
+  .game-pick:disabled { opacity:.55; cursor:default; }
+  .game-pick:disabled:active { transform:none; }
+  .game-pick:disabled b, .game-pick:disabled small { color:#000; }
+  /* 참가 토글 스위치 — 휴대폰 설정 앱에 있는 그 스위치다 (R1-1).
+     상태의 출처는 aria-checked 하나뿐이고 색·손잡이 위치를 CSS 가 그 속성에서 파생시킨다.
+     그래서 보이는 모양과 스크린리더가 읽는 값이 어긋날 수 없다 (R1-2, R1-5).
+     켜짐/꺼짐을 트랙 색과 손잡이 위치 '둘'로 말한다 — 색만 바꾸면 색약 사용자가 못 읽는다 (R1-3).
+     높이 44px = 보이는 32px + 위아래 padding 6px 로 탭 영역을 확보하고, 음수 margin 으로
+     레이아웃 높이는 32px 로 되돌린다 — 행 높이를 밀지 않으면서 손가락 여유를 얻는다 (R1-4).
+     가로는 트랙이 이미 52px 이라 44px 을 넘으므로 따로 넓히지 않는다.
+     margin-left:auto 는 .pill 과 같은 처방 — 행 오른쪽 끝에 붙인다. */
+  .gsw { position:relative; flex:none; width:52px; height:44px; padding:6px 0; margin:-6px 0 -6px auto;
+    background:none; border:0; cursor:pointer; }
+  .gsw-track { display:block; width:52px; height:32px; border-radius:16px; background:var(--gray); transition:background .18s ease; }
+  /* 트랙 32 - 손잡이 26 = 6 → 위아래·좌우 여백 3px. 이동거리를 20px 로 두면 꺼짐 3px · 켜짐 23px
+     (52-26-3=23)로 양쪽이 대칭이다. top:9px 은 padding(6)+3 — 절대배치 기준이 padding box 라서
+     이 값이어야 트랙 안에서 가운데 온다.
+     흰 손잡이는 꺼짐 트랙(--gray)과 대비가 2.30:1 밖에 안 되어 테두리 없이는 손잡이 위치가
+     안 읽힌다. 반투명 어두운 테두리를 덧대 경계선 대비를 꺼짐 4.76:1 · 켜짐 6.43:1 로 올린다
+     (비텍스트 대비 3:1 기준). 꺼짐 트랙 자체는 흰 카드 대비 2.30:1 이라 스위치 윤곽은 이 테두리가 맡는다. */
+  .gsw-knob { position:absolute; left:3px; top:9px; width:26px; height:26px; border-radius:50%;
+    background:#fff; border:1px solid rgba(40,28,16,.4); box-shadow:0 1px 3px rgba(40,28,16,.35);
+    transition:transform .18s ease; }
+  .gsw[aria-checked="true"] .gsw-track { background:var(--green); }
+  .gsw[aria-checked="true"] .gsw-knob { transform:translateX(20px); }
+  /* 브라우저 기본 링은 44px 박스에 그려져 보이는 스위치보다 크게 뜬다 — 트랙에 직접 링을 그린다.
+     32px + outline-offset 2px + 2px = 40px 이라 44px 박스 안에 들어와 잘리지 않는다 (R1-6). */
+  .gsw:focus-visible { outline:none; }
+  .gsw:focus-visible .gsw-track { outline:2px solid var(--brand); outline-offset:2px; }
+  /* prefers-reduced-motion 은 이 파일 맨 위 전역 블록이 모든 transition 을 이미 끈다 (R1-7).
+     여기 같은 미디어쿼리를 또 두면 !important 인 전역 규칙에 밀려 죽은 CSS 가 되므로 두지 않는다. */
+  /* 제외된 행 — 아바타 배경을 --sub 로 바꾸던 처방을 대신한다. 상태의 본 신호는 스위치가 말하므로
+     아바타는 늘 --brand 로 두고, 이름·부제만 흐리게 해서 '지금 빠져 있다'를 한 번 더 얹는다.
+     흐리게 하는 정도(.55)는 설계값 그대로지만 색은 함께 낮춘다 — 팔레트 색을 그대로 .55 로 깔면
+     흰 카드(#fff) 위에서 이름(--ink)이 3.65:1, 부제(--sub)가 2.33:1 로 AA(4.5:1)를 못 넘긴다.
+     특히 --sub 는 흰 카드 대비가 원래 5.92:1 이라 어떤 값으로 흐리게 해도(최대 .88) 기준을 못 지킨다.
+     #000 을 .55 로 깔면 합성 결과가 #737373 이고 흰 카드 대비 4.76:1 이라 기준을 넘는다 (R1-9). */
+  .person.gs-off .pname, .person.gs-off .pmenu { color:#000; opacity:.55; }
   /* 손가락 룰렛 */
   .fp-pad { position:absolute; inset:0; pointer-events:none; }
   .fp-dot { position:absolute; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 5px 16px rgba(40,28,16,.25);
@@ -351,6 +418,27 @@
   /* 돌림판 */
   .wheel-wrap { position:relative; width:100%; max-width:min(320px, 50vh); margin:0 auto; padding-top:14px; }
   .wheel-pin { position:absolute; left:50%; top:-2px; transform:translateX(-50%); font-size:26px; line-height:1; z-index:1; filter:drop-shadow(0 2px 3px rgba(40,28,16,.3)); }
+  /* 🏁 구슬 레이스 (R19)
+     캔버스는 논리 크기 340×440 에 devicePixelRatio 를 곱해 실제 픽셀을 잡고, 폭은 CSS 가 맞춘다 —
+     width/height 속성 비율이 남아 있으므로 height:auto 로 세로가 따라온다(폰에서 흐릿하지 않게 하는 표준 처방).
+     세로 상한은 설계(부록 A.5)의 62vh 대신 45vh 다. 340:440 = 1:1.29 라서 62vh 를 그대로 쓰면 캔버스
+     높이가 80vh 가 되어 게임 안내 한 줄·HUD·결과 블록이 전부 스크롤 밖으로 밀린다. 45vh 면 높이가
+     ≈58vh 로 사다리(50vh × 1:1.09 ≈ 54vh)와 같은 대역에 들어온다. */
+  .race-wrap { position:relative; width:100%; max-width:min(340px, 45vh); margin:0 auto; }
+  .race-wrap canvas { display:block; width:100%; height:auto; border-radius:12px;
+                      background:#fffdf9; border:1.5px solid var(--line); }
+  .race-hud { margin-top:8px; font-size:12px; color:var(--sub); font-weight:600; line-height:1.5; }
+  .race-hud .bar { height:6px; border-radius:3px; background:var(--brand-soft); overflow:hidden; margin-bottom:6px; }
+  /* 200ms 마다만 갱신하므로 그 간격만큼 선형 보간을 걸어 바가 계단처럼 튀지 않게 한다.
+     prefers-reduced-motion 은 이 파일 맨 위 전역 블록이 모든 transition 을 끄므로 여기 미디어쿼리를 또 두지 않는다. */
+  .race-hud .bar > i { display:block; width:0; height:100%; border-radius:3px; background:var(--brand); transition:width .2s linear; }
+  .race-hud .rc-row { display:flex; align-items:center; gap:6px; min-width:0; }
+  .race-hud .rc-rk { flex:none; width:13px; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
+  .race-hud .rc-sw { flex:none; width:9px; height:9px; border-radius:3px; }
+  .race-hud .rc-no { flex:none; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
+  /* 이름은 한 줄로 자른다 — HUD 가 200ms 마다 바뀌는 자리라 줄 수가 늘었다 줄면 캔버스가 위아래로 흔들린다.
+     전체 이름은 범례(11명 이상)와 결과 발표에 그대로 남는다. */
+  .race-hud .rc-nm { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--ink); font-weight:700; }
 </style>
 </head>
 <body>
@@ -371,7 +459,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.72";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.80";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -668,11 +756,6 @@ function setServings(list){
 function servingLabel(seq){ return seq ? (seq + "번째 섬김") : ""; }
 function servingDrinks(s){ let n=0; const o=s&&s.orders||{}; for(const k in o){ if(o[k].type==="drink") n++; } return n; }
 
-// 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시)
-let lastSyncAt=0;
-function syncAgoText(){ if(!lastSyncAt) return "연결 중"; const d=new Date(lastSyncAt), p=n=>String(n).padStart(2,"0"); return `마지막 갱신 ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
-setInterval(()=>{ try{ const el=document.getElementById("syncAgo"); if(el) el.textContent=syncAgoText(); }catch(e){} }, 10000);
-
 /* ---- 단독(로컬) 모드 ---- */
 const LocalSync = () => {
   const key = ()=> `coffee_local_${ROOM}_${todayKey()}`;
@@ -714,12 +797,11 @@ const SupabaseSync = () => {
         const r = await client.rpc("get_room_day",{p_room:ROOM,p_date:date()}); if(r.error) throw r.error;
         const s=r.data&&r.data.session;
         setServings(s ? [{seq:s.seq||1, state:s.state, hostId:s.host_id, cafeId:s.cafe_id||null, closeAt:s.close_at, orders:ordersObj(r.data.orders)}] : []);
-        lastSyncAt=Date.now(); return;
+        return;
       }
       throw error;
     }
     setServings(servingsFromDB(data&&data.servings));
-    lastSyncAt=Date.now();
   }
   return {
     shared:true, client,
@@ -753,7 +835,12 @@ const $app=document.getElementById("app"), $bottom=document.getElementById("bott
 const $scrim=document.getElementById("scrim"), $sheet=document.getElementById("sheet"), $toast=document.getElementById("toast");
 const $cscrim=document.getElementById("cscrim");
 // 커스텀 확인창 — 기본 confirm() 대체. 뒤로가기 모델과 통합(뒤로가기=취소). 시트 위에도 안전(상위 레이어).
-let confirmOpen=false, ignorePop=false, confirmResolve=null;
+// ignorePop 은 카운터다(불리언 아님) — 우리가 부른 history.back() 을 몇 번 무시할지 센다.
+// 당첨 확정 직후처럼 게임 항목 + 탭/시트 항목을 연달아 두 칸 정리하는 경우가 있어 불리언으로는 표현이 안 된다.
+// back() 이 예외 없이 성공했는데 popstate 가 오지 않으면(뒤로 갈 항목이 없는 경우) 값이 남는데,
+// 이는 불리언 시절 true 가 남던 것과 같은 노출이고 카운터가 더 나쁘게 만들지 않는다.
+// back() 은 항상 우리가 직접 pushState 한 항목에 대해서만 부르므로 실제 경로에서는 생기지 않는다.
+let confirmOpen=false, ignorePop=0, confirmResolve=null;
 function askConfirm(message, opts){ opts=opts||{};
   return new Promise(resolve=>{
     confirmResolve=resolve;
@@ -772,7 +859,8 @@ function askConfirm(message, opts){ opts=opts||{};
 function finishConfirm(result){ // 버튼으로 닫기: 히스토리 항목 소비(ignorePop)
   if(!confirmOpen) return; confirmOpen=false; $cscrim.classList.remove("show");
   const r=confirmResolve; confirmResolve=null;
-  ignorePop=true; try{ history.back(); }catch(e){ ignorePop=false; }
+  // 증감은 짝을 맞춘다: back() 이 던지면 곧바로 되돌려 카운터가 사용자의 실제 뒤로가기를 삼키지 않게 한다.
+  ignorePop++; try{ history.back(); }catch(e){ ignorePop--; }
   if(r) r(result);
 }
 $cscrim.addEventListener("click",e=>{ if(e.target===$cscrim) finishConfirm(false); });
@@ -834,10 +922,13 @@ $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
 // 칩 키보드 접근성: 포커스된 칩(tabindex=0)에서 Enter/Space → 클릭(키보드·스크린리더 사용자)
 document.addEventListener("keydown",e=>{ const t=e.target; if((e.key==="Enter"||e.key===" "||e.key==="Spacebar")&&t&&t.getAttribute&&t.getAttribute("tabindex")==="0"&&(t.getAttribute("role")==="button"||(t.classList&&t.classList.contains("chip")))){ e.preventDefault(); t.click(); } });
 window.addEventListener("popstate",()=>{
-  if(ignorePop){ ignorePop=false; return; }   // 버튼으로 확인창 닫을 때의 history.back() 무시
+  if(ignorePop > 0){ ignorePop--; return; }   // 우리가 부른 history.back() 한 칸을 무시(확인창 버튼 닫기 등). 한 번에 한 칸씩만 소비한다.
   if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
+  // 게임은 subActive 를 건드리기 '전에' 처리한다. 오버레이는 자기 항목을 따로 갖고 있으므로
+  // 여기서 빠진 칸은 게임의 것이다 — subActive=false 로 내리면 탭·시트의 항목이 없는 것처럼 되어
+  // 다음 뒤로가기가 앱을 나간다. 확인창 처리보다는 뒤에 둬야 오버레이 위 확인창이 먼저 취소된다.
+  if(GS && GS.open){ closeGame({fromPop:true}); return; }
   subActive=false;   // 쌓아둔 하위 항목이 (뒤로가기로) 빠졌다
-  if(gameOpen){ closeGame(); return; }        // 게임 오버레이가 시트보다 위 — 뒤로가기 한 번이면 게임만 닫힌다
   if(sheetOpen){ $scrim.classList.remove("show"); sheetOpen=false; return; }  // 시트 닫기
   if(openTab!=="order"){ openTab="order"; render(); return; }   // 현황·주문서 탭 → 내 주문 탭
   if(curView==="pick" && ME){ render(); return; }         // 이름변경 → 주문
@@ -861,11 +952,11 @@ function render(){
 function view(){ return document.getElementById("view"); }
 
 function renderHeader(){
-  const connHtml = SHARED ? `<span class="dot on"></span>공유중 · <span id="syncAgo">${syncAgoText()}</span>` : `<span class="dot off"></span>이 기기 전용`;
+  const connHtml = SHARED ? "" : `<span class="dot off"></span>이 기기 전용`;   // 정상 상태는 조용히, 이 기기 전용 경고만 표시
   $app.innerHTML = `
     <header><div class="h-row">
       <div style="min-width:0;overflow:hidden"><h1 class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</h1>
-        <div class="date">${prettyDate()} · ${connHtml}</div></div>
+        <div class="date">${prettyDate()}${connHtml ? ` · ${connHtml}` : ""}</div></div>
       <div class="header-actions">
         <div class="me-chip" id="meChip" role="button" tabindex="0" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
         <button class="nav-link" id="gear" style="font-size:18px" aria-label="설정">⚙️</button>
@@ -991,32 +1082,52 @@ function renderOpen(){
     ${[["order","내 주문"],["people","현황 "+countDrinks()+"잔"],["cafe","주문서"]].map(([t,label])=>
       `<button class="tab ${openTab===t?'on':''}" data-t="${t}" role="tab" aria-selected="${openTab===t}">${label}</button>`).join("")}</div>`;
 
-  // 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
-  // 주문이 1건 이상일 때만 연다: 주문이 없으면 호스트 교체(unclaim)가 섬김 자체를 지운다.
-  const canGame = SESSION.hostId===ME && Object.keys(ORDERS).length>0 && gameEligible();
+  /* 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
+     노출 조건은 '돌릴 수 있는가(gameEligible)' + '내가 결정권을 가진 자리인가'다.
+     호스트가 남이면 그 사람의 결정을 가로챌 수 없으니 안 띄운다 (R16-1).
+     주문 수 조건(Object.keys(ORDERS).length>0)은 지웠다 — 기본 참가가 '음료를 주문한 분'이라
+     보통은 gameEligible() 이 더 강한 조건이다. 다만 [전원 참가]로 명단을 채운 뒤 주문이 모두
+     취소되면 '참가자 2명 + 주문 0건'이 성립하므로, 그 방어는 실제로 쓰는 지점인
+     commitGameWinner 로 옮겼다 (R16-5). 화면 조건으로 막으면 시트가 열려 있는 동안 주문이
+     사라지는 경우를 놓친다. */
+  const canGame = gameEligible() && (SESSION.hostId===ME || !SESSION.hostId);
+  // 라벨은 실제 노출 조건을 그대로 말해야 한다 — 예전엔 '내가 호스트일 때만' 뜨면서
+  // "누가 섬길지 아직 안 정했다면"이라고 적혀 있었다 (R16-1).
+  const amHostNow = SESSION.hostId===ME;
+  const gameLabel = amHostNow ? "섬길 사람을 다시 정하려면" : "누가 섬길지 아직 안 정했다면";
+  const gameBtnText = amHostNow ? "🎲 다른 분에게 넘길지 게임으로 정하기 [test]" : "🎲 게임으로 섬길 사람 정하기 [test]";
   // 기본 탭에도 둔다. '현황' 탭에만 뒀더니 기본 탭이 '내 주문'이라 아무도 못 봤다(G9).
   // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
   const gameHtml = canGame ? `
-      <div class="label">누가 섬길지 아직 안 정했다면</div>
-      <button class="btn btn-choice" id="gamepick">🎲 게임으로 섬길 사람 정하기</button>` : "";
+      <div class="label">${gameLabel}</div>
+      <button class="btn btn-choice" id="gamepick">${gameBtnText}</button>` : "";
+  /* 버튼이 숨는 자리에 사유 한 줄. 호스트 없는 섬김에서만 남긴다 — 그 화면은 '누가 섬길까'가
+     본론이라 게임을 기다리는 사람이 있고, 호스트가 나인 화면은 이미 결정이 끝난 자리다 (R16-2, R16-4).
+     사유 문구는 gameShortReason() 의 why 를 그대로 쓴다(판정을 두 곳에 두지 않는다). how 는 안 쓴다 —
+     그건 '참가자 바꾸기'로 보내는 시트 안의 안내인데, 여기선 그 시트로 갈 버튼 자체가 없다. */
+  const gameWhyHtml = (!canGame && !SESSION.hostId)
+    ? `<p class="muted center" style="margin-top:10px">🎲 ${esc(gameShortReason().why)} — 참가할 분이 2명 이상 모이면 게임으로 정할 수 있어요.</p>` : "";
 
   if(openTab==="order"){
     view().innerHTML=`
       <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
         <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
         ${myOrder?'':'<p>메뉴를 고르거나, 안 드실 땐 알려주세요</p>'}</div>
-      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}${gameHtml}`;
+      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}${gameHtml}${gameWhyHtml}`;
   } else {
     view().innerHTML=`
       <div class="muted" style="margin:0 2px 10px">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}섬기는 분: <b>${host?esc(hon(host.name)):"아직 없어요"}</b></div>
       ${tabs}
       ${openTab==="people"
-        ? dashStatsHtml()+dashPeopleHtml()+(canGame?`<button class="btn btn-soft" id="gamepick" style="margin-top:10px">🎲 게임으로 섬길 사람 정하기</button>`:"")
+        ? dashStatsHtml()+dashPeopleHtml()+gameHtml+gameWhyHtml
         : dashCafeHtml()}`;
   }
   view().querySelectorAll("#openTabs .tab").forEach(el=> el.onclick=()=>setOpenTab(el.dataset.t));
   wireDashboard();
-  bind("gamepick",()=>{ gameInit(); openGameSheet(); });
+  // 누른 버튼을 그대로 넘긴다 — 오버레이가 닫힐 때 포커스를 여기로 되돌려야 한다(R13-3).
+  // e.currentTarget 은 onclick 이 걸린 그 엘리먼트다. #gamepick 은 '내 주문'과 '현황' 두 자리에
+  // 나오는데(한 번에 하나만 존재) 이렇게 하면 어느 쪽이 잡혔는지 따로 몰라도 맞는 버튼이 넘어간다.
+  bind("gamepick",e=>{ gameEnsure(e.currentTarget); openGameSheet(); });
   if(openTab!=="order") return;   // 아래 배선은 '내 주문' 탭 전용
 
   const grid=document.getElementById("menuGrid");
@@ -1378,7 +1489,12 @@ function renderBottom(){
   } else if(s.state==="open"){
     // 현황은 탭으로 올라갔으므로 하단바에서 뺀다 — 화면마다 버튼이 바뀌지 않아 예측 가능해진다.
     if(!s.hostId){                              // 호스트 없는(인계 대기) 열린 섬김 → 누구나 이어받기 / 게임으로 정하기
-      html=`<button class="btn btn-soft" id="gamepickBar">🎲 게임으로 정하기</button><button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
+      // 탭 안 진입점과 같은 판정을 쓴다 — 예전엔 검사가 없어서, 눌러 시트를 열고서야
+      // "참가자가 2명 이상이어야 돌릴 수 있어요"를 읽었다 (R16-3, R16-4).
+      // 이 분기는 !s.hostId 가 이미 확정이라 canGame 의 나머지 항은 참이고 gameEligible() 만 남는다.
+      const canGame = gameEligible();
+      html=(canGame?`<button class="btn btn-soft" id="gamepickBar">🎲 게임으로 정하기 [test]</button>`:"")
+         + `<button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
     } else if(amHost){
       html=`<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`;
     }                                           // 호스트가 아니면 하단 액션 없음 — 할 일은 화면 안(메뉴 고르기)에 있다
@@ -1390,7 +1506,7 @@ function renderBottom(){
   document.body.classList.toggle("no-bottom", !html);   // 하단바가 없으면 본문 아래 여백도 걷는다
   bind("startserv",()=>{ if(CAFE_LIST.length<=1) doStartServing((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
   bind("takeover",()=>doClaim(SESSION.cafeId||(CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
-  bind("gamepickBar",()=>{ gameInit(); openGameSheet(); });
+  bind("gamepickBar",e=>{ gameEnsure(e.currentTarget); openGameSheet(); });   // 하단바 진입도 포커스 복귀 지점을 남긴다
   bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("이 섬김을 취소할까요?\n(주문이 있으면 다른 분이 이어받게 남고, 없으면 이 섬김은 사라져요)",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
   bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ viewSeq=seq; render(); } }});
   bind("reopen",async()=>{ const seq=SESSION.seq; if(await safeWrite(Sync.reopen(seq),"다시 열 수 없어요 — 다른 섬김이 진행 중입니다")){ viewSeq=null; render(); } });
@@ -1438,30 +1554,401 @@ function openClaimCafeSheet(){
    1) 절대 자동으로 뜨지 않는다. 자진해서 섬기려던 분의 마음을 게임이 가로채면 안 되므로,
       [🎲 게임으로 정하기]를 직접 눌렀을 때만 시작한다. 호스트가 있는 섬김은 '그 호스트만' 열 수 있다.
    2) 결과에 구속력이 없다. [확정]을 누르기 전에는 서버에 아무것도 쓰지 않고, [한 판 더]가 늘 있다.
-   3) 주문이 모인 뒤에 돌린다 — 안 마시는 분이 자동으로 빠져 후보가 정확해지고,
-      unclaim→claim 으로 호스트를 갈아끼워도 섬김이 사라지지 않는다(주문이 없으면 unclaim 이 섬김째 지운다).
+   3) 주문이 모인 뒤에 돌린다 — 안 마시는 분이 자동으로 빠져 후보가 정확해진다. 호스트가 있는 섬김을
+      unclaim→claim 으로 갈아끼울 때 섬김이 사라지지 않게 하는 방어는 commitGameWinner 앞에 있다
+      (주문이 0건이면 unclaim 이 섬김째 지운다).
    4) 흔들기·기울이기(DeviceMotion)는 쓰지 않는다 — 카톡 인앱 브라우저에서 권한 프롬프트가 안 뜨는 사례가 많다. */
+/* 아래 마커 사이는 tests/game-logic.test.mjs 가 그대로 떼어내 샌드박스에서 평가한다.
+   리포지토리에 빌드 단계도 테스트 러너도 없어서, 파일을 쪼개는 대신 이 구간만 분리해 검증한다.
+   그러니 DOM 이나 전역 상태(MEMBERS·ORDERS·GS·SESSION·SERVINGS)를 읽는 코드는 블록 밖에 둔다.
+   시작 마커는 추출기가 첫 줄을 버리는 방식이라 반드시 한 줄로 유지한다. */
+/* @test-export:start */
+const GS_SOFT_W = 1/3;              // 직전 섬긴 분의 확률 낮추기 강도. 0 이 아니라야 '평등하지 않을 뿐'이 된다
+const GAME_LABEL_MAX = 10;          // 이보다 많으면 이름이 겹치므로 번호 + 범례로 바꾼다
+const GAME_MAX = { ladder:16, wheel:24, finger:Infinity, race:24 };   // 화면에 들어가는 인원 한계
 const GAME_COLORS = ["#7a4a12","#1f6b3a","#2a5f8f","#97371c","#5b4080","#14615c","#8f2f2c","#35435c","#6b5220","#4a6b1f"];
-const gcolor = i => GAME_COLORS[i % GAME_COLORS.length];
+
+function gameFits(kind, n){ return n <= GAME_MAX[kind]; }
+
+// 10명 이하는 지금 보이는 색 그대로 두고, 넘을 때만 골든앵글로 생성해 인접 인덱스끼리
+// 색상차를 최대로 벌린다 — 돌림판에서 이웃 조각이 같은 색이 되는 걸 막는 게 목적이다.
+// l 34% 는 기존 팔레트와 같은 명도대라서 흰 구분선·#e7ddcf 배경 위에서 그대로 식별된다.
+// n 을 안 넘기면 예전처럼 팔레트를 순환한다 — 손가락 룰렛은 참가자 수와 무관한 손가락 순번으로
+// 부르기 때문에 이 경로가 필요하다. 사다리·돌림판은 반드시 n 을 넘긴다.
+function gcolor(i, n){
+  if(n === undefined || n <= GAME_COLORS.length) return GAME_COLORS[i % GAME_COLORS.length];
+  return "hsl(" + ((i*137.508) % 360).toFixed(1) + " 52% 34%)";
+}
+
+// 난수를 인자로 받는다 — 그래야 확률이 의도한 비율로 수렴하는지 결정론적으로 검증할 수 있다
+function pickWeighted(players, w, rnd){
+  const total = w.reduce((a,b)=>a+b, 0);
+  let r = (rnd||Math.random)() * total;
+  for(let i=0;i<players.length;i++){ r -= w[i]; if(r < 0) return players[i]; }
+  return players[players.length-1];        // 부동소수 잔차 방어 — undefined 를 돌려주면 안 된다
+}
+
+// 명단 판단의 순수 버전. '안 마심'만 되돌릴 수 없는 제외이고, 그 위에 사용자의 명시적 선택이 얹힌다 —
+// 주문이 실시간으로 바뀌어도 사용자가 직접 켜고 끈 것이 살아남아야 한다.
+function rosterFrom(members, orders, on, off){
+  return members.filter(m=>{
+    const o = orders[m.id];
+    if(o && o.type==="skip") return false;
+    if(off.has(m.id)) return false;
+    if(on.has(m.id))  return true;
+    return !!(o && o.type==="drink");      // 기본 참가 = 음료를 주문한 사람
+  });
+}
+
+// 추첨 대상 = 명단에 정책을 얹은 것. skip 만 명단을 줄이고 soft·even 은 가중치로만 다룬다
+function playersFrom(roster, policy, lastHostId){
+  if(policy==="skip" && lastHostId) return roster.filter(m=>m.id!==lastHostId);
+  return roster;
+}
+
+// 사다리 치수. 인원 상한(16)이 실제 한계와 맞는지 이 값으로 역검증한다
+function ladderGeometry(n){
+  const W=340, PAD=24, GAP=(W-2*PAD)/(n-1);
+  return { GAP, BOX_W: Math.min(30, GAP*0.82), NCH: n<=7?4 : n<=9?3 : 2, NFS: n<=7?11 : n<=9?10 : 8.5 };
+}
+
+/* ─────────── 🏁 구슬 레이스 (R19) ───────────
+   물리 엔진을 쓰지 않는다. 물리가 결과를 만들면 확률 정책(R6)의 1/3 가중치를 걸 지점이 없어지고,
+   20초 안에 끝난다는 보장도 사라진다. 그래서 다른 세 게임과 같다 — 당첨자를 먼저 뽑고,
+   경로가 그 결과를 향한다. 역전 장면은 '구간별 속도 편차'라는 장치 하나로만 만든다.
+   난수는 예외 없이 인자(rnd)로 받는다. 블록 안에서 Math.random 을 부르면 도착 순서·역전 횟수를
+   결정론적으로 검증할 수 없고, R19-17 이 요구하는 게 바로 그 검증 가능성이다. */
+const RACE_SEGS = 12;            // 구간 수 = 속도 편차를 넣을 수 있는 자리 수. 적으면 역전이 안 생긴다
+const RACE_SEG_LEN = 200;        // 구간 길이 → 전체 2400 (약 7화면)
+const RACE_W = 340;              // 다른 게임과 같은 논리 폭
+const RACE_AMP_MIN = 40, RACE_AMP_VAR = 70;   // 사행 진폭 [40,110) — CX=170 이라 x 는 (60,280)
+const RACE_SPD_MIN = 0.55, RACE_SPD_VAR = 0.9;// 구간 속도 배수 [0.55,1.45) — 위아래로 2.6배 차
+/* 도착 시간 배분 구간. 1위는 duration*0.80, 꼴찌는 duration*0.99.
+   꼴찌를 1.00 에 두지 않는 이유: 지터가 위로 삐져나가 duration 을 넘는 도착 시간이 생긴다.
+   0.99 + 지터 절반(≤0.0075) = 0.9975 로 항상 duration 안이고, 아래쪽도 0.80-0.0075=0.7925 로
+   duration*0.75 위다. 두 경계를 지터 폭과 함께 계산해 둔 값이다. */
+const RACE_F_LO = 0.80, RACE_F_HI = 0.99;
+const RACE_JITTER = 0.015;       // 지터 최대 폭(전체). 아래에서 인접 등수 간격에 맞춰 더 좁힌다
+
+// 코스 생성 — 구간별 진폭·위상·꺾임 수. 구간 길이는 고정이라 총 길이가 인원과 무관하게 일정하다.
+function raceCourse(rnd){
+  const segs = [];
+  for(let s=0; s<RACE_SEGS; s++){
+    segs.push({
+      len:   RACE_SEG_LEN,
+      amp:   RACE_AMP_MIN + rnd()*RACE_AMP_VAR,   // 좌우 흔들림 폭
+      phase: rnd()*Math.PI*2,
+      turns: 1 + Math.floor(rnd()*2)              // 구간 안에서 몇 번 꺾이는지
+    });
+  }
+  return { segs, W: RACE_W, CX: RACE_W/2, total: RACE_SEGS*RACE_SEG_LEN };
+}
+
+// 진행률 p(0..1) → 코스 위 좌표. x 는 진폭 상한 때문에 (60,280) 을 벗어나지 않으므로
+// 구슬 반지름 여유가 좌우로 최소 60px 남는다 — 렌더러가 반지름을 키워도 벽을 뚫지 않는다.
+function raceXY(course, p){
+  const y = Math.max(0, Math.min(1, p)) * course.total;
+  let acc = 0, s = 0;
+  while(s < course.segs.length-1 && acc + course.segs[s].len < y){ acc += course.segs[s].len; s++; }
+  const g = course.segs[s], u = (y - acc) / g.len;
+  const x = course.CX + g.amp * Math.sin(u * Math.PI * 2 * g.turns + g.phase);
+  return { x, y };
+}
+
+// 구슬 i 의 구간별 속도 배수 — 구간마다 빠름/느림이 달라 역전이 생긴다
+function raceSpeeds(n, segCount, rnd){
+  const sp = [];
+  for(let i=0;i<n;i++){
+    const row = [];
+    for(let s=0;s<segCount;s++) row.push(RACE_SPD_MIN + rnd()*RACE_SPD_VAR);
+    sp.push(row);
+  }
+  return sp;
+}
+
+/* order[0] 이 1위. 총 소요 시간을 그 순서로 배분하고, 각 구슬의 구간 속도를 그 총합에 맞춰 스케일한다.
+   반환된 cum[i] 는 구슬 i 가 각 구간 끝에 도달하는 누적 시간(ms), want[i] 는 도착 시간.
+
+   지터 폭을 인접 등수 간격에 묶는 이유(R19-4 는 '항상'이다):
+   등수 간격은 0.19/(n-1) 이라 인원이 많으면 좁아진다 — n=24 에서 0.00826 이다. 지터를 고정 0.015
+   폭으로 주면 그 폭이 간격보다 넓어서 2등이 1등을 앞지르는 배분이 실제로 나온다. 그래서 폭을
+   간격의 0.9 배로 제한한다. 인접 도착 시간 차가 최소 간격의 0.1 배(n=24, duration=20000 에서
+   약 16ms)로 남아 순서가 절대 뒤집히지 않는다. 인원이 적으면 간격이 넓어 0.015 가 그대로 쓰인다. */
+function raceSchedule(course, speeds, order, duration, rnd){
+  const n = speeds.length, segs = course.segs;
+  const raw = speeds.map(row => segs.reduce((a,g,s)=> a + g.len/row[s], 0));
+  const band = RACE_F_HI - RACE_F_LO;
+  const gap  = n<=1 ? band : band/(n-1);
+  const span = Math.min(RACE_JITTER, gap*0.9);
+  const want = new Array(n);
+  order.forEach((idx, rank)=>{
+    const f = n<=1 ? RACE_F_LO : RACE_F_LO + band*(rank/(n-1));
+    want[idx] = duration * (f + (rnd()-0.5)*span);
+  });
+  const cum = [];
+  for(let i=0;i<n;i++){
+    const k = want[i]/raw[i];              // 이 구슬 전체를 want[i] 에 맞추는 배율
+    let t = 0; const row = [0];
+    for(let s=0;s<segs.length;s++){ t += (segs[s].len/speeds[i][s]) * k; row.push(t); }
+    /* 마지막 칸을 want[i] 로 덮는다. sum((len/v)*k) 는 raw*k=want 와 부동소수 잔차만큼 어긋나서,
+       그대로 두면 t=want[i] 에서 진행률이 1 에 아주 못 미치는 경우가 생긴다(실측 3.5%).
+       루프 종료 판정이 want 를 보는데 그림은 아직 결승선 앞이라는 불일치가 그것이다. */
+    row[segs.length] = want[i];
+    cum.push(row);
+  }
+  return { cum, want };
+}
+
+// t(ms) 시점 구슬 i 의 진행률 0..1. t 를 양끝에서 잠근다 — 프레임 dt 가 어떻게 튀어도
+// 진행률이 뒤로 가거나 1 을 넘는 그림은 나오지 않아야 한다 (R19-14).
+function raceProgress(course, sched, i, t){
+  const row = sched.cum[i], segs = course.segs, last = row[row.length-1];
+  if(!(t > 0)) return 0;                   // t<=0 과 NaN 을 같이 막는다
+  if(t >= last) return 1;
+  let s = 0; while(s < segs.length-1 && row[s+1] < t) s++;
+  const dt = row[s+1] - row[s];
+  const u = dt > 0 ? (t - row[s]) / dt : 1;   // 0 길이 구간에서 0/0 이 되지 않게
+  let acc = 0; for(let k=0;k<s;k++) acc += segs[k].len;
+  return (acc + u*segs[s].len) / course.total;
+}
+
+/* 선두가 바뀐 횟수 — R19-5 를 검증 가능하게 만드는 함수.
+   표본 구간을 duration 이 아니라 '1위 도착 시각'까지로 자른다. 레이스는 1위가 들어오면 끝나므로
+   그 뒤는 화면에 없고, 게다가 모두 도착한 시점에는 전원 진행률이 1 이라 인덱스 순서로 선두가
+   바뀐 것처럼 세어진다 — 그 유령 1회가 '지루한 레이스'를 3회 문턱 위로 올려 재생성 루프를
+   무력화한다. 실제로 보이는 장면만 센다. */
+function raceLeadChanges(course, sched, n, duration, samples){
+  const N = samples || 120;
+  let end = duration;
+  for(let i=0;i<n;i++) if(sched.want[i] < end) end = sched.want[i];
+  let prev = -1, changes = 0;
+  for(let k=1;k<=N;k++){
+    const t = end*k/N;
+    let lead = 0, best = -1;
+    for(let i=0;i<n;i++){ const p = raceProgress(course, sched, i, t); if(p > best){ best = p; lead = i; } }
+    if(prev !== -1 && lead !== prev) changes++;
+    prev = lead;
+  }
+  return changes;
+}
+/* @test-export:end */
+
 const lessMotion = ()=> !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 const pickOne = arr => arr[Math.floor(Math.random()*arr.length)];
+// 이름을 자를 때 말줄임(…)을 붙이지 않는다. 라벨이 좁아서 자르는 것이므로 한 글자를 더 얹으면
+// 자르는 목적 자체가 무너진다 — 돌림판 10명은 4글자 11px(≈44px)가 이미 조각 폭(≈39px)에 겨우
+// 들어가 있어 여기에 …를 더하면 이웃 라벨과 겹친다. 전체 이름은 사다리 <title> 과 결과 발표에
+// 그대로 남고, 11명부터는 라벨이 번호로 바뀌어 애초에 자를 일이 없다 (R10-2).
 function shortName(n,k){ n=String(n||""); return n.length>k ? n.slice(0,k) : n; }
+
+/* 번호–색–이름 범례. 사다리와 돌림판이 같은 함수를 쓴다 (R9-5, R10-2).
+   11명을 넘으면 라벨에 번호만 들어가므로 이 표가 없으면 누가 어느 선·어느 조각인지 알 수 없다.
+   하나로 세 가지가 풀린다 — 이름이 겹치지 않고(라벨이 번호 두 자리), 색이 비슷해 보여도 번호로
+   갈리고, 잘려서 못 읽던 이름을 여기서 온전히 읽는다.
+   n <= GAME_LABEL_MAX 면 빈 문자열을 돌려준다 — 호출부에 같은 조건을 두 번 쓰지 않기 위해서다.
+   색은 그림이 쓴 gcolor(i, n) 을 그대로 부른다. 여기서 따로 계산하면 언젠가 그림과 어긋난다.
+   n 은 인자로 받는다(players.length 를 쓰지 않는다) — 그리는 시점의 인원과 같은 값이어야 하고,
+   호출부가 이미 그 값을 쥐고 있다. */
+function gameLegendHtml(players, n){
+  if(n <= GAME_LABEL_MAX) return "";
+  return `<div class="game-legend" role="list" aria-label="번호와 이름">${players.map((m,i)=>
+    `<span class="gl-it" role="listitem"><i class="gl-sw" style="background:${gcolor(i, n)}"></i><span class="gl-no">${i+1}</span><span class="gl-nm">${esc(m.name)}</span></span>`).join("")}</div>`;
+}
 function gvibe(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }   // iOS 는 진동 API 자체가 없다 — 시각 효과가 본체
 function $gv(){ return document.getElementById("gameOv"); }
 
-let gameOpen=false, gameOff=new Set(), gameKind=null, gameTimers=[], gameTeardown=null;
+// 게임 상태는 '보고 있는 섬김' 하나에 매인다. 섬김이 바뀌면 통째로 버린다.
+// 열림 여부·제외 명단·게임 종류·타이머·정리 함수가 각자 전역으로 흩어져 있었다. 하나로 모아야
+// 명단 연동과 확률 정책을 얹을 자리가 생긴다. 게임을 한 번도 열지 않았으면 null 이다.
+let GS = null;
+// {
+//   seq:        number|null   이 상태가 속한 섬김
+//   on:         Set<memberId> 사용자가 명시적으로 '참가'로 켠 사람
+//   off:        Set<memberId> 사용자가 명시적으로 '제외'로 끈 사람
+//   kind:       "ladder"|"wheel"|"finger"|null
+//   policy:     "soft"|"skip"|"even"      직전 섬긴 분 확률 정책
+//   lastHostId: string|null|undefined     undefined = 아직 조회 안 됨
+//   sig:        string|null   게임 시작 시점의 참가자 서명(도중 변경 감지용)
+//   open:       boolean       오버레이가 떠 있는지
+//   pushed:     boolean       오버레이가 히스토리 1칸을 쥐고 있는지
+//   opener:     Element|null  오버레이를 연 버튼(포커스 복귀용)
+//   timers:     number[]      진행 중 예약된 타이머
+//   teardown:   fn|null       진행 중 게임의 정리 함수
+// }
 
-// 오늘 안 마시는 분은 애초에 후보가 아니다. 그 외 제외는 gameOff 하나로만 관리한다.
-function gameRoster(){ return MEMBERS.filter(m=>{ const o=ORDERS[m.id]; return !(o&&o.type==="skip") && !gameOff.has(m.id); }); }
-function gameEligible(){ return MEMBERS.filter(m=>!(ORDERS[m.id]&&ORDERS[m.id].type==="skip")).length>=2; }
-function gameServedIds(){ return new Set(SERVINGS.map(s=>s.hostId).filter(Boolean)); }
-function gameInit(){   // 진입 때 기본 후보: 오늘 이미 섬긴 분을 빼되, 그래서 못 돌리게 되면 전원 참가로 되돌린다
-  gameOff = gameServedIds();
-  if(gameRoster().length<2) gameOff = new Set();
+// 명단은 게임을 열기 전에도(렌더 중 canGame 계산) 물어볼 수 있어야 한다.
+// GS 가 없는 상태는 '아무도 켜거나 끄지 않았고 정책도 기본값'인 상태와 같다 — 그렇게 읽고 던지지 않는다.
+const GS_NONE = new Set();
+function gsOn(){  return GS ? GS.on  : GS_NONE; }
+function gsOff(){ return GS ? GS.off : GS_NONE; }
+function gsPolicy(){ return GS ? GS.policy : "soft"; }          // 기본 soft — 명단을 줄이지 않는다
+function gsLastHost(){ return GS ? GS.lastHostId : undefined; }  // undefined = 아직 조회 안 됨, '없음'과 같게 다룬다
+
+/* ---------- 직전에 섬긴 분 조회 (R5) ----------
+   조회 결과를 (방, 날짜, 보고 있는 섬김) 조합당 한 번만 가져온다. 시트를 여러 번 열어도
+   재조회하지 않고, 섬김을 옮기면 키가 달라져 다시 조회된다.
+   키에 seq 가 빠지면 2번째 섬김에서 얻은 값이 3번째 섬김에도 그대로 보여 '직전'이 틀어진다. */
+let LAST_HOST = { key:null, id:null };
+function lastHostKey(){ return ROOM + "|" + todayKey() + "|" + (SESSION.seq ?? 0); }
+
+// 폴백: 오늘의 SERVINGS 안에서만 찾는다 (R5-6, R5-9). SERVINGS 는 [{seq,state,hostId,...}] 이고
+// '오늘' 것만 담으므로 날짜를 넘는 조회는 못 한다 — 그래서 RPC 가 따로 있다.
+// hostId 가 있는 것만 보므로 인계 대기(unclaim) 섬김은 자연히 빠진다. 현재 섬김은 seq 로 잘라낸다 —
+// 보고 있는 섬김이 없으면(seq null) 오늘 전체가 대상이다.
+function lastHostFromToday(){
+  const cur = SESSION.seq ?? Infinity;
+  const past = SERVINGS.filter(s=>s.hostId && s.seq < cur).sort((a,b)=>b.seq-a.seq);
+  return past.length ? past[0].hostId : null;
 }
 
-function gtimer(fn,ms){ const t=setTimeout(fn,ms); gameTimers.push(t); return t; }
-function clearGameTimers(){ gameTimers.forEach(clearTimeout); gameTimers=[]; }
+// 공유 모드에서만 RPC 를 부르고, 실패하면 조용히 오늘 기록으로 폴백한다.
+// rpcSetMembers 의 구버전 폴백과 같은 정신인데, 여기엔 재시도할 대체 시그니처가 없어서
+// 폴백값을 그대로 쓴다 — 그래서 마이그레이션 적용 전에도 게임이 정상 동작한다 (R5-6, R5-8).
+async function fetchLastHost(){
+  const key = lastHostKey();
+  if(LAST_HOST.key===key) return LAST_HOST.id;
+  let id = lastHostFromToday();          // 로컬 모드(R5-9)와 RPC 실패의 공통 기본값
+  if(SHARED){
+    try{
+      const { data, error } = await Sync.client.rpc("get_last_host",
+        { p_room:ROOM, p_date:todayKey(), p_seq:SESSION.seq ?? null });
+      // RPC 미배포(PGRST202)·오프라인·기타 오류를 구분하지 않는다 — 어느 쪽이든 할 일이 같고,
+      // 사용자에게 드러낼 실패가 아니다. cells 로드 실패와 같은 급의 console.warn 만 남긴다.
+      if(error) console.warn("get_last_host 실패 — 오늘 기록으로 폴백", error);
+      else if(typeof data==="string" && data) id = data;
+      // data 가 null 이면 서버에도 이력이 없다는 뜻이지만 폴백값을 굳이 덮지 않는다.
+      // 공유 모드의 SERVINGS 는 서버에서 온 것이라 보통 둘 다 비어 있고, 어긋난다면
+      // RPC 의 state 조건이 더 좁은 경우뿐이라 폴백이 더 많이 아는 쪽이다.
+    }catch(e){ console.warn("get_last_host 실패 — 오늘 기록으로 폴백", e); }
+  }
+  if(id && !memberById(id)) id = null;   // 명단에서 사라진 분은 없는 것으로 (R5-7)
+  LAST_HOST = { key, id };
+  return id;
+}
+
+function gameEnsure(opener){
+  const seq = SESSION.seq ?? null;   // 호스트 없는 섬김에서 하단바로 들어오면 null — 그대로 키로 쓴다
+  if(!GS || GS.seq !== seq){         // 보고 있는 섬김이 바뀌면 명단·정책을 그 섬김의 기본값으로 되돌린다
+    GS = { seq, on:new Set(), off:new Set(), kind:null,
+           policy:"soft", lastHostId:undefined, sig:null,
+           open:false, pushed:false, opener:null, timers:[], teardown:null };
+  }
+  GS.opener = opener || null;        // 같은 섬김이면 명단·정책은 그대로 살아 있다
+}
+
+// 기본 참가 = 음료를 주문한 분 (R2-1). 무응답은 기본 제외지만 토글로 넣을 수 있다.
+function gameDefaultOn(m){ const o=ORDERS[m.id]; return !!(o && o.type==="drink"); }
+// '오늘은 안 마실게요'는 되돌릴 수 없는 제외다 — 토글로도 넣지 못한다 (R2-5).
+function gameIsSkip(m){ const o=ORDERS[m.id]; return !!(o && o.type==="skip"); }
+
+// 명단과 추첨 대상은 저장하지 않고 매번 파생시킨다 — 주문이 실시간으로 바뀌어도 사용자가 직접
+// 켜고 끈 것이 살아남아야 하기 때문이다(R3-5). 판단 규칙은 위 마커 블록의 순수 함수에만 두고
+// 아래 둘은 전역을 읽어 넘겨주는 껍데기로만 남긴다 — 규칙이 두 곳에 생기면 화면에 보이는 인원과
+// 실제 추첨 대상이 어긋난다.
+// '오늘 섬긴 분 전원 자동 제외'는 없어졌다 — 직전 한 명은 확률 정책으로 다룬다.
+function gameRoster(){ return rosterFrom(MEMBERS, ORDERS, gsOn(), gsOff()); }
+// 참가자 수 표기와 게임 가능 판정의 단일 출처 (R3-6, R6-6). 정책이 명단을 줄이는 경우까지 여기서 반영된다.
+function gamePlayers(){ return playersFrom(gameRoster(), gsPolicy(), gsLastHost()); }
+// 렌더 도중 canGame 이 부르므로 GS 없이도 답이 나와야 한다 — 위 널 안전 리더들이 그 경로를 받친다.
+// 기본값 규칙과 같은 출처를 쓰므로, 음료 주문자가 2명 미만이면 진입점이 뜨지 않는다 (R2-8).
+function gameEligible(){ return gamePlayers().length >= 2; }
+/* 게임이 도는 동안 추첨 대상이 바뀌었는지 알아보는 서명 (R17-1).
+   id 만 모아 정렬한다 — MEMBERS 는 이름순이라 누가 개명하면 배열 순서가 바뀌는데, 그건 명단이
+   바뀐 게 아니다. 정렬하면 순서가 id 에만 매이므로 개명은 서명을 흔들지 않고, 사람이 들어오거나
+   빠진 경우만 잡힌다. 값 비교라 감시자·구독이 필요 없고, 필요한 두 지점(결과 표시·확정)에서
+   그때그때 늦게 비교한다. */
+function gameRosterSig(){ return gamePlayers().map(m=>m.id).sort().join(","); }
+// 수동 [오늘 섬긴 분 빼기] 전용으로 남는다 — 더 이상 진입 시 자동 적용하지 않는다
+function gameServedIds(){ return new Set(SERVINGS.map(s=>s.hostId).filter(Boolean)); }
+
+// 토글은 두 Set 을 함께 갱신한다. 한쪽만 만지면 '켰다 껐다' 한 사람이 기본값으로 돌아가버린다 (R3-5).
+// 아래 세 함수는 사용자가 시트에서 조작할 때만 불리므로 GS 는 이미 있다.
+function gameToggle(id, on){
+  if(on){ GS.on.add(id);  GS.off.delete(id); }
+  else  { GS.off.add(id); GS.on.delete(id);  }
+}
+// 전원 참가 (R2-10): 안 마시는 분을 뺀 전원을 '명시적 참가'로 — 나중에 주문이 들어와도 흔들리지 않는다
+function gameAllOn(){ GS.off.clear(); GS.on = new Set(MEMBERS.filter(m=>!gameIsSkip(m)).map(m=>m.id)); }
+// 오늘 섬긴 분 빼기 (R2-9): 그분들만 끄고 나머지 명단은 그대로 둔다
+function gameDropServed(){ gameServedIds().forEach(id=>gameToggle(id,false)); }
+
+/* ---------- 확률 정책 (R6) ----------
+   가중치 계산은 전역(GS)을 읽으므로 마커 블록 밖에 둔다. 검증 대상인 추첨 자체는 위 pickWeighted 가 맡고
+   여기서는 '누구에게 얼마를 줄지'만 정한다 — 순수한 부분과 상태를 읽는 부분의 경계가 그 선이다.
+   soft 만 가중치를 쓴다. skip 은 gamePlayers() 가 이미 명단에서 빼므로 남은 사람은 전원 1 이 되고,
+   even 은 애초에 전원 1 이다. 그래서 정책별 분기가 여기 한 줄로 끝난다.
+   직전 섬긴 분이 없거나(null) 아직 조회가 안 끝났으면(undefined) 조건이 falsy 라서 전원 1 이다 —
+   undefined 가 실수로 어떤 구성원의 id 와 같아질 일은 없으므로 별도 방어가 필요하지 않다 (R6-12).
+   사용자가 그분을 이미 껐으면 명단에 없으니 가중치가 걸릴 자리도 없다 (R6-13). */
+function gameWeights(players){
+  const soft = gsPolicy()==="soft", last = gsLastHost();
+  return players.map(m => (soft && last && m.id===last) ? GS_SOFT_W : 1);
+}
+function gamePickWinner(players){ return pickWeighted(players, gameWeights(players)); }
+
+function gtimer(fn,ms){ const t=setTimeout(fn,ms); if(GS) GS.timers.push(t); return t; }
+function clearGameTimers(){ if(!GS) return; GS.timers.forEach(clearTimeout); GS.timers=[]; }
+
+/* ---------- 모달 접근성 (R13) ----------
+   #gameOv 는 role="dialog" aria-modal="true" 를 갖고 있지만, 그것만으로는 포커스가 배경에 남고
+   스크린리더가 뒤쪽 화면을 계속 읽는다. 아래 세 함수가 '진짜 모달'의 나머지 절반이다.
+   gameA11yPrev 가 null 이 아니면 '켜져 있음'을 뜻한다 — openGameOv 는 한 판마다 다시 불리므로
+   켜기는 여러 번 들어오고, 닫기는 popstate·✕·그만두기·확정 네 경로에서 들어온다. */
+let gameA11yPrev = null;
+
+function gameA11yOn(){
+  const el=$gv();
+  // 진입점(gamepick/gamepickBar)이 opener 를 넘겨주지만, 그 경로를 안 거치고 열리는 일이 생기면
+  // 지금 포커스를 돌아갈 자리로 삼는다 — 닫을 때 갈 곳이 없는 상태를 만들지 않는다.
+  const act=document.activeElement;
+  if(GS && !GS.opener && act && act!==document.body) GS.opener=act;   // body 는 돌아갈 자리가 아니다 — 그냥 비워 두고 아래 폴백에 맡긴다
+  // 복원 상태는 처음 켤 때 한 번만 잡는다. '한 판 더'로 두 번 잡으면 이미 aria-hidden 이 걸린
+  // 상태를 원래 모습으로 기억해, 닫아도 배경이 계속 숨겨진 채로 남는다.
+  if(!gameA11yPrev){
+    gameA11yPrev=[$app,$bottom];
+    // #gameOv 는 이 둘의 형제라 자기 자신은 숨겨지지 않는다 — 배경만 스크린리더에서 사라진다 (R13-1~3)
+    gameA11yPrev.forEach(n=>{ if(n) n.setAttribute("aria-hidden","true"); });
+    // 오버레이가 아니라 document 에 건다. 결과가 나오면 setGameFoot 이 푸터를 다시 그리는데,
+    // 그때 포커스가 있던 [그만두기]가 사라지면 포커스는 <body> 로 떨어진다. 오버레이에만 걸린
+    // 리스너는 body 에서 올라오는 Tab 을 아예 못 보므로 그 순간 덫이 풀려버린다.
+    document.addEventListener("keydown", gameTrap);
+  }
+  // 열릴 때마다 ✕ 는 새로 그려진 엘리먼트다. 이전 포커스는 DOM 에서 사라졌으니 다시 잡아준다 (R13-1)
+  const first=el && el.querySelector("#gvX");
+  if(first) first.focus();
+}
+function gameA11yOff(){
+  if(!gameA11yPrev) return;   // 한 번도 안 열었거나 이미 되돌렸다 — 두 번 불려도 아무 일도 하지 않는다
+  document.removeEventListener("keydown", gameTrap);
+  gameA11yPrev.forEach(n=>{ if(n) n.removeAttribute("aria-hidden"); });
+  gameA11yPrev=null;
+  // 여는 버튼으로 돌아간다 (R13-3). 그 버튼이 render() 로 이미 사라졌으면 포커스가 <body> 에 남는데,
+  // 그러면 다음 Tab 이 문서 맨 처음부터 시작해 사용자가 자리를 잃는다 → 앱 컨테이너에 세운다.
+  const back=GS && GS.opener;
+  const home=()=>{ if($app){ $app.setAttribute("tabindex","-1"); try{ $app.focus(); }catch(e){} } };  // -1 = 프로그램으로만 잡힘, Tab 순서엔 안 들어간다
+  if(back && document.body.contains(back)){
+    try{ back.focus(); }catch(e){}
+    // 확정 경로는 closeGame() 바로 뒤에 render() 로 #app 을 다시 그린다 — 방금 잡은 버튼이 그때
+    // 사라져 포커스가 <body> 로 떨어진다. 한 프레임 뒤에 확인해서 떨어졌으면 컨테이너로 올린다.
+    requestAnimationFrame(()=>{ if(document.activeElement===document.body) home(); });
+  } else home();
+  if(GS) GS.opener=null;
+}
+// Tab 순환을 오버레이 안에 묶는다 (R13-2).
+// .game-ov 자체가 position:fixed 라 그 자손의 offsetParent 는 오버레이(또는 .game-body)다 —
+// null 이 되는 건 오버레이가 닫혀 display:none 일 때뿐이라, 이 필터가 '보이는 것만' 검사로 정확히 맞는다.
+function gameTrap(e){
+  if(e.key!=="Tab") return;
+  const el=$gv();
+  if(!el || !el.classList.contains("show")) return;
+  const f=[...el.querySelectorAll('button:not([disabled]), [tabindex="0"]')].filter(x=>x.offsetParent!==null);
+  if(!f.length) return;
+  const first=f[0], last=f[f.length-1], cur=document.activeElement;
+  if(!el.contains(cur)){ e.preventDefault(); (e.shiftKey?last:first).focus(); return; }   // 푸터 재렌더로 포커스를 잃은 경우 회수
+  if(e.shiftKey && cur===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && cur===last){ e.preventDefault(); first.focus(); }
+}
+
 function openGameOv(title, bodyHtml){
   const el=$gv();
   el.innerHTML=`<div class="game-head"><div class="game-title">${title}</div>
@@ -1469,120 +1956,562 @@ function openGameOv(title, bodyHtml){
     <div class="game-body" id="gvBody">${bodyHtml}</div>
     <div class="game-foot" id="gvFoot"></div>`;
   el.classList.add("show");
-  // 뒤로가기로 닫히도록 하위 상태 1칸 확보(시트에서 넘어왔으면 이미 있으므로 재사용)
-  if(!gameOpen){ gameOpen=true; pushSub(); }
-  document.getElementById("gvX").onclick=closeGame;
+  // 오버레이는 자기 히스토리 항목을 직접 소유한다. pushSub() 을 쓰지 않는 이유:
+  // pushSub 은 subActive 가 이미 true 면 no-op 이라, 현황 탭·게임 시트·오버레이가 한 칸을 공유했다.
+  // 그래서 뒤로가기 한 번에 게임이 닫히면서 탭의 항목까지 함께 사라져 다음 뒤로가기가 앱을 나갔다.
+  // subActive 와 무관하게 1칸을 push 하면 탭·시트의 뒤로가기 한 칸이 그대로 살아 있다.
+  if(!GS.open){
+    GS.open=true; GS.pushed=true;
+    try{ history.pushState({sub:1, game:1},""); }catch(e){ GS.pushed=false; }   // push 실패면 소비할 항목도 없다
+  }
+  document.getElementById("gvX").onclick=()=>closeGame();   // 이벤트 객체가 opts 로 들어오지 않게 감싼다
+  gameA11yOn();   // ✕ 를 배선한 뒤·show 를 켠 뒤라야 포커스가 걸린다(display:none 엔 포커스가 안 간다)
 }
 function setGameFoot(html){ const f=document.getElementById("gvFoot"); if(f) f.innerHTML=html; }
-function closeGame(){
+// opts.fromPop — 뒤로가기(popstate)로 들어온 호출. 그 경우 항목은 브라우저가 이미 소비했으므로
+// 다시 back() 을 부르면 한 칸을 더 먹어 탭·시트의 뒤로가기가 사라진다.
+function closeGame(opts){
+  const fromPop = !!(opts && opts.fromPop);
   clearGameTimers();
-  if(gameTeardown){ try{ gameTeardown(); }catch(e){} gameTeardown=null; }
-  const el=$gv(); el.classList.remove("show"); el.innerHTML=""; gameOpen=false;
+  if(GS && GS.teardown){ try{ GS.teardown(); }catch(e){} GS.teardown=null; }
+  const el=$gv(); el.classList.remove("show"); el.innerHTML="";
+  if(GS){
+    GS.open=false;
+    gameA11yOff();   // 배경 aria-hidden 해제 + 포커스 복귀. 네 경로(popstate·✕·그만두기·확정) 모두 여기를 지난다.
+    // 버튼·✕·확정으로 닫을 때만 우리가 쥔 항목을 되돌린다. 증감은 짝을 맞춘다.
+    if(!fromPop && GS.pushed){ ignorePop++; try{ history.back(); }catch(e){ ignorePop--; } }
+    GS.pushed=false;
+  }
+}
+// 탭·시트가 쌓아둔 하위 항목 1칸을 정리한다. 확정 후 '내 주문' 탭으로 직접 넘어갈 때만 쓴다(12.2).
+function clearSubEntry(){
+  if(subActive){ subActive=false; ignorePop++; try{ history.back(); }catch(e){ ignorePop--; } }
 }
 
-/* ---------- 게임 고르기 시트 ---------- */
+/* ---------- 게임 고르기 시트 ----------
+   두 함수로 나눈다. openGameSheet 은 '진입'이라 비동기 조회를 걸고, drawGameSheet 은 '그리기'라
+   동기로 끝난다. 나눠야 하는 이유는 둘이다 — 조회를 기다리지 않고 즉시 그려야 하고(R5-10),
+   참가자 고르기에서 돌아올 때는 조회를 다시 걸지 않고 그리기만 다시 불러야 한다(R11-7).
+   시트는 블록 단위로 쪼개 그린다. 정책 칩이 참가자 수를 바꾸므로 시트 전체를 다시 그리지 않고
+   블록만 갈아끼워야 스크롤이 유지된다(R7-6) — 그래서 각 블록에 감싸는 div 와 HTML 생성 함수가 있다. */
 function openGameSheet(){
-  const roster=gameRoster(), served=gameServedIds();
-  const enough=roster.length>=2;
+  if(!GS) gameEnsure();          // 진입점을 거치지 않고 열리는 경로가 생겨도 상태 없이 돌지 않게
+  drawGameSheet();
+  // 조회는 시트 렌더를 기다리게 하지 않는다 (R5-10). 위에서 이미 그렸고, 결과가 오면 그 블록만 갈아끼운다.
+  // 조회를 여기(진입)에만 두는 이유: 이 가드는 GS.lastHostId 로 '조회했는지'만 보므로,
+  // 응답이 오기 전에 openGameSheet 이 또 불리면 같은 RPC 가 두 번 나간다. 시트를 다시 그리는
+  // 경로(backToGameSheet)는 drawGameSheet 을 부르게 해서 그 창을 아예 없앤다.
+  if(GS.lastHostId === undefined){
+    const seq = GS.seq;                     // 응답이 늦게 와도 '조회를 시작한 그 섬김'에만 쓴다
+    fetchLastHost().then(id=>{
+      // 시트를 닫고 섬김을 바꾼 뒤 응답이 도착하면 남의 상태를 오염시킨다 — 그때는 버린다.
+      // 같은 섬김이면 gameEnsure 가 GS 를 새로 만들지 않으므로 seq 비교로 충분하다.
+      if(!GS || GS.seq !== seq) return;
+      GS.lastHostId = (id === undefined) ? null : id;   // 조회가 끝났으면 undefined 를 되쓰지 않는다 — '없음'은 null
+      // 시트가 아직 열려 있으면 정책 블록만 채운다. 닫혔으면 syncPolicyBlock 이 스스로 아무것도 하지 않는다.
+      syncPolicyBlock();
+    });
+  }
+}
+
+// 참가자 카드 (블록 2). 인원은 gamePlayers() 하나에서만 나온다 — 참가자 고르기 시트의 '현재 N명'과
+// 같은 값이어야 하고(R3-6), 정책이 명단을 줄이는 경우까지 그 함수가 이미 반영한다.
+// 기준 안내 한 줄이 필요한 이유: 무응답인 분이 왜 안 보이는지 여기서 말하지 않으면 [바꾸기]를
+// 열어봐야 알 수 있다 (R2-6). 예전의 '오늘 이미 섬긴 분은 기본으로 빠져 있어요'는 이제 사실이
+// 아니라서 2.1 에서 지웠다 — 오늘 섬긴 분 제외는 수동 버튼으로만 남는다.
+function gamePlayerCardHtml(){
+  const players=gamePlayers();
+  return `<div class="card" style="padding:13px 14px;margin-bottom:12px">
+      <div class="row-between"><b style="font-size:14px">참가자 ${players.length}명</b>
+        <button class="btn btn-sm btn-soft" id="gRoster">바꾸기</button></div>
+      <div class="muted" style="margin-top:6px">${players.length?players.map(m=>esc(m.name)).join(" · "):"—"}</div>
+      <div class="muted" style="margin-top:6px;font-size:12px">메뉴를 고른 분이 기본으로 들어가 있어요</div>
+    </div>`;
+}
+
+/* ---------- 확률 정책 카드 (블록 3, R6-1~R6-3) ----------
+   GS.lastHostId 는 세 상태다 — undefined(아직 조회 안 됨) · null(직전에 섬긴 분이 없음) · string(있음).
+   문자열일 때만 그린다. 조회 중에 자리를 잡아두는 스켈레톤도 넣지 않는다: 첫 섬김이거나 이력이 없는
+   방에서는 끝까지 안 뜨는 자리라, 깜빡였다 사라지는 쪽이 아무것도 없는 쪽보다 나쁘다 (R6-12).
+   응답이 오면 syncPolicyBlock() 이 이 블록만 채운다 — 시트를 다시 그리지 않으므로 스크롤이 그대로다(R7-6). */
+const GS_POLICIES = [
+  { k:"soft", label:"확률 낮추기" },   // 기본값 (R6-3)
+  { k:"skip", label:"제외" },
+  { k:"even", label:"평등" }
+];
+
+// 칩 이름만으로는 '얼마나' 낮추는지 알 수 없다 — 1/3 이라는 실제 크기를 글로 적어 준다 (R6-4, R6-5).
+// [제외]는 참가자 수까지 바꾸므로 그 사실을 미리 말한다(누르고 나서 숫자가 줄면 사고처럼 보인다).
+function gamePolicyHint(p){
+  if(p==="skip") return "이번 판에는 아예 안 넣어요. 참가자 수도 한 분 줄어요.";
+  if(p==="even") return "다른 분들과 똑같은 확률로 걸려요.";
+  return "다른 분 한 분의 1/3 확률로만 걸려요. 아예 안 걸리는 건 아니에요.";
+}
+
+// 단일선택 칩은 파일에 이미 쓰는 패턴이 있다(주문 옵션 그룹) — .chips + role="radiogroup" +
+// role="radio" · aria-checked. 세 개를 aria-pressed 버튼 세 개로 두면 '3개 중 1개'라는 관계가
+// 안 읽히므로 그쪽을 그대로 따른다. 전역 keydown 심은 role 이 아니라 .chip 클래스도 보므로
+// Enter/Space 는 그대로 동작한다. 그룹 이름은 위의 이름 줄을 aria-labelledby 로 가리켜 얻는다.
+function gamePolicyCardHtml(){
+  const last = gsLastHost();
+  if(typeof last !== "string" || !last) return "";      // undefined·null 은 둘 다 아무것도 그리지 않는다
+  const m = memberById(last);
+  if(!m) return "";                                     // fetchLastHost 가 이미 걸러주지만, 조회 후 명단이 바뀔 수도 있다 (R5-7)
+  const p = gsPolicy();
+  // 명단 판정은 gameRoster() 로 한다. gamePlayers() 는 skip 정책이 이미 뺀 결과라, 그걸로 보면
+  // [제외]를 누르는 순간 '명단에 없어요' 안내가 켜져 사용자가 방금 한 조작을 오해한다.
+  const inRoster = gameRoster().some(x=>x.id===last);
+  // 사용자가 그분을 직접 끈 상태여도 카드는 남긴다 (R6-13). 칩을 감추면 [바꾸기]에서 다시 켤 때
+  // 카드가 나타났다 사라지는 것처럼 보이고, 정책이 어디로 갔는지 물을 자리가 없어진다 —
+  // 대신 '지금은 영향 없음'을 한 줄로 밝혀 아무 일도 안 하는 칩을 조용히 두지 않는다.
+  return `<div class="card" style="padding:13px 14px;margin-bottom:12px">
+      <b id="gPolicyName" style="font-size:14px">직전에 섬긴 분: ${esc(hon(m.name))}</b>
+      <div class="chips" id="gPolicyChips" role="radiogroup" aria-labelledby="gPolicyName">${
+        GS_POLICIES.map(o=>`<div class="chip ${o.k===p?"sel":""}" role="radio" tabindex="0" aria-checked="${o.k===p}" data-p="${o.k}">${o.label}</div>`).join("")}</div>
+      <div class="muted" id="gPolicyHint" style="margin-top:8px;font-size:12px">${gamePolicyHint(p)}</div>
+      ${inRoster?"":`<div class="muted" style="margin-top:4px;font-size:12px">지금은 이분이 명단에서 빠져 있어 이 설정이 결과를 바꾸지 않아요. [바꾸기]로 다시 넣으면 적용돼요.</div>`}
+    </div>`;
+}
+
+// 2명 미만인 이유는 갈린다 — 주문이 아직 안 모였거나, 사용자가 명단에서 뺐거나, 정책이 한 분을
+// 뺐거나. "2명 이상이어야 돌릴 수 있어요" 한 문장만 보여주면 어느 손잡이를 당겨야 하는지 알 수 없다.
+// 그래서 사유와 다음 동작을 함께 적는다 (R2-7).
+function gameShortReason(){
+  const ordered = MEMBERS.filter(gameDefaultOn).length;   // 기본 참가 후보 = 메뉴를 고른 분
+  const roster  = gameRoster().length;
+  const players = gamePlayers().length;
+  // ① 정책이 줄인 경우를 먼저 본다. 명단에는 두 분이 보이는데 못 돌리는 유일한 경우라
+  //    [바꾸기]로 보내면 헛걸음한다. 이 배너 위에 정책 카드가 그대로 남아 있으므로
+  //    [확률 낮추기] 칩을 누르는 것만으로 바로 풀린다 — 그래서 문구가 그쪽을 먼저 가리킨다.
+  if(players < roster) return { why:"직전에 섬긴 분을 [제외]로 둬서 한 분만 남았어요",
+                                how:"정책을 [확률 낮추기]로 돌리거나 참가자를 늘려주세요" };
+  // ② 다 켜도 두 분이 안 되는 경우. 토글로는 안 풀리니 주문을 기다리는 쪽을 먼저 말한다.
+  if(ordered < 2) return { why: ordered ? "지금까지 메뉴를 고른 분이 한 분뿐이에요" : "아직 주문이 모이지 않았어요",
+                           how:"조금 기다리거나, 아직 안 고른 분을 직접 넣어도 돼요" };
+  // ③ 주문은 모였는데 사용자가 껐다. 다시 켜면 바로 풀린다.
+  return { why:"명단에서 빠진 분이 있어요", how:"빠진 분을 다시 켜면 바로 돌릴 수 있어요" };
+}
+
+/* 인원 상한 초과 처리 (R10-4). 상한값은 GAME_MAX 한 곳에서만 나온다 — 마크업에 숫자를 박으면
+   상한을 고쳐도 화면이 옛 숫자를 말한다. 사유에 상한과 '지금 몇 명인지'를 함께 적는 이유:
+   숫자 하나만 보여주면 몇 명을 빼야 풀리는지 사용자가 셈을 해야 한다.
+   사유는 새 노드가 아니라 원래 있던 <small> 자리에 들어간다 — 줄을 하나 더 붙이면 세 버튼의
+   높이가 들쭉날쭉해지고, 막힌 버튼이 오히려 더 커 보인다. */
+function gamePickOff(kind, n){ return gameFits(kind, n) ? "" : " disabled"; }
+function gamePickSub(kind, n, sub){
+  return gameFits(kind, n) ? sub : GAME_MAX[kind]+"명까지 — 지금 "+n+"명이라 화면에 안 들어가요";
+}
+
+// 게임 고르기 블록 (블록 4). 참가자가 2명 미만이면 게임 대신 사유 배너 + [바꾸기]를 보여준다 (R2-7).
+// 상한 판정은 이 배너 분기 '뒤'에만 있다 — 2명 미만이면 어떤 상한도 넘을 수 없으므로 볼 필요가 없다.
+// 손가락 룰렛은 GAME_MAX 가 Infinity 라 어떤 인원에서도 살아남는다. 그래서 네 개가 동시에
+// 막히는 상태는 만들어지지 않는다 — 사용자가 고를 게 하나도 없는 화면을 보지 않는다.
+// 순서는 '짧은 것 → 긴 것'이 아니라 기존 세 개를 그대로 두고 구슬 레이스를 맨 끝에 붙인다 (R19-1).
+// 20초짜리를 위로 올리면 이미 익숙한 배치가 흐트러지고, 제일 오래 걸리는 게임이 첫 선택지가 된다.
+function gamePickBlockHtml(){
+  const n=gamePlayers().length;
+  if(n<2){
+    const r=gameShortReason();
+    return `<div class="banner-warn"><b>${r.why}</b><br>${r.how}</div>
+      <button class="btn btn-soft" id="gRosterB">참가자 바꾸기</button>`;
+  }
+  return `<div class="label">게임 고르기</div>
+      <button class="game-pick" data-g="ladder"${gamePickOff("ladder",n)}><span class="gp-em">🪜</span><span><b>사다리타기</b><small>${gamePickSub("ladder",n,"한 폰을 다 같이 보며 · 제일 두근거려요")}</small></span></button>
+      <button class="game-pick" data-g="finger"${gamePickOff("finger",n)}><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>${gamePickSub("finger",n,"폰 하나에 다 같이 손가락을 올려요")}</small></span></button>
+      <button class="game-pick" data-g="wheel"${gamePickOff("wheel",n)}><span class="gp-em">🎡</span><span><b>돌림판</b><small>${gamePickSub("wheel",n,"가장 빠르게 · 한 번에 끝")}</small></span></button>
+      <button class="game-pick" data-g="race"${gamePickOff("race",n)}><span class="gp-em">🏁</span><span><b>구슬 레이스</b><small>${gamePickSub("race",n,"다 같이 20초 · 제일 오래 즐겨요")}</small></span></button>`;
+}
+
+// 블록을 다시 그린 뒤에도 그대로 부를 수 있게 배선을 한 곳에 모은다 — 부분 갱신이
+// 리스너를 잃지 않게 하는 유일한 방법이 '다시 배선하는 지점을 하나로 두는 것'이다.
+// 블록 안의 노드만 다루므로 시트 밖으로 새지 않는다.
+function bindGameSheet(){
+  bind("gRoster",  openRosterSheet);
+  bind("gRosterB", openRosterSheet);   // 사유 배너의 CTA — 같은 곳으로 보낸다 (R2-7)
+  // 상한을 넘어 disabled 인 버튼도 그냥 함께 배선한다 — <button disabled> 는 브라우저가 click 을
+  // 아예 발생시키지 않으므로 이 핸들러가 돌 길이 없고, 탭 순서에서도 빠진다(gameTrap 의
+  // 'button:not([disabled])' 도 같은 이유로 건너뛴다). 배선 쪽에 조건을 또 두면 상한 규칙이 두 곳에 생긴다.
+  $sheet.querySelectorAll(".game-pick").forEach(b=> b.onclick=()=>{ const k=b.dataset.g; closeSheet(); startGame(k); });
+  const pc=document.getElementById("gPolicyChips");
+  if(pc) pc.querySelectorAll(".chip").forEach(c=> c.onclick=()=>setGamePolicy(c.dataset.p));
+}
+
+// 참가자 수를 쓰는 두 블록은 항상 함께 그린다 — 따로 그리면 '참가자 2명'인데 아래엔 사유 배너가
+// 떠 있는 중간 상태가 한 프레임 보인다. innerHTML 을 갈므로 그 안의 [바꾸기]·게임 버튼이 새 노드가
+// 되어 리스너를 잃는다 → 마지막에 반드시 다시 배선한다. $sheet 자체는 건드리지 않으니 스크롤은 그대로다.
+function syncGameCountBlocks(){
+  const pl=document.getElementById("gPlayerBlock"), pk=document.getElementById("gPickBlock");
+  if(!pl || !pk) return;               // 게임 고르기 시트가 아니면 아무것도 하지 않는다
+  pl.innerHTML=gamePlayerCardHtml();
+  pk.innerHTML=gamePickBlockHtml();
+  bindGameSheet();
+}
+
+// 칩은 제자리에서 고친다. 정책 카드까지 innerHTML 로 갈아버리면 방금 누른 칩이 사라져 포커스가
+// <body> 로 떨어지고, 키보드로 정책을 바꾼 사용자는 자리를 잃는다(참가자 행 patch 와 같은 이유).
+function patchPolicyChips(){
+  const box=document.getElementById("gPolicyChips");
+  if(!box) return;
+  const p=gsPolicy();                  // 화면은 GS 를 읽는다 — 지역 변수를 따로 들면 두 값이 갈라진다
+  box.querySelectorAll(".chip").forEach(c=>{ const on=c.dataset.p===p;
+    c.classList.toggle("sel", on); c.setAttribute("aria-checked", on?"true":"false"); });
+  const hint=document.getElementById("gPolicyHint");
+  if(hint) hint.textContent=gamePolicyHint(p);
+}
+
+// 칩 클릭. 인원이 실제로 달라졌을 때만 아래 두 블록을 다시 그린다 — skip↔나머지 전환이 그 경우다.
+// '어느 정책이 명단을 줄이는가'를 여기 적어두면 정책이 늘 때 같이 고쳐야 하므로, 전후 인원을 세서 판단한다.
+function setGamePolicy(p){
+  if(!GS || GS.policy===p) return;
+  const before=gamePlayers().length;
+  GS.policy=p;                         // 정책은 GS 에만 있다 — 게임 종류를 바꾸거나 한 판 더 돌려도 살아남는다 (R6-8)
+  patchPolicyChips();
+  if(gamePlayers().length!==before) syncGameCountBlocks();
+}
+
+// 직전 섬긴 분 조회가 끝난 뒤 그 블록만 채운다. 시트가 이미 닫혔거나 다른 시트가 떠 있으면
+// #gPolicyBlock 이 없으므로 아무것도 하지 않는다 — 그 경우 다시 그릴 때 GS.lastHostId 를 읽어 함께 그려진다.
+function syncPolicyBlock(){
+  const el=sheetOpen ? document.getElementById("gPolicyBlock") : null;
+  if(!el) return;
+  el.innerHTML=gamePolicyCardHtml();
+  // 조회가 끝나는 시점의 정책은 사실상 항상 기본값(soft)이지만, 명단을 줄이는 정책이 살아 있었다면
+  // 인원 표기가 지금 틀린 상태다. 그때만 두 블록을 함께 고친다.
+  if(gsPolicy()==="skip") syncGameCountBlocks();
+  bindGameSheet();                     // 새로 생긴 칩에 리스너를 붙인다
+}
+
+// 그리기만 한다. 비동기 조회는 openGameSheet 이 맡으므로 여기서는 아무것도 기다리지 않는다.
+// 여러 번 불려도 안전하다 — openSheet 의 pushSub() 은 subActive 가 이미 true 면 no-op 이라
+// 히스토리 항목이 늘지 않는다 (R11-7).
+function drawGameSheet(){
   openSheet(`
     <h3>🎲 섬길 사람 정하기</h3>
     <p class="muted" style="margin-top:0">결과는 <b>[확정하기]</b>를 누르기 전까진 아무것도 바꾸지 않아요. 마음에 안 들면 한 판 더 돌리면 됩니다.</p>
-    <div class="card" style="padding:13px 14px;margin-bottom:12px">
-      <div class="row-between"><b style="font-size:14px">참가자 ${roster.length}명</b>
-        <button class="btn btn-sm btn-soft" id="gRoster">바꾸기</button></div>
-      <div class="muted" style="margin-top:6px">${roster.length?roster.map(m=>esc(m.name)).join(" · "):"—"}</div>
-      ${served.size&&roster.length?`<div class="muted" style="margin-top:4px;font-size:12px">오늘 이미 섬긴 분은 기본으로 빠져 있어요</div>`:""}
-    </div>
-    ${enough?`
-      <div class="label">게임 고르기</div>
-      <button class="game-pick" data-g="ladder"><span class="gp-em">🪜</span><span><b>사다리타기</b><small>한 폰을 다 같이 보며 · 제일 두근거려요</small></span></button>
-      <button class="game-pick" data-g="finger"><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>폰 하나에 다 같이 손가락을 올려요</small></span></button>
-      <button class="game-pick" data-g="wheel"><span class="gp-em">🎡</span><span><b>돌림판</b><small>가장 빠르게 · 한 번에 끝</small></span></button>`
-    :`<div class="banner-warn">참가자가 2명 이상이어야 돌릴 수 있어요.</div>`}
+    <div id="gPlayerBlock">${gamePlayerCardHtml()}</div>
+    <!-- 블록 3: 확률 정책 카드. GS.lastHostId 가 문자열일 때만 내용이 생긴다 — 조회 전에 그리면
+         빈 div 로 남고, 조회가 끝나면 syncPolicyBlock() 이 이 div 만 채운다. -->
+    <div id="gPolicyBlock">${gamePolicyCardHtml()}</div>
+    <div id="gPickBlock">${gamePickBlockHtml()}</div>
     <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="gClose">닫기</button>`);
-  document.getElementById("gClose").onclick=closeSheet;
-  document.getElementById("gRoster").onclick=openRosterSheet;
-  $sheet.querySelectorAll(".game-pick").forEach(b=> b.onclick=()=>{ const k=b.dataset.g; closeSheet(); startGame(k); });
+  bind("gClose", closeSheet);
+  bindGameSheet();
 }
 
 /* ---------- 참가자 바꾸기 ---------- */
+/* ---------- 참가 토글 스위치 ---------- */
+// 이름 노드에 붙일 id 규약. 스위치가 aria-labelledby 로 같은 행의 이름을 가리켜야
+// "김요셉, 스위치, 켜짐"으로 읽힌다 (R1-5). 행 마크업도 반드시 이 함수로 id 를 만든다.
+// 구성원 id 는 보통 genMemberId() 가 만든 "m_" + [0-9a-z]{10} 이지만, 옛 데이터에서는
+// memObjs() 가 이름 문자열을 그대로 id 로 쓴다({id:m, name:m}) — 공백이 섞이면 HTML id 로
+// 쓸 수 없다. 그래서 [A-Za-z0-9-] 밖의 글자는 "_코드36_"으로 감싼다. 구분자로 감싸므로
+// 서로 다른 id 가 같은 라벨 id 로 뭉개지지 않는다(이름이 다른 사람의 스위치가 되는 사고 방지).
+function gswLabelId(id){
+  return "gswl-" + String(id).replace(/[^A-Za-z0-9-]/g, c => "_" + c.codePointAt(0).toString(36) + "_");
+}
+// 스위치 한 개의 HTML 을 만드는 순수 문자열 생성기. 상태는 aria-checked 로만 싣고
+// 색·손잡이 위치는 CSS 가 파생시킨다. <button> 이라 Space/Enter 와 포커스가 공짜로 들어온다 (R1-6).
+// type="button" 은 지금 감싸는 form 이 없어도 붙여 둔다 — 나중에 form 안으로 들어가도 제출로 새지 않는다.
+function gswHtml(id, on, labelId){
+  return `<button type="button" class="gsw" role="switch" aria-checked="${on?"true":"false"}"`
+       + ` aria-labelledby="${esc(labelId || gswLabelId(id))}" data-id="${esc(id)}">`
+       + `<span class="gsw-track"></span><span class="gsw-knob"></span></button>`;
+}
+
+/* ---------- 참가자 고르기 시트 (R7) ----------
+   토글마다 openSheet() 을 다시 부르던 draw() 구조를 버린다. openSheet 은 $sheet.innerHTML 을
+   갈아치우고 scrollTop=0 을 실행하므로, 명단 아래쪽 사람을 연달아 조정할 수 없었다 —
+   매번 맨 위로 튀고 방금 누른 버튼도 사라졌다. 구성원이 많으면 시트 자체를 쓸 수 없다.
+   그래서 렌더는 최초 1회로 고정하고, 조작 결과는 '그 행 + 상단 카운트'만 제자리에서 고친다. */
+
+// 한 번의 갱신에 필요한 값을 그 순간 gameRoster()/gsLastHost() 에서 다시 읽어 묶는다.
+// 화면이 자기 상태를 들고 있으면 보이는 인원과 실제 추첨 대상이 어긋나므로(design 13) 오래 들고 있지 않는다 —
+// 여러 행을 함께 고칠 때 행마다 명단을 다시 계산하지 않기 위한 한 번짜리 묶음이다.
+function rosterNow(){
+  return { on:new Set(gameRoster().map(m=>m.id)), served:gameServedIds(), last:gsLastHost() };
+}
+
+// 행 부제의 우선순위를 여기 한 곳에서 정한다. 한 사람이 여러 조건에 동시에 걸리므로(주문도 했고
+// 오늘 섬겼고 직전 호스트이기도 하다) 순서를 못 박아야 화면이 흔들리지 않는다. 위에서부터:
+//   1. 안 마심        — 되돌릴 수 없는 제외라 나머지가 무의미하다 (R2-5)
+//   2. 아직 주문 전   — 왜 기본 제외인지와 무엇을 하면 되는지를 말하는 유일한 문구다 (R2-4)
+//   3. 직전에 섬기신 분 — 정책 카드가 이름으로 가리키는 사람이라 행에서도 찾을 수 있어야 한다
+//   4. 오늘 이미 섬기셨어요
+//   5. 주문 완료
+// 2가 3보다 위인 대가: 주문을 안 한 사람이 직전 호스트이기도 하면 '아직 주문 전'만 보인다.
+// 그 경우 그분은 기본 명단에 없고, 정책 카드가 이름을 그대로 적어 주므로 정보가 사라지지는 않는다.
+// 켜져 있을 때는 CTA('넣으려면 켜주세요')를 떼어낸다 — 이미 켜 둔 사람에게 켜라고 말하면 안 된다.
+// last 가 undefined(아직 조회 안 됨)면 falsy 라서 '직전' 문구가 뜨지 않는다 — '없음'과 같게 다룬다.
+function rosterSubText(m, on, snap){
+  if(gameIsSkip(m))     return "오늘은 안 마셔요 — 후보에서 빠짐";
+  if(!gameDefaultOn(m)) return on ? "아직 주문 전" : "아직 주문 전 — 넣으려면 켜주세요";
+  if(snap.last && m.id===snap.last) return "직전에 섬기신 분";
+  if(snap.served.has(m.id)) return "오늘 이미 섬기셨어요";
+  return "주문 완료";
+}
+
+// 행 마크업. 아바타 배경을 --sub 로 바꾸던 처방은 없앴다 — 상태는 스위치가 말하고,
+// 제외된 행은 .gs-off 로 이름·부제만 흐려진다 (R1-9는 CSS 쪽 주석 참고).
+function rosterRowHtml(m, snap){
+  const skip=gameIsSkip(m), on=snap.on.has(m.id), lid=gswLabelId(m.id);
+  return `<div class="person${on?"":" gs-off"}" data-id="${esc(m.id)}">
+    <div class="avatar">${esc(initials(m.name))}</div>
+    <div><div class="pname" id="${esc(lid)}">${esc(m.name)}</div>
+      <div class="pmenu">${esc(rosterSubText(m,on,snap))}</div></div>
+    ${skip?`<span class="pill skip">안마심</span>`:gswHtml(m.id,on,lid)}</div>`;
+}
+
+// 행 하나를 '제자리에서' 고친다. innerHTML 을 다시 넣지 않고 속성·클래스·텍스트만 건드리는 것이
+// 핵심이다 — 노드가 살아 있으니 방금 누른 스위치의 포커스가 애초에 날아갈 일이 없다 (R7-2).
+function patchRosterRow(row, snap){
+  const m=memberById(row.dataset.id);
+  if(!m) return;                                    // 갱신 중 명단에서 사라진 행은 건드리지 않는다
+  const on=snap.on.has(m.id);
+  row.classList.toggle("gs-off", !on);
+  const sw=row.querySelector(".gsw");
+  if(sw) sw.setAttribute("aria-checked", on?"true":"false");   // 색·손잡이 위치는 CSS 가 여기서 파생시킨다
+  const sub=row.querySelector(".pmenu"), t=rosterSubText(m,on,snap);
+  if(sub && sub.textContent!==t) sub.textContent=t;
+}
+
+function rosterRows(){ const l=document.getElementById("gRosterList"); return l ? l.querySelectorAll(".person") : []; }
+
+// data-id 를 CSS 선택자에 끼워 찾지 않는다 — 옛 데이터의 구성원 id 는 이름 문자열이라 따옴표·공백이
+// 섞일 수 있다. 구성원은 최대 60명이라 훑는 비용이 무의미하다.
+function syncRosterRow(id){
+  const snap=rosterNow(); id=String(id);
+  rosterRows().forEach(row=>{ if(row.dataset.id===id) patchRosterRow(row, snap); });
+}
+// 게임 고르기 시트와 같은 값이어야 한다 — 그래서 gamePlayers() 하나만 본다 (R3-6).
+function syncRosterCount(){
+  const el=document.getElementById("gRosterCount");
+  if(el) el.textContent=gamePlayers().length+"명";
+}
+// 컨테이너를 다시 만들지 않으므로 scrollTop 이 유지되고, 위임 리스너도 그대로 살아 있다 (R7-4).
+function syncRosterAll(){
+  const snap=rosterNow();
+  rosterRows().forEach(row=>patchRosterRow(row, snap));
+  syncRosterCount();
+}
+
+// [완료] 는 '되돌아가기'다 — 히스토리 항목이 늘어나면 뒤로가기가 한 번 헛돈다 (R11-7).
+// openSheet 안의 pushSub() 은 subActive 가 이미 true 면 no-op 이라 실제로 늘지는 않지만,
+// 그 no-op 에 기대는 계약은 조용히 깨진다. 늘어났으면 개발 중에 드러나게 확인만 남긴다.
+// openGameSheet 이 아니라 drawGameSheet 을 부른다. 진입은 이미 한 번 있었고 직전 섬긴 분 조회도
+// 그때 걸렸으므로, 여기서 다시 진입하면 응답이 오기 전이었을 때 같은 RPC 가 두 번 나간다.
+// (fetchLastHost 의 캐시는 응답이 도착한 뒤에야 채워진다 — 진행 중인 조회를 합쳐주지 않는다.)
+// 조회가 이 시트가 닫혀 있는 동안 끝났더라도, 아래 그리기가 GS.lastHostId 를 읽어 정책 카드까지 함께 그린다.
+function backToGameSheet(){
+  const had=subActive;
+  drawGameSheet();
+  if(!had && subActive) console.warn("참가자 고르기 [완료]가 히스토리 항목을 늘렸다 (R11-7)");
+}
+
 function openRosterSheet(){
-  const served=gameServedIds();
-  function draw(){
-    const rows=MEMBERS.map(m=>{
-      const o=ORDERS[m.id], skip=!!(o&&o.type==="skip"), on=!skip&&!gameOff.has(m.id);
-      const sub = skip ? "오늘은 안 마셔요 — 후보에서 빠짐"
-                : (served.has(m.id) ? "오늘 이미 섬기셨어요" : (o ? "주문 완료" : "아직 주문 전"));
-      return `<div class="person"><div class="avatar" style="${on?'':'background:var(--sub)'}">${esc(initials(m.name))}</div>
-        <div style="min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${sub}</div></div>
-        ${skip?`<span class="pill skip">안마심</span>`
-              :`<button class="btn btn-sm ${on?'btn-brand':'btn-ghost'} gtog" data-id="${esc(m.id)}">${on?'참가':'제외'}</button>`}</div>`;
-    }).join("");
-    openSheet(`
-      <h3>참가자 고르기</h3>
-      <p class="muted" style="margin-top:0">현재 <b>${gameRoster().length}명</b>. '안 마실게요' 하신 분은 넣을 수 없어요.</p>
-      <div class="row-2" style="margin-bottom:10px">
-        <button class="btn btn-sm btn-soft" id="gAll">전원 참가</button>
-        <button class="btn btn-sm btn-soft" id="gServed">오늘 섬긴 분 빼기</button></div>
-      <div class="card" style="padding:6px 14px">${rows}</div>
-      <div style="height:10px"></div><button class="btn btn-brand" id="gDone">완료</button>`);
-    $sheet.querySelectorAll(".gtog").forEach(b=> b.onclick=()=>{ const id=b.dataset.id;
-      if(gameOff.has(id)) gameOff.delete(id); else gameOff.add(id); draw(); });
-    document.getElementById("gAll").onclick=()=>{ gameOff=new Set(); draw(); };
-    document.getElementById("gServed").onclick=()=>{ gameOff=new Set(served); draw(); };
-    document.getElementById("gDone").onclick=openGameSheet;
-  }
-  draw();
+  if(!GS) gameEnsure();
+  const snap=rosterNow();
+  openSheet(`
+    <h3>참가자 고르기</h3>
+    <p class="muted" style="margin-top:0">현재 <b id="gRosterCount">${gamePlayers().length}명</b>. '안 마실게요' 하신 분은 넣을 수 없어요.</p>
+    <div class="row-2" style="margin-bottom:10px">
+      <button class="btn btn-sm btn-soft" id="gAll">전원 참가</button>
+      <button class="btn btn-sm btn-soft" id="gServed">오늘 섬긴 분 빼기</button></div>
+    <div class="card" id="gRosterList" style="padding:6px 14px">${MEMBERS.map(m=>rosterRowHtml(m,snap)).join("")}</div>
+    <div style="height:10px"></div><button class="btn btn-brand" id="gDone">완료</button>`);
+  // 리스너는 목록 컨테이너에 하나만 건다. 행을 제자리에서 고치니 재배선할 일이 없고,
+  // 컨테이너가 살아 있는 동안(=시트가 열려 있는 동안) 위임이 유지된다.
+  // 스위치가 없는 '안 마심' 행은 .gsw 가 없어 여기 걸리지 않고, 설령 강제로 켜도
+  // rosterFrom 이 안 마시는 분을 먼저 잘라내므로 명단에 들어가지 못한다 (R2-5).
+  const list=document.getElementById("gRosterList");
+  list.addEventListener("click", e=>{
+    const sw=e.target.closest(".gsw");
+    if(!sw || !list.contains(sw)) return;
+    gameToggle(sw.dataset.id, sw.getAttribute("aria-checked")!=="true");   // 상태의 출처는 화면이 아니라 GS 지만, 뒤집을 기준은 방금 보고 누른 값이다
+    syncRosterRow(sw.dataset.id);   // 그 행만
+    syncRosterCount();              // 상단 카운트만 — 컨테이너를 다시 만들지 않으니 scrollTop 이 그대로다 (R7-1, R7-3)
+    sw.focus();                     // iOS 사파리는 버튼을 눌러도 포커스를 주지 않는다 — 여기서 못 박는다 (R7-2)
+  });
+  bind("gAll",    ()=>{ gameAllOn();      syncRosterAll(); });   // R2-10
+  bind("gServed", ()=>{ gameDropServed(); syncRosterAll(); });   // R2-9 — 오늘 섬긴 분만 꺼지고 나머지 명단은 그대로다
+  bind("gDone",   backToGameSheet);
 }
 
 /* ---------- 실행 ---------- */
 function startGame(kind){
-  const roster=gameRoster();
-  if(roster.length<2){ toast("참가자가 2명 이상이어야 해요"); return; }
-  gameKind=kind;
-  // 결과를 먼저 뽑고 그림이 그 결과를 향하게 한다 — 애니메이션이 결과를 만들면 확률이 고르지 않다
-  if(kind==="ladder") playLadder(roster, pickOne(roster));
-  else if(kind==="wheel") playWheel(roster, pickOne(roster));
-  else playFinger(roster);
+  if(!GS) gameEnsure();
+  const players=gamePlayers();   // 시트에 보인 인원과 같은 출처 — 정책 적용 후 1명이 되는 경우도 여기서 막힌다
+  if(players.length<2){
+    // 사유를 갈라 말한다 (R6-14). [제외] 때문에 줄어든 경우에 "2명 이상이어야 해요"만 띄우면
+    // 명단에는 두 명이 보이는데 왜 안 되는지 알 수 없고, 어느 손잡이를 당길지도 모른다.
+    const dropped = gameRoster().length >= 2;
+    toast(dropped ? "[제외] 때문에 참가자가 "+players.length+"명이에요 — 정책을 바꾸거나 참가자를 늘려주세요"
+                  : "참가자가 2명 이상이어야 해요");
+    return;
+  }
+  // 상한은 시트에서 이미 막았지만 [한 판 더]는 시트를 지나지 않고 startGame(GS.kind) 을 직접 부른다.
+  // 게임 도중 누가 주문을 넣어 명단이 16명을 넘으면, 시트에서는 비활성인 사다리가 여기로 다시
+  // 들어와 라벨이 겹친 화면을 그린다. 그래서 판정을 실행 지점에도 둔다. 문구는 시트의 사유와 같다 (R10-4).
+  // GAME_MAX[kind] 가 없는(=모르는) kind 는 판정하지 않는다 — Infinity·16·24 는 모두 truthy 다.
+  if(GAME_MAX[kind] && !gameFits(kind, players.length)){
+    toast(GAME_MAX[kind]+"명까지 — 지금 "+players.length+"명이라 화면에 안 들어가요");
+    return;
+  }
+  GS.kind=kind;   // [한 판 더]가 같은 게임을 다시 돌릴 수 있게 기억해 둔다 (R6-8)
+  // 서명도 여기서 남긴다 — 위 두 가드를 통과한 뒤라야 한다. 가드에 걸려 돌아가는 경우까지 덮어쓰면
+  // 화면에 남아 있는 지난 결과의 기준이 '시작하지도 않은 판'의 명단으로 갈려 경고가 사라진다.
+  // [한 판 더]도 이 지점을 다시 지나므로 서명이 새로 잡히고, 그러면 경고가 저절로 걷힌다 (R17-1).
+  GS.sig=gameRosterSig();
+  // 결과를 먼저 뽑고 그림이 그 결과를 향하게 한다 — 애니메이션이 결과를 만들면 확률이 고르지 않다.
+  // 그래서 확률 정책이 여기 한 지점에만 얹힌다 (R6-9).
+  if(kind==="ladder") playLadder(players, gamePickWinner(players));
+  else if(kind==="wheel") playWheel(players, gamePickWinner(players));
+  // 구슬 레이스도 같은 지점에서 당첨자를 먼저 뽑는다 — 확률 정책이 그대로 반영된다 (R19-4).
+  // 명단도 여기서 읽은 players 를 그대로 넘긴다. [한 판 더]가 이 지점을 다시 지나므로 그때의
+  // gamePlayers() 로 새로 뽑히고, playRace 는 명단을 어디에도 캐시하지 않는다 (R19-15).
+  else if(kind==="race") startRace(players, gamePickWinner(players));
+  // 손가락 룰렛은 예외다 (R6-10). 당첨되는 건 화면에 올라온 물리적 손가락이고 그게 누구인지는
+  // 사후에 사람이 지목한다 — 미리 뽑아 강제하면 사람의 지목을 몰래 덮어쓰게 되므로 뽑지 않는다.
+  // 명단도 넘기지 않는다. 이름 칩은 지목하는 그 순간의 gamePlayers() 를 읽어야 하므로(R3-7)
+  // 시작 시점의 배열을 들고 있으면 오히려 낡은 값을 쓸 위험만 생긴다.
+  else playFinger();
+}
+
+/* 그림판의 aria-label 을 '진행 중'에서 결과로 바꾼다 (R13-6, R19-16).
+   사다리와 돌림판 두 곳이 같은 문제를 갖고 있어 각자 고치면 처방이 갈라진다. 세 게임이 반드시
+   지나가는 showGameResult 한 지점에 얹는 이유는 여기가 (a) 게임마다 한 번씩 불리고 (b) 이미
+   당첨자를 쥐고 있어서다. 문구만 GS.kind 로 갈린다.
+   선택자에 canvas 를 함께 넣는다 — 구슬 레이스의 그림판은 <canvas role="img"> 라서 svg 만 찾으면
+   조용히 지나가고 라벨이 '진행 중'으로 남는다. '무엇으로 그렸는지'가 아니라 'role=img 인 그림판'이
+   이 함수가 찾는 대상이므로, 종류별 분기를 늘리는 대신 선택자를 그 뜻에 맞게 넓힌다.
+   손가락 룰렛은 그림판이 없으므로 querySelector 가 null 을 돌려주고 조용히 지나간다 — 손가락은
+   화면에 '진행 중' 라벨을 걸지 않으니 되돌릴 것도 없다.
+   [한 판 더]는 openGameOv 가 마크업을 다시 그리므로 라벨이 '진행 중'으로 저절로 되돌아온다. */
+function gameStageDone(w){
+  const ov=$gv(); if(!ov) return;
+  const stage=ov.querySelector('svg[role="img"], canvas[role="img"]');   // 오버레이 안의 그림판. 게임마다 하나뿐이다
+  if(!stage) return;
+  const kind=GS && GS.kind;
+  const head= kind==="ladder" ? "사다리타기 결과: "
+            : kind==="wheel"  ? "돌림판 결과: "
+            : kind==="race"   ? "구슬 레이스 결과: " : "게임 결과: ";
+  stage.setAttribute("aria-label", head + hon(w.name));
 }
 
 function showGameResult(w){
   gvibe([28,60,28]);
+  gameStageDone(w);   // 진행 중 라벨을 결과로 갱신 (R13-6)
+  // role="status"(= aria-live polite + atomic)는 이 안에 꽂는 마크업이 아니라 빈 #gvWin 컨테이너에 미리 걸려 있다.
+  // 라이브 리전은 '이미 DOM 에 등록된 영역이 바뀔 때' 읽힌다 — 내용과 함께 새로 삽입되면 안 읽히는 리더가 있다 (R13-4).
   const box=document.getElementById("gvWin");
-  if(box) box.innerHTML=`<div class="game-win"><div class="we">☕</div>
+  /* 게임이 도는 사이 명단이 바뀌었는지는 여기서 처음 본다 (R17-1, R17-2). 감시자를 걸지 않는 이유는
+     이 값이 쓰이는 순간이 둘뿐이라서다 — 결과가 걸릴 때와 확정할 때. 그 사이에 알아도 할 일이 없다.
+     결과를 몰래 다시 뽑거나 오버레이를 닫지는 않는다. 사용자가 방금 본 그림과 이름은 그대로 두고
+     '이 결과를 그대로 쓸지'만 사용자가 고르게 한다.
+     gone(당첨자가 지금 추첨 대상이 아님)이 더 강한 조건이다 — 명단에서 빠진 분을 호스트로 앉히는
+     것이 실제 사고이고, changed 는 남이 주문을 넣은 정도의 변화도 함께 잡는다. */
+  const changed = !!(GS && GS.sig!==null && GS.sig!==gameRosterSig());
+  const gone = !gamePlayers().some(m=>m.id===w.id);
+  const warn = gone    ? "당첨되신 분이 방금 명단에서 빠졌어요 — 한 판 더 돌려주세요"
+             : changed ? "게임 도중 참가자가 바뀌었어요 — 한 판 더 돌리시겠어요?" : "";
+  // 배너를 #gvWin 안, 결과 블록 '위'에 넣는다. 따로 만든 div 를 바깥에 끼우면 새로 삽입된 영역이라
+  // 라이브 리전으로 안 읽히는 리더가 있고, 리전을 하나 더 두면 결과와 경고가 두 번에 나눠 읽힌다.
+  // 여기 넣으면 role="status"(atomic) 가 '경고 + 당첨자'를 한 번에 읽는다 — #gvWin 의 속성은 그대로다.
+  if(box) box.innerHTML=`${warn?`<div class="game-warn">${esc(warn)}</div>`:""}<div class="game-win"><div class="we">☕</div>
     <div class="wn">${esc(hon(w.name))}</div>
     <div class="ws">오늘 음료로 섬겨주실 분${w.id===ME?" — 바로 나!":""}</div></div>`;
   const say=document.getElementById("gvSay"); if(say) say.innerHTML="결과가 나왔어요";
   const same = SESSION.hostId===w.id;
-  setGameFoot(`<button class="btn btn-brand" id="gvOk">${same?"확인":"✅ "+esc(hon(w.name))+"으로 확정하기"}</button>
+  // 라벨에서 이름을 뺀다 (R18-3, R18-4). 당첨자 이름은 바로 위 .game-win .wn 에 25px 로 크게 나와
+  // 있으니 버튼에서 되풀이할 이유가 없고, 이름을 빼면 길이에 따른 넘침과 이름 뒤 조사 문제가
+  // 함께 사라진다 — 조사를 다른 자리로 옮기는 게 아니라 없애는 쪽이다.
+  const okLabel = same ? "확인" : "✅ 이분으로 확정하기";
+  /* 명단에서 빠진 분을 호스트로 앉히는 길을 아예 없앤다 (R17-2). 비활성 버튼으로 남기지 않는 이유는
+     푸터가 이미 [한 판 더]로 다음 행동을 주고 있어서다 — 못 누르는 버튼을 하나 더 보여줄 이유가 없다.
+     same(당첨자가 이미 호스트)인 경우는 막지 않는다. 그 버튼은 [확인]이라 서버에 쓰는 것이 없고
+     '그대로 섬깁니다'도 여전히 사실이다 — 막으면 현상 유지를 받아들일 길만 사라진다. */
+  const blocked = gone && !same;
+  setGameFoot(`${blocked?"":`<button class="btn btn-brand" id="gvOk">${okLabel}</button>`}
     <div class="row-2"><button class="btn btn-soft" id="gvAgain">🎲 한 판 더</button>
       <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
-  bind("gvOk",()=>{ if(same){ closeGame(); toast(hon(w.name)+"이 그대로 섬깁니다 🙏"); } else commitGameWinner(w); });
-  bind("gvAgain",()=>{ clearGameTimers(); if(gameTeardown){ try{ gameTeardown(); }catch(e){} gameTeardown=null; } startGame(gameKind); });
-  bind("gvCancel",closeGame);
+  bind("gvOk", async()=>{
+    // 호스트가 이미 당첨자면 서버에 쓸 것이 없다 — 잠글 이유도 없으므로 두 갈래를 구분해 둔다.
+    // 위에서 잡아둔 same 이 아니라 눌린 시점의 SESSION 을 다시 읽는다 (R17-3). 결과 화면이 떠 있는
+    // 동안 폴링이 호스트를 갈아끼울 수 있고, 낡은 same 으로 갈리면 남이 이어받은 섬김을 두고
+    // '그대로 섬깁니다'라고 말하거나(true→false), 이미 호스트인 분을 다시 인계한다(false→true).
+    if(SESSION.hostId===w.id){ closeGame(); toast(hon(w.name)+"이 그대로 섬깁니다 🙏"); return; }
+    // guardWrite 는 busyWrite 가 이미 true 면 fn 을 아예 부르지 않는다. 그 상태에서 잠그면
+    // 되돌릴 계기가 없는 disabled 로 남을 수 있으니, 잠그기 전에 확인해서 그때는 손대지 않는다.
+    if(busyWrite) return;
+    const b=document.getElementById("gvOk");
+    // await 앞에서 동기로 잠근다 — 재진입 차단은 guardWrite 가 하고 여기서는 시각 상태만 얹는다(R18-1).
+    if(b){ b.disabled=true; b.textContent="확정하는 중…"; }
+    try{ await commitGameWinner(w); }
+    finally{
+      // 성공 경로에서는 closeGame() 이 오버레이를 비웠으므로 이 버튼은 이미 DOM 에 없다.
+      // 되돌리기가 의미 있는 건 오버레이가 남아 있는 실패 경로뿐이라 contains 로 확인한다.
+      if(b && document.body.contains(b)){ b.disabled=false; b.textContent=okLabel; }
+    }
+  });
+  bind("gvAgain",()=>{ clearGameTimers(); if(GS && GS.teardown){ try{ GS.teardown(); }catch(e){} GS.teardown=null; } startGame(GS && GS.kind); });
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
   // 인원이 많거나 화면이 짧으면 발표가 접힌 아래에 생긴다 — 끝까지 내려서 보여준다.
-  // 버튼 3개가 들어간 뒤라야 푸터 높이가 확정되므로 반드시 setGameFoot 다음, 레이아웃 한 프레임 뒤에 잰다.
+  // 버튼이 다 들어간 뒤라야 푸터 높이가 확정되므로 반드시 setGameFoot 다음, 레이아웃 한 프레임 뒤에 잰다.
+  // (확정이 막힌 경우엔 두 개다 — 높이가 달라지므로 여기서 재는 순서가 더 중요해진다.)
   requestAnimationFrame(()=>{ const bd=document.getElementById("gvBody"); if(!bd || bd.scrollHeight<=bd.clientHeight) return;
     try{ bd.scrollTo({top:bd.scrollHeight, behavior:lessMotion()?"auto":"smooth"}); }catch(e){ bd.scrollTop=bd.scrollHeight; } });
 }
 
-// 확정 = 여기서 처음으로 서버에 쓴다. 호스트가 이미 있으면 비운 뒤(unclaim) 당첨자가 이어받는다(claim).
-// unclaim 은 주문이 없으면 섬김 자체를 지우므로, 게임 진입점은 주문이 1건 이상일 때만 노출한다.
+/* 확정 = 여기서 처음으로 서버에 쓴다. 호스트가 이미 있으면 비운 뒤(unclaim) 당첨자가 이어받는다(claim).
+   unclaim 은 주문이 0건이면 섬김 자체를 지우고, 그러면 claim 이 새 seq 로 섬김을 다시 만든다 —
+   'N번째 섬김'이 사라지고 번호가 튀는 사고다. 이 방어는 예전엔 진입점 조건
+   (Object.keys(ORDERS).length>0)에 있었는데, 그 자리로는 두 경우를 못 막는다:
+     ① 시트가 열려 있는 동안 마지막 주문이 취소되는 경우 — 화면 조건은 이미 통과했다.
+     ② [전원 참가](gameAllOn)로 GS.on 을 채우면 rosterFrom 이 주문과 무관하게 참가로 세므로
+        '참가자 2명 + 주문 0건'이 성립하는 경우.
+   그래서 쓰기 바로 앞으로 옮겼다. 인계가 필요 없는 경우(prevHost 없음)엔 unclaim 을 부르지
+   않으므로 조건도 걸지 않는다 — 호스트 없는 빈 섬김을 게임으로 가져가는 건 안전하다 (R16-5). */
 async function commitGameWinner(w){
-  const seq=SESSION.seq, prevHost=SESSION.hostId, cafeId=SESSION.cafeId||activeCafeId();
   await guardWrite(async()=>{
+    /* SESSION 을 함수 진입 시점이 아니라 쓰기 직전에 읽는다 (R17-3). 게임은 몇십 초를 도는 동안
+       폴링이 SESSION 을 계속 갈아끼우므로, 미리 잡아둔 prevHost 로 판단하면 두 가지가 어긋난다 —
+       그사이 남이 이어받았는데도 '호스트 없음'으로 보고 unclaim 을 건너뛰거나, 반대로 이미 비워진
+       섬김을 또 비운다. 0건 가드도 같은 값을 봐야 하므로 한 번 읽어 둘이 함께 쓴다.
+       읽는 자리를 guardWrite 안으로 옮긴 것도 같은 이유다 — 지금은 이 앞에 await 가 없어 값이
+       같지만, 나중에 확인창 같은 await 가 앞에 끼면 밖에서 읽은 값이 곧 낡은 값이 된다. */
+    const seq=SESSION.seq, prevHost=SESSION.hostId, cafeId=SESSION.cafeId||activeCafeId();
+    if(prevHost && !Object.keys(ORDERS).length){
+      toast("아직 주문이 없어서 지금 넘기면 이 섬김이 사라져요 — 주문이 모인 뒤에 확정해주세요");
+      return;   // 오버레이는 그대로 둔다 — [한 판 더]나 닫기를 사용자가 고르게 한다
+    }
     toast("확정하는 중…");
     try{
       if(prevHost) await Sync.unclaim(seq);
       const ok=await Sync.claim(w.id, cafeId);
-      closeGame(); viewSeq=null;
-      if(ok) toast(w.id===ME ? "🎲 제가 섬기게 됐어요 — 메뉴는 지금도 바꿀 수 있어요"
-                             : "🎲 "+hon(w.name)+"이 오늘의 섬김을 맡았어요");
-      else toast("앗, 방금 다른 분이 먼저 이어받으셨어요!");
-      render();
-      // 게임을 연 자리(현황 탭)에 그대로 둔다. 단 당첨자 본인은 메뉴를 다시 고를 수 있어야 하므로
+      /* claim 은 'host_id is null' 일 때만 성공하므로 false = 그 찰나에 남이 먼저 이어받았다는 뜻이다.
+         이 경우엔 오버레이를 닫지 않는다 (R17-4). 닫으면 우리가 시도한 결과가 화면에서 사라지고
+         [한 판 더]도 함께 없어져, 다시 돌리려면 시트를 처음부터 다시 열어야 한다 — 복구 가능해야
+         한다는 요구와 반대다. 성공 경로만 닫고, 실패 경로는 결과 화면을 남긴 채 사유를 알린다.
+         render() 는 실패 경로에서도 부른다 — 아래 화면이 새 호스트를 반영해야 하고, 오버레이는
+         #app 밖에 있어 재렌더에 닫히지 않는다 (R17-5). */
+      if(!ok){
+        toast("앗, 방금 다른 분이 먼저 이어받으셨어요 — [한 판 더]로 다시 돌려보세요");
+        render();
+        return;
+      }
+      closeGame(); viewSeq=null;   // 게임이 쥔 히스토리 항목을 여기서 소비한다
+      toast(w.id===ME ? "🎲 제가 섬기게 됐어요 — 메뉴는 지금도 바꿀 수 있어요"
+                      : "🎲 "+hon(w.name)+"이 오늘의 섬김을 맡았어요");
+      // 게임을 연 자리에 그대로 둔다(R12-4). 단 당첨자 본인은 메뉴를 다시 고를 수 있어야 하므로
       // '내 주문' 탭으로 보낸다 — 사는 줄 모르고 고른 메뉴를 바꿀 기회를 주는 게 이 흐름의 예의다.
-      if(ok && w.id===ME){ forceGrid=true; setOpenTab("order"); }
+      // setOpenTab 을 쓰지 않는 이유가 둘이다: openTab 이 이미 "order"(내 주문 탭에서 게임을 열었을 때)면
+      // 즉시 return 해서 forceGrid 가 화면에 반영되지 않고, 다른 탭이면 history.back() 이라는 부수효과가
+      // 방금 closeGame() 이 맞춰둔 히스토리 장부와 부딪힌다. 그래서 직접 대입한다.
+      if(w.id===ME){          // 여기까지 왔으면 성공 경로다 — 실패는 위에서 이미 return 했다
+        clearSubEntry();      // 내 주문 탭으로 넘어가므로 탭·시트가 쥔 1칸도 함께 정리한다 (7.3)
+        forceGrid=true;
+        openTab="order";
+      }
+      render();   // 분기 '뒤'에 딱 한 번. 먼저 부르면 forceGrid 가 반영될 기회가 없다 (R12-1)
     }catch(e){ console.error(e); closeGame(); toast("확정 실패 — 네트워크 확인 후 다시 시도해주세요"); render(); }
   });
 }
@@ -1596,6 +2525,20 @@ function playLadder(roster, winner){
   // 짧게 잘려도 전체 이름은 결과 발표와 <title> 에 그대로 나온다.
   const GAP=(W-2*PAD)/(n-1), NCH= n<=7?4 : n<=9?3 : 2, NFS= n<=7?11 : n<=9?10 : 8.5;
   const BOX_W=Math.min(30, GAP*0.82);
+  // 11명부터는 라벨을 번호로 바꾼다. 이름 축소는 2글자·8.5px 에서 멈추므로 그 아래로는 겹칠 뿐이고,
+  // 2글자로 자른 이름은 어차피 못 읽는다. 번호는 아래 범례가 이름과 이어준다 (R10-1, R10-2).
+  // 숫자는 한글보다 좁아서 두 자리가 10px 로도 ≈11px — 세로줄 간격이 가장 좁은 16명(19.5px)에도
+  // 들어간다. NFS(8.5px)까지 줄일 이유가 없으므로 읽기 쉬운 쪽을 고른다.
+  const NUMS = n > GAME_LABEL_MAX, LFS = NUMS ? 10 : NFS;
+  // 도착 상자 안 기호 크기. 상자 폭에 비례로 묶어야 16명(BOX_W≈15.96)에서 ☕ 가 상자를 넘지
+  // 않는다 (R4-7, R10-3). ☕ 는 이모지라 마침표보다 넓고 폰트에 따라 1em 을 살짝 넘기도 하는데,
+  // 0.62em 이면 넘쳐도 상자 폭의 ~75% 라서 테두리 안에 남는다. 14px 상한은 2~12명에서 지금과
+  // 같은 크기를 유지하기 위한 것이다.
+  const BFS = Math.min(14, BOX_W*0.62);
+  // 기호를 상자 정중앙에 놓는 베이스라인. 글자 크기가 인원에 따라 변하므로 상수 18 을 쓰면
+  // 작은 상자에서 글자가 아래로 처진다. 중심(BOX_Y+BOX_H/2)에서 대문자 높이 절반(≈0.36em)만큼
+  // 내린다 — BFS=14 에서 BOX_Y+18.0 으로 기존 값과 같다.
+  const BTY = BOX_Y + BOX_H/2 + BFS*0.36;
   const rowY=l=> Y0 + (l+0.5)*STEP;
   // 가로줄: 같은 높이에서 이웃끼리 겹치면 경로가 갈라지지 않는다 → 인접 금지.
   // 가로줄이 너무 적거나, 아무도 자리를 안 바꾸는(제자리) 사다리는 그림이 밋밋해서 다시 만든다.
@@ -1617,22 +2560,31 @@ function playLadder(roster, winner){
   // 같은 가로줄을 두 사람이 지날 때 색이 덮이지 않도록 사람마다 아주 조금 어긋나게 그린다
   const dOf=(pts,i)=>{ const off=(i-(n-1)/2)*0.8;
     return pts.map((p,k)=>(k?"L":"M")+p[0].toFixed(1)+" "+(p[1]+off).toFixed(1)).join(" "); };
+  // 색은 gcolor(i, n) 으로 뽑는다. n 을 안 넘기면 11명째부터 0번과 색이 겹쳐 두 사람의
+  // 경로선을 구분할 수 없다 (R9-1·R9-3). n 은 이 판을 그릴 때 쓴 roster.length 그대로 —
+  // 그리는 중에 명단이 바뀌어도 라벨 색과 경로 색이 어긋나지 않는다.
+  // 도착 상자(.lbox)는 첫 프레임부터 확정된 모습으로 그린다 — goal 칸은 강조 배경·굵은 테두리에
+  // ☕, 나머지는 중립 배경에 · 만 둔다. ? 로 시작해 뒤늦게 하나씩 여는 연출을 없앴다
+  // (R4-1·R4-2·R4-5·R4-8). 왼쪽부터 열리던 예전 연출은 소거법으로 답이 새기도 했다.
+  // 긴장은 선이 2.4초 동안 위에서 아래로 내려오는 데서 나온다.
 
   openGameOv("🪜 사다리타기", `
-    <div class="game-say" id="gvSay">한 폰을 다 같이 보세요 — 내려갑니다…</div>
+    <div class="game-say" id="gvSay" aria-live="polite">한 폰을 다 같이 보세요 — 내려갑니다…</div>
     <div class="game-stage"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="사다리타기 진행 중">
-      ${roster.map((m,i)=>`<text x="${colX(i)}" y="${LABEL_Y}" text-anchor="middle" font-size="${NFS}" font-weight="800" fill="${gcolor(i)}"><title>${esc(m.name)}</title>${esc(shortName(m.name,NCH))}</text>`).join("")}
+      ${roster.map((m,i)=>`<text x="${colX(i)}" y="${LABEL_Y}" text-anchor="middle" font-size="${LFS}" font-weight="800" fill="${gcolor(i, n)}"><title>${esc(m.name)}</title>${NUMS ? (i+1) : esc(shortName(m.name,NCH))}</text>`).join("")}
       ${roster.map((m,i)=>`<line x1="${colX(i)}" y1="${Y0}" x2="${colX(i)}" y2="${Y1}" stroke="#e7ddcf" stroke-width="3" stroke-linecap="round"/>`).join("")}
       ${rungs.map((row,l)=>row.map(i=>`<line x1="${colX(i)}" y1="${rowY(l)}" x2="${colX(i+1)}" y2="${rowY(l)}" stroke="#e7ddcf" stroke-width="3" stroke-linecap="round"/>`).join("")).join("")}
-      ${roster.map((m,i)=>`<path class="lpath" d="${dOf(paths[i].pts,i)}" fill="none" stroke="${gcolor(i)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
-      ${roster.map((m,i)=>`<g class="lbox" data-c="${i}"><rect x="${(colX(i)-BOX_W/2).toFixed(1)}" y="${BOX_Y}" width="${BOX_W.toFixed(1)}" height="${BOX_H}" rx="9" fill="#fff" stroke="#e7ddcf" stroke-width="1.5"/>
-        <text x="${colX(i)}" y="${BOX_Y+18}" text-anchor="middle" font-size="14" font-weight="800" fill="#6f6253">?</text></g>`).join("")}
+      ${roster.map((m,i)=>`<path class="lpath" d="${dOf(paths[i].pts,i)}" fill="none" stroke="${gcolor(i, n)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
+      ${roster.map((m,i)=>{ const hit = i===goal;
+        return `<g class="lbox" data-c="${i}"><rect x="${(colX(i)-BOX_W/2).toFixed(1)}" y="${BOX_Y}" width="${BOX_W.toFixed(1)}" height="${BOX_H}" rx="9" fill="${hit?"#fbe9e3":"#f6f1ea"}" stroke="${hit?"#c2552f":"#e7ddcf"}" stroke-width="${hit?2:1.5}"/>
+        <text x="${colX(i)}" y="${BTY.toFixed(1)}" text-anchor="middle" font-size="${BFS.toFixed(1)}" font-weight="800" fill="${hit?"#a8401f":"#b6a99a"}">${hit?"☕":"·"}</text></g>`; }).join("")}
     </svg></div>
-    <div id="gvWin"></div>`);
+    ${gameLegendHtml(roster, n)}
+    <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
-  bind("gvCancel",closeGame);
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
-  const DUR = lessMotion() ? 10 : 2400, STAG = lessMotion() ? 0 : 130;
+  const DUR = lessMotion() ? 10 : 2400;
   // 선이 위에서 아래로 그려지는 애니메이션. 두 가지를 지켜야 실제로 움직인다:
   //   ① 길이에 단위를 붙인다 — CSS 의 stroke-dashoffset 은 <length> 라 단위 없는 숫자는 0 으로 떨어진다.
   //   ② 시작값을 브라우저가 한 번 반영한 뒤에 끝값을 준다 — 안 그러면 두 값이 같은 스타일 재계산에
@@ -1645,70 +2597,115 @@ function playLadder(roster, winner){
   els.forEach(p=>{ p.style.transition="stroke-dashoffset "+DUR+"ms cubic-bezier(.45,.05,.25,1)";
                    p.style.strokeDashoffset="0px"; });
 
-  const boxes=[...$gv().querySelectorAll(".lbox")];
-  const openBox=(c,hit)=>{ const g=boxes[c]; if(!g) return;
-    g.querySelector("rect").setAttribute("fill", hit?"#fbe9e3":"#f6f1ea");
-    if(hit) g.querySelector("rect").setAttribute("stroke", "#c2552f");
-    const t=g.querySelector("text"); t.textContent=hit?"☕":"·"; t.setAttribute("fill", hit?"#a8401f":"#b6a99a"); };
-  gtimer(()=>{
-    const rest=roster.map((m,i)=>i).filter(i=>i!==goal);
-    rest.forEach((c,k)=> gtimer(()=>openBox(c,false), k*STAG));
-    gtimer(()=>{ openBox(goal,true); showGameResult(winner); }, rest.length*STAG + (lessMotion()?0:340));
-  }, DUR+120);
+  // 선이 다 내려오면 곧바로 발표한다. 상자는 이미 다 보이므로 열어 보일 것이 없다 (R4-5).
+  // 120ms 는 마지막 선의 끝점이 상자에 닿은 걸 눈이 확인할 여유다.
+  gtimer(()=>showGameResult(winner), DUR+120);
 }
 
 /* ---------- 🎡 돌림판 ---------- */
 function playWheel(roster, winner){
   const n=roster.length, R=100, a=360/n, wi=roster.indexOf(winner);
+  // 조각 색은 gcolor(i, n). n 을 안 넘기면 11명째에 0번과 같은 색이 되고, 그 둘은 바로
+  // 옆 조각이라 흰 구분선만 남아 경계가 사실상 사라진다 (R9-1·R9-2).
   const sectors=roster.map((m,i)=>{
     const s=(i*a-90)*Math.PI/180, e=((i+1)*a-90)*Math.PI/180, big=a>180?1:0;
-    return `<path d="M0 0 L ${(R*Math.cos(s)).toFixed(2)} ${(R*Math.sin(s)).toFixed(2)} A ${R} ${R} 0 ${big} 1 ${(R*Math.cos(e)).toFixed(2)} ${(R*Math.sin(e)).toFixed(2)} Z" fill="${gcolor(i)}" stroke="#fff" stroke-width="1.2"/>`;
+    return `<path d="M0 0 L ${(R*Math.cos(s)).toFixed(2)} ${(R*Math.sin(s)).toFixed(2)} A ${R} ${R} 0 ${big} 1 ${(R*Math.cos(e)).toFixed(2)} ${(R*Math.sin(e)).toFixed(2)} Z" fill="${gcolor(i, n)}" stroke="#fff" stroke-width="1.2"/>`;
   }).join("");
   // 핀은 12시. 12시에서 시계방향 mid 만큼 떨어진 조각을 핀 아래로 보내려면 그만큼 되돌려 감는다.
   const mid=(wi+0.5)*a, jitter=(Math.random()-0.5)*Math.max(0, a-10), spin=360*5 - mid + jitter;
   // 이름은 판과 같이 돌면 멈췄을 때 거꾸로 선다. 판이 도는 만큼 글자를 제자리에서 되돌려 놔
   // 멈춘 순간 항상 똑바로 읽히게 한다(폰에서는 가로로 놓인 2~4글자가 제일 잘 읽힌다).
+  // 11명부터는 조각 라벨도 번호만 넣는다 — 조각 각도가 15°(24명)까지 좁아지면 2글자 이름조차
+  // 이웃 조각으로 넘어간다. 역회전(-spin)은 번호에도 그대로 걸어야 멈춘 순간 똑바로 선다 (R14-4).
+  // 글자 크기는 기존 식(n>8?11:13)을 건드리지 않는다. 번호 경로는 항상 n>10 이라 그 식이 이미
+  // 11px 을 주고, 두 자리 숫자가 ≈12px 이라 24명의 라벨 간격(반지름 62 · 15° ≈ 16px)에 들어간다.
+  // 더 줄일 이유가 없으니 줄이지 않는다.
+  const NUMS = n > GAME_LABEL_MAX;
   const labels=roster.map((m,i)=>{ const t=((i+0.5)*a-90)*Math.PI/180, lr=R*0.62;
     const x=lr*Math.cos(t), y=lr*Math.sin(t);
-    return `<text x="${x.toFixed(2)}" y="${(y+4).toFixed(2)}" transform="rotate(${(-spin).toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})" text-anchor="middle" font-size="${n>8?11:13}" font-weight="800" fill="#fff">${esc(shortName(m.name,4))}</text>`;
+    return `<text x="${x.toFixed(2)}" y="${(y+4).toFixed(2)}" transform="rotate(${(-spin).toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})" text-anchor="middle" font-size="${n>8?11:13}" font-weight="800" fill="#fff">${NUMS ? (i+1) : esc(shortName(m.name,4))}</text>`;
   }).join("");
   openGameOv("🎡 돌림판", `
-    <div class="game-say" id="gvSay">돌아갑니다…</div>
+    <div class="game-say" id="gvSay" aria-live="polite">돌아갑니다…</div>
     <div class="wheel-wrap"><div class="wheel-pin">🔻</div>
       <div id="wRot" style="transform:rotate(0deg)"><svg viewBox="-108 -108 216 216" role="img" aria-label="돌림판 회전 중">
         ${sectors}${labels}<circle cx="0" cy="0" r="13" fill="#fff" stroke="#e7ddcf" stroke-width="2"/></svg></div></div>
-    <div id="gvWin"></div>`);
+    ${gameLegendHtml(roster, n)}
+    <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
-  bind("gvCancel",closeGame);
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
   const slow=!lessMotion(), DUR= slow?4400:220;
   const rot=document.getElementById("wRot");
+  // 회전 시작을 사다리(playLadder 의 stroke-dashoffset)와 같은 처방으로 맞춘다 (R14-1).
+  // [한 판 더]는 openGameOv 가 오버레이 마크업을 통째로 갈아치우므로 #wRot 은 매번 방금 만든
+  // 노드이고, 갓 삽입된 요소는 첫 스타일 계산에서 시작값과 끝값이 한 덩어리로 묶여 보간할 구간이
+  // 없다 — 완성된 각도로 그냥 나타난다. 그래서 시작값(0deg)을 명시하고 강제 리플로우로 한 번
+  // 커밋한 뒤에 끝값을 준다. 믿을 수 있는 건 rAF 가 아니라 리플로우다 — rAF 는 '다음 프레임 직전'
+  // 이라는 시점만 잡아주고 그 사이 스타일이 커밋됐음을 보장하지 않아서, 브라우저가 두 변경을 한
+  // 재계산으로 합쳐버릴 수 있다. offsetHeight 읽기는 레이아웃을 그 자리에서 강제로 확정시킨다.
+  rot.style.transition="none";
+  rot.style.transform="rotate(0deg)";
+  void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
+  // lessMotion() 이면 transition 을 아예 걸지 않는다 — 위에서 넣은 "none" 이 그대로 남아 끝값이
+  // 즉시 적용되고, DUR(220ms) 뒤에 결과가 뜬다. 회전 연출만 사라지고 결과는 바로 나온다 (R14-2).
   if(slow) rot.style.transition="transform 4.2s cubic-bezier(.16,.72,.14,1)";
-  requestAnimationFrame(()=> rot.style.transform="rotate("+spin.toFixed(2)+"deg)");
+  rot.style.transform="rotate("+spin.toFixed(2)+"deg)";
   gtimer(()=>showGameResult(winner), DUR);
 }
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
-function playFinger(roster){
+function playFinger(){
+  // 확률 정책 안내 (R6-10, R6-11). [확률 낮추기]가 켜져 있어도 이 게임에서는 아무 일도 하지 않는다 —
+  // 당첨은 화면에 올라온 물리적 손가락에서 결정되고 그게 누구인지는 사후에 사람이 지목하니 가중치를
+  // 얹을 지점이 없다. 그래서 결과가 아니라 시작 화면에 적는다. 결과에 적으면 "왜 직전에 섬긴 분이
+  // 또 걸렸지"를 이미 겪은 뒤라 늦다. 잘못된 상태가 아니라 정상 동작이므로 경고가 아닌 설명으로 쓴다.
+  // 직전 섬긴 분을 모르는 동안(undefined)이나 없을 때는 조정할 대상 자체가 없으니 띄우지 않는다.
+  // [제외]는 gamePlayers() 가 명단에서 빼주므로 안내가 필요 없다 — 이름 칩에도 애초에 나오지 않는다.
+  const policyNote = (gsPolicy()==="soft" && gsLastHost())
+    ? `<div class="game-hint" style="margin-bottom:8px">이 게임은 확률 조정이 적용되지 않아요</div>` : "";
+  // .fp-pad 는 inset:0 인 absolute 라 이 한 줄이 흐름에 끼어들어도 좌표 기준(gvBody 의 패딩 박스)은
+  // 그대로다 — at() 의 클램프 계산에 영향이 없다.
   openGameOv("☝️ 손가락 룰렛", `
-    <div class="game-say" id="gvSay">폰을 가운데 놓고 <b>다 같이 손가락</b>을 올려주세요</div>
+    <div class="game-say" id="gvSay" aria-live="polite">폰을 가운데 놓고 <b>다 같이 손가락</b>을 올려주세요</div>
+    ${policyNote}
     <div class="fp-pad" id="fpPad"></div><div class="fp-mid" id="fpMid"></div>
-    <div id="gvWin"></div>`);
+    <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
-  bind("gvCancel",closeGame);
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
   const body=document.getElementById("gvBody"), pad=document.getElementById("fpPad"), mid=document.getElementById("fpMid");
-  // 이 게임만은 세로 스크롤도 막는다 — 손가락이 미끄러질 때 화면이 따라 움직이면 좌표가 어긋난다
+  // 이 게임만은 세로 스크롤도 막는다 — 손가락이 미끄러질 때 화면이 따라 움직이면 좌표가 어긋난다 (R8-4)
+  // 걸기 전 값을 그대로 기억해 두고 teardown 에서 되돌린다 (R8-1, R8-3). 빈 문자열이라고 가정하지
+  // 않는 이유: 여기서 아는 건 '내가 덮어쓴다'는 사실뿐이고, 원래 값은 읽어서만 알 수 있다.
+  const prevBody={ touchAction: body.style.touchAction, overflowY: body.style.overflowY };
   body.style.touchAction="none"; body.style.overflowY="hidden";
-  const pts=new Map(); let seq=0, cdT=null, picked=false;
-  const stop=()=>{ if(cdT){ clearInterval(cdT); cdT=null; } };
+  // 고정된 값을 다시 쓰기만 하므로 몇 번 불러도 결과가 같다 — teardown 이 두 번 들어와도 안전하다.
+  const restoreBody=()=>{ body.style.touchAction=prevBody.touchAction; body.style.overflowY=prevBody.overflowY; };
+  const pts=new Map(); let seq=0, cdT=null, settleT=null, picked=false;
+  // 손가락 수가 바뀌면 곧바로 3부터 세지 않고, SETTLE 동안 '변화가 없음'을 먼저 기다린다 (R15-3, R15-4).
+  // 예전에는 두 번째 손가락이 닿는 순간 카운트가 시작돼 세 번째 사람이 올릴 틈이 없었다.
+  // 마지막 손가락이 닿은 뒤 당첨까지 SETTLE + 3×800 ≈ 3.3초 — 예전 2.4초보다 길어진 건 의도한 값이다.
+  // 기다리는 기준은 '많아짐'이 아니라 '안 바뀜'이라, 손가락이 빠져도 똑같이 다시 기다린다.
+  const SETTLE=900;
+  // 두 타이머를 한 자리에서 끈다 — 부르는 쪽이 지금 어느 단계인지 몰라도 되고, teardown 도 이것만 부른다.
+  const stop=()=>{ if(cdT){ clearInterval(cdT); cdT=null; } if(settleT){ clearTimeout(settleT); settleT=null; } };
+  // 안정화가 끝난 뒤의 3·2·1. 문구를 안정화 단계와 갈라놓아 "언제 세기 시작하는가"라는 규칙이 화면에
+  // 드러나게 한다 — 한 화면에 둘을 같이 띄우면 다시 규칙이 안 보인다.
+  function countdown(){
+    settleT=null;                      // 이미 발화한 타이머 — 남겨두면 stop() 이 죽은 id 를 지운다
+    if(picked || pts.size<2){ refresh(); return; }   // 타이머와 포인터 사이의 틈을 세기 직전에 한 번 더 확인
+    let k=3; mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12);
+    cdT=setInterval(()=>{ k--;
+      if(k<=0){ stop(); choose(); } else { mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12); } }, 800);
+  }
+  // 손가락이 늘 때(onDown)와 줄 때(onUp) 모두 여기로 온다. 어느 쪽이든 stop() 으로 진행 중인 카운트다운을
+  // 버리고 처음부터 다시 기다리므로, 카운트다운 중에 2명 미만으로 떨어지면 '두 개 이상' 안내로 돌아간다.
   function refresh(){
     if(picked) return; stop();
-    if(pts.size>=2){
-      let k=3; mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12);
-      cdT=setInterval(()=>{ k--;
-        if(k<=0){ stop(); choose(); } else { mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12); } }, 800);
-    } else mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 두 개 이상 올리면 셉니다</div>`;
+    if(pts.size<2){ mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 두 개 이상 올려주세요</div>`; return; }
+    mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 다 올리셨으면 곧 시작해요</div>`;
+    settleT=setTimeout(countdown, SETTLE);
   }
   function choose(){
     picked=true; mid.innerHTML="";
@@ -1717,33 +2714,352 @@ function playFinger(roster){
                           else p.el.classList.add("lose"); });
     gvibe([30,70,30]);
     document.getElementById("gvSay").innerHTML="당첨된 손가락, <b>누구세요?</b>";
-    setGameFoot(`<div class="chips" style="justify-content:center;margin-bottom:2px">${roster.map(m=>`<div class="chip gwho" role="button" tabindex="0" data-id="${esc(m.id)}">${esc(m.name)}</div>`).join("")}</div>
-      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
-    $gv().querySelectorAll(".gwho").forEach(c=> c.onclick=()=>{ teardown(); showGameResult(roster.find(m=>m.id===c.dataset.id)); });
-    bind("gvCancel",closeGame);
+    renderWho();
   }
-  const at=e=>{ const r=body.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+  /* 이름 칩은 시작 시점에 잡아둔 배열이 아니라 그리는 순간의 gamePlayers() 를 읽는다 (R3-7).
+     게임이 도는 사이에 주문이 들어오거나 참가자 토글이 바뀔 수 있고, 그때 낡은 명단으로 칩을 그리면
+     이미 명단에서 빠진 사람을 지목할 수 있게 된다. [제외] 정책도 gamePlayers() 가 이미 걸러주므로
+     여기서 따로 볼 것이 없다 (R6-10).
+     탭 시점에도 명단을 다시 읽는다 — 칩을 그린 뒤 탭까지의 사이도 같은 창이다. 그 사이 빠진 분이면
+     결과로 넘기지 않고 칩만 다시 그린다(teardown 전이라 게임은 그대로 살아 있다). */
+  function renderWho(){
+    setGameFoot(`<div class="chips" style="justify-content:center;margin-bottom:2px">${gamePlayers().map(m=>`<div class="chip gwho" role="button" tabindex="0" data-id="${esc(m.id)}">${esc(m.name)}</div>`).join("")}</div>
+      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    $gv().querySelectorAll(".gwho").forEach(c=> c.onclick=()=>{
+      const m=gamePlayers().find(p=>p.id===c.dataset.id);
+      if(!m){ toast("방금 명단에서 빠진 분이에요 — 다시 골라주세요"); renderWho(); return; }
+      teardown(); showGameResult(m); });
+    bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
+  }
+  /* 좌표를 본문 경계 안으로 클램프한다 (R15-1). 손가락이 헤더·푸터 쪽으로 조금 밀려도 점은
+     가장자리에 붙어 남고, 그 손가락은 계속 살아 있는 것으로 센다.
+     기준이 body 의 rect 인 이유: .fp-pad 는 inset:0 인 absolute 라 위치 기준이 body 의 패딩 박스이고,
+     테두리가 없으니 그 박스가 getBoundingClientRect() 와 정확히 같은 사각형이다 — 즉 rect 좌표를
+     그대로 점의 left/top 으로 써도 어긋나지 않는다. 패딩 10px 16px 은 pad 안쪽이 아니라 pad 가
+     덮는 영역이므로 빼지 않는다. */
+  const at=e=>{ const r=body.getBoundingClientRect();
+    return [ Math.max(0, Math.min(r.width,  e.clientX-r.left)),
+             Math.max(0, Math.min(r.height, e.clientY-r.top)) ]; };
+  // seq 는 화면에 올라온 손가락 순번이라 참가자 수와 아무 상관이 없다 — 그래서 여기만
+  // n 을 넘기지 않고 GAME_COLORS 순환을 그대로 쓴다 (gcolor 의 n 생략 경로). 한 폰에 올릴 수
+  // 있는 손가락은 현실적으로 10개를 넘지 않으니 색이 겹칠 일도 없다. gcolor(seq++, n) 으로
+  // "고치면" 참가자가 11명일 때 손가락 색이 팔레트를 벗어나므로 그대로 둔다.
   const onDown=e=>{ if(picked) return; e.preventDefault();
+    // 포인터를 본문에 붙잡아 둔다. pointerleave 를 떼어낸 뒤 남는 구멍이 '경계 밖에서 손을 뗀
+    // 포인터'다 — 그 pointerup 은 본문이 아닌 다른 엘리먼트에서 일어나므로 우리 리스너에 오지
+    // 않고 점이 영원히 남는다. 터치는 브라우저가 암시적으로 캡처해 주지만 마우스·펜은 아니라서
+    // 동작이 갈린다. 명시적으로 캡처하면 세 종류 모두 up/cancel 이 반드시 여기로 돌아온다.
+    // document 에 up 을 얹는 대안을 쓰지 않은 이유: 같은 이벤트가 버블링으로 두 번 처리되고
+    // 리스너 대상이 둘로 갈려 teardown 의 짝이 흐트러진다.
+    try{ body.setPointerCapture(e.pointerId); }catch(err){}
     const [x,y]=at(e), d=document.createElement("div"); d.className="fp-dot";
     d.style.cssText=`left:${x}px;top:${y}px;width:74px;height:74px;background:${gcolor(seq++)}`;
     pad.appendChild(d); pts.set(e.pointerId,{el:d}); refresh(); };
   const onMove=e=>{ const p=pts.get(e.pointerId); if(picked||!p) return; e.preventDefault();
     const [x,y]=at(e); p.el.style.left=x+"px"; p.el.style.top=y+"px"; };
+  // 실제로 손가락이 떨어질 때만 점을 지운다 (R15-2). pointerleave 는 여기에 걸지 않는다 —
+  // 경계를 살짝 넘은 것과 화면에서 뗀 것은 다른 사건인데 같은 처리를 받아 카운트다운이 헛돌았다.
   const onUp=e=>{ const p=pts.get(e.pointerId); if(picked||!p) return; p.el.remove(); pts.delete(e.pointerId); refresh(); };
   // touch-action:none 으로 막히지만, 인앱 웹뷰가 무시하는 경우가 있어 핀치 줌은 이벤트로도 한 번 더 막는다
   const noGesture=e=>e.preventDefault();
   body.addEventListener("pointerdown",onDown,{passive:false});
   body.addEventListener("pointermove",onMove,{passive:false});
-  body.addEventListener("pointerup",onUp); body.addEventListener("pointercancel",onUp); body.addEventListener("pointerleave",onUp);
+  body.addEventListener("pointerup",onUp); body.addEventListener("pointercancel",onUp);
   body.addEventListener("touchmove",noGesture,{passive:false});
   document.addEventListener("gesturestart",noGesture); document.addEventListener("gesturechange",noGesture);
-  function teardown(){ stop();
+  // 이름 칩 경로가 teardown() 을 직접 부르고, 그 뒤 결과 화면을 닫을 때 closeGame 이 GS.teardown 으로
+  // 한 번 더 부른다. 두 번째 호출이 할 일은 없으므로 깃발로 막는다 — 되돌리기는 한 번이면 끝난다.
+  let torn=false;
+  function teardown(){ if(torn) return; torn=true;
+    stop();
+    restoreBody();   // 스크롤·터치 제한 해제 (R8-1, R8-3). 결과 화면이 넘치면 손가락으로 내릴 수 있다 (R8-2)
     body.removeEventListener("pointerdown",onDown); body.removeEventListener("pointermove",onMove);
-    body.removeEventListener("pointerup",onUp); body.removeEventListener("pointercancel",onUp); body.removeEventListener("pointerleave",onUp);
+    body.removeEventListener("pointerup",onUp); body.removeEventListener("pointercancel",onUp);
     body.removeEventListener("touchmove",noGesture);
     document.removeEventListener("gesturestart",noGesture); document.removeEventListener("gesturechange",noGesture); }
-  gameTeardown=teardown;
+  GS.teardown=teardown;
   refresh();
+}
+
+/* ---------- 🏁 구슬 레이스 (R19) ----------
+   순수 함수(raceCourse·raceSpeeds·raceSchedule·raceProgress·raceLeadChanges·raceXY)는 위 마커 블록에
+   있고 난수를 인자로만 받는다. 아래 두 함수는 Math.random 을 부르고 DOM·캔버스를 만지므로 블록 밖이다 —
+   그 경계가 R19-17(당첨자 1위·역전 3회를 결정론적으로 검증)의 전제다. */
+
+/* 레이스 길이. 20000 이 아니라 25000 이다 — 되돌리지 말 것.
+   R19-3 이 요구하는 '18~22초'는 화면에서 보이는 레이스 길이이고, 그건 duration 이 아니라
+   '1위가 도착하는 시각'이다. 도착 배분은 duration*(0.80 ± 지터/2) 이라 실측 0.7925~0.8075 배 —
+   duration=20000 이면 15.85~16.15초로 18초에 못 미친다. 25000 × 0.80 = 19.8~20.2초라야 맞는다.
+   (레이스는 1위가 들어오면 끝난다. 꼴찌의 도착 시간 duration 은 화면에 나오지 않는다.) */
+const RACE_DUR = 25000;
+const RACE_TRIES = 40;           // 재생성 시도 횟수 — 사다리의 '제자리 사다리 다시 만들기'와 같은 처방
+const RACE_SAMPLES = 120;        // 역전 횟수를 셀 표본 수
+
+/* 역전 문턱이 인원에 따라 갈리는 이유 (R19-5).
+   16.1 이 실측한 값이다: n>=3 은 40 회 안에 3 회 이상을 항상 찾지만, n=2 는 약 13.5% 가 40 회를
+   다 써도 못 찾는다. 두 구슬의 도착 시간 차가 24%(0.80 vs 0.99)로 벌어져 있어서, 그 둘이 네 번
+   교차하는(=선두가 3번 바뀌는) 스케줄이 구조적으로 드물다. 그래서 n=2 는 '한 번은 바뀐다'로 낮춘다 —
+   1 회 역전도 "쫓고 쫓기는" 장면이 되고, 문턱을 못 지킬 코스를 억지로 통과시키는 것보다 정직하다.
+   3 명 이상에서는 설계 그대로 3 회다. */
+function raceGate(n){ return n===2 ? 1 : 3; }
+
+/* 코스·속도·스케줄을 한 벌 만든다. order 는 [당첨자, ...나머지를 섞은 것] — 당첨자는 이미
+   gamePickWinner 으로 뽑혀 있으므로 확률 정책이 그대로 반영된다 (R19-4).
+   40 회를 다 써도 문턱을 못 넘으면 '마지막' 시도가 아니라 '가장 잘 나온' 시도를 쓴다. 마지막을 쓰면
+   40 번 중 최악이 나올 수도 있어서, 실패했을 때 화면이 오히려 더 지루해진다. */
+function raceBuild(players, winner, duration){
+  const n = players.length;
+  // -1 이면 order 가 망가져 당첨자가 1위로 도착하지 않는다. 호출부가 gamePlayers() 에서 뽑으므로
+  // 일어나지 않지만, 조용히 틀린 결과를 그리는 것보다 0 번으로 떨어뜨리고 경고를 남기는 쪽이 낫다.
+  let wi = players.indexOf(winner);
+  if(wi < 0){ console.warn("구슬 레이스 — 당첨자가 참가자 명단에 없다", winner); wi = 0; }
+  const rest = players.map((m,i)=>i).filter(i=>i!==wi);
+  for(let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=rest[i]; rest[i]=rest[j]; rest[j]=t; }
+  const order = [wi].concat(rest);
+  const gate = raceGate(n);
+  let best = null;
+  for(let k=0;k<RACE_TRIES;k++){
+    const course = raceCourse(Math.random);
+    const speeds = raceSpeeds(n, course.segs.length, Math.random);
+    const sched  = raceSchedule(course, speeds, order, duration, Math.random);
+    const changes = raceLeadChanges(course, sched, n, duration, RACE_SAMPLES);
+    if(!best || changes > best.changes) best = { course, speeds, sched, order, wi, changes, tries:k+1 };
+    if(changes >= gate) break;
+  }
+  return best;
+}
+
+/* 논리 치수. 캔버스 좌표는 전부 이 값들로 쓰고, devicePixelRatio 는 setTransform 한 줄로만 다룬다 —
+   그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
+const RACE_VIEW_H = 440;         // 캔버스 논리 높이 (폭은 course.W = 340)
+const RACE_R = 11;               // 구슬 반지름. raceXY 의 x 는 (60,280) 이라 벽(±17)까지 넣어도 좌우 43px 이 남는다
+const RACE_WALL = 6;             // 구슬과 벽 사이 여유
+const RACE_CAM = 0.42;           // 선두를 화면 위에서 이 비율 지점에 둔다
+const RACE_CAM_PAD = 24;         // 카메라 여유 — 코스 양 끝에서 선두가 화면 테두리에 걸치지 않게 한다
+const RACE_HUD_MS = 200;         // HUD 갱신 간격 (R19-9)
+const RACE_DPR_MAX = 3;          // 화면 캔버스 dpr 상한
+/* 오프스크린 벽 캐시의 dpr 상한. 계산해 보면 상한이 필요한 이유가 드러난다 —
+   코스는 340×2400 논리 px 이고, dpr 3 을 그대로 곱하면 1020×7200 = 7.34MP × 4B ≈ 29MB 다.
+   폰에서 한 판에 29MB 를 잡는 것도 과하지만, 그보다 먼저 깨진다: iOS 사파리는 캔버스 한 변을
+   4096px 로 제한해서 7200px 캔버스는 그냥 빈 화면이 된다.
+   1.5 로 묶으면 510×3600 = 1.84MP × 4B ≈ 7.3MB 이고 한 변도 3600 < 4096 이라 안전하다.
+   흐려지는 것은 장식인 벽선·페그뿐이고, 읽어야 하는 구슬 번호는 매 프레임 화면 dpr 그대로 그린다. */
+const RACE_CACHE_DPR = 1.5;
+// 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body 의 스택과 같은 순서다
+const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', sans-serif";
+
+/* playRace(players, winner[, onDone])
+   그리고 움직이는 것까지만 한다. 게임 등록·건너뛰기 버튼·GS.teardown·결과 발표는 아래 startRace 가
+   맡고, 그 둘을 잇는 이음매가 두 개다 — 돌려주는 ctl(raf·stop·finish)과 onDone 콜백이다.
+   ctl.finish() 는 스스로 rAF 를 취소하므로 [건너뛰기]는 finish() 만 부르면 되고,
+   ctl.stop() 은 예약된 프레임만 없앤다(결과를 만들지 않는다). */
+function playRace(players, winner, onDone){
+  const n = players.length;
+  // prefers-reduced-motion 이면 10ms — 도착 시간이 8~10ms 라 첫 프레임(dt≈16ms)에서 이미 지나 있어
+  // 연출이 사실상 생략된다 (R19-8). raceSchedule 의 구간 시간도 함께 줄어들 뿐 0 이 되지는 않으므로
+  // raceProgress 의 나눗셈이 0/0 이 되는 경로는 생기지 않는다.
+  const DUR = lessMotion() ? 10 : RACE_DUR;
+  const build = raceBuild(players, winner, DUR);
+  const course = build.course, sched = build.sched, wi = build.wi;
+  const W = course.W, H = RACE_VIEW_H, END = sched.want[wi];
+
+  openGameOv("🏁 구슬 레이스", `
+    <div class="game-say" id="gvSay" aria-live="polite">출발!</div>
+    <div class="race-wrap">
+      <canvas id="raceCv" role="img" aria-label="구슬 레이스 진행 중"></canvas>
+      <div class="race-hud" id="raceHud">
+        <div class="bar"><i id="raceBar"></i></div>
+        ${players.slice(0, 3).map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}</b><i class="rc-sw"></i><span class="rc-no"></span><span class="rc-nm"></span></div>`).join("")}
+      </div>
+    </div>
+    ${gameLegendHtml(players, n)}
+    <div id="gvWin" role="status"></div>`);
+  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
+
+  const cv = document.getElementById("raceCv");
+  const ctx = cv.getContext("2d");
+  const dpr = Math.max(1, Math.min(RACE_DPR_MAX, window.devicePixelRatio || 1));
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // 이 뒤의 좌표는 전부 논리 px 이다
+
+  /* ── 코스 벽·페그 캐시 ──
+     벽은 정적이라 한 번만 그린다. 매 프레임 사인 곡선 600 점을 다시 잇는 것과 이미지 한 장을
+     오려 붙이는 것의 차이가 24 구슬 × 60fps 에서 그대로 프레임 시간으로 나타난다. */
+  const cDpr = Math.min(dpr, RACE_CACHE_DPR);
+  const wallCv = document.createElement("canvas");
+  wallCv.width = Math.round(W*cDpr); wallCv.height = Math.round(course.total*cDpr);
+  drawCourse(wallCv.getContext("2d"));
+
+  function drawCourse(g){
+    g.setTransform(cDpr, 0, 0, cDpr, 0, 0);
+    const half = RACE_R + RACE_WALL, step = 4;   // 4px 간격이면 진폭 110 사인도 각이 보이지 않는다
+    const pts = [];
+    for(let y=0; y<=course.total; y+=step) pts.push([raceXY(course, y/course.total).x, y]);
+    if(pts[pts.length-1][1] < course.total) pts.push([raceXY(course, 1).x, course.total]);
+    // 코스 안쪽을 한 겹 밝게 깔아 '길'로 읽히게 한다 — 캔버스 배경(#fffdf9)보다 밝은 흰색이다
+    g.beginPath();
+    pts.forEach((p,k)=> k ? g.lineTo(p[0]-half, p[1]) : g.moveTo(p[0]-half, p[1]));
+    for(let k=pts.length-1;k>=0;k--) g.lineTo(pts[k][0]+half, pts[k][1]);
+    g.closePath(); g.fillStyle = "#ffffff"; g.fill();
+    // 벽 두 줄 (사다리의 세로줄과 같은 --line 색)
+    g.lineWidth = 3; g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = "#e7ddcf";
+    [-half, half].forEach(off=>{ g.beginPath();
+      pts.forEach((p,k)=> k ? g.lineTo(p[0]+off, p[1]) : g.moveTo(p[0]+off, p[1])); g.stroke(); });
+    /* 페그 — 사인 극점의 '반대쪽'에 찍는다. 극점 위에 찍으면 구슬이 정확히 그 점을 지나가므로
+       못이 구슬에 가려 보이지 않는다. 반대쪽은 진폭의 2배(>=80px)만큼 떨어져 있어 겹치지 않는다. */
+    g.fillStyle = "#e7ddcf";
+    let acc = 0;
+    course.segs.forEach(sg=>{
+      // sin' = 0 → u*2π*turns + phase = π/2 + kπ. turns 는 1~2 라 극점은 구간마다 2~4 개다.
+      for(let k=0; k<8; k++){
+        const u = ((Math.PI/2 + k*Math.PI) - sg.phase) / (Math.PI*2*sg.turns);
+        if(u >= 1) break;
+        if(u < 0) continue;
+        const y = acc + u*sg.len, xe = raceXY(course, y/course.total).x;
+        g.beginPath(); g.arc(2*course.CX - xe, y, 3.5, 0, Math.PI*2); g.fill();
+      }
+      acc += sg.len;
+    });
+    // 결승선 — 체커 두 줄. 1위가 도착하는 순간 화면에 무엇이 걸렸는지 보여야 한다 (R19-16 의 전제)
+    const cell = 10, top = course.total - cell*2;
+    for(let row=0; row<2; row++) for(let cx=0; cx<W; cx+=cell){
+      g.fillStyle = ((cx/cell + row) % 2) ? "#2b2118" : "#ffffff";
+      g.fillRect(cx, top + row*cell, cell, cell);
+    }
+  }
+
+  /* ── HUD ── 200ms 마다 갱신한다 (R19-9).
+     별도 setInterval 대신 루프 안에서 레이스 시각 t 를 검사한다. 이유가 셋이다:
+       ① 중단 경로에서 끌 것이 rAF 하나로 유지된다 — 타이머를 두면 R19-13 이 지워야 할 대상이 늘어난다.
+       ② dt 상한(아래)에 걸려 레이스가 실제 시간보다 늦게 흐를 때 HUD 도 같은 시계를 쓴다.
+       ③ prefers-reduced-motion(DUR=10) 에서는 t 가 한 번에 끝까지 가므로 갱신이 한 번만 일어난다.
+     DOM 은 처음 한 번 만들어 두고 바뀐 문자열만 갈아 넣는다 — 매 프레임 innerHTML 을 다시 쓰면
+     레이아웃 비용이 프레임을 먹는다. */
+  const barEl = document.getElementById("raceBar");
+  const rowEls = [...document.querySelectorAll("#raceHud .rc-row")].map(r=>({
+    sw: r.querySelector(".rc-sw"), no: r.querySelector(".rc-no"), nm: r.querySelector(".rc-nm"), cur: -1
+  }));
+  let hudAt = -Infinity, barCur = "";
+  function drawHud(t, order, force){
+    if(!force && t - hudAt < RACE_HUD_MS) return;
+    hudAt = t;
+    const pct = Math.round(prog[order[0]]*100) + "%";
+    if(pct !== barCur){ barCur = pct; if(barEl) barEl.style.width = pct; }
+    rowEls.forEach((row,k)=>{
+      const i = order[k];
+      if(i === undefined || row.cur === i) return;   // 순위가 그대로면 아무것도 만지지 않는다
+      row.cur = i;
+      row.sw.style.background = gcolor(i, n);
+      row.no.textContent = (i+1) + ".";
+      row.nm.textContent = players[i].name;
+    });
+  }
+
+  /* ── 한 프레임 ── */
+  const prog = new Array(n).fill(0);      // 진행률을 한 번만 계산해 카메라·그림·HUD 가 같은 값을 쓴다
+  const rank = players.map((m,i)=>i);
+  function draw(t){
+    for(let i=0;i<n;i++) prog[i] = raceProgress(course, sched, i, t);
+    rank.sort((a,b)=> prog[b]-prog[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
+    const lead = rank[0], leadY = prog[lead]*course.total;
+    /* 카메라 (R19-10). 선두를 화면 42% 지점에 두되 코스 밖을 보여주지 않는다.
+       클램프 범위에 ±RACE_CAM_PAD 를 주는 이유: 0..total-H 로 묶으면 출발 순간 leadY=0 이
+       화면 y=0 이 되어 구슬이 위쪽 테두리에 반쯤 잘린다. 24px 여유를 주면
+         · 출발: camY=-24 → 선두가 화면 y=24 (반지름 11 이라 온전히 보인다)
+         · 도착: camY=total-H+24=1984 → 선두가 화면 y=416, 아래 테두리까지 24px
+       세 경우(여유 안 / 위 클램프 / 아래 클램프) 모두 선두가 [R, H-R] 안에 남는다. */
+    const camY = Math.max(-RACE_CAM_PAD, Math.min(course.total - H + RACE_CAM_PAD, leadY - H*RACE_CAM));
+    ctx.clearRect(0, 0, W, H);
+    // 캐시에서 보이는 띠만 오려 붙인다. 코스 밖(camY<0 이거나 camY+H>total)은 캔버스 배경으로 남는다.
+    const y0 = Math.max(0, camY), y1 = Math.min(course.total, camY + H);
+    if(y1 > y0) ctx.drawImage(wallCv, 0, y0*cDpr, wallCv.width, (y1-y0)*cDpr, 0, y0-camY, W, y1-y0);
+    for(let k=n-1;k>=0;k--){
+      const i = rank[k], xy = raceXY(course, prog[i]);
+      drawMarble(i, xy.x, xy.y - camY, k===0);
+    }
+    return rank;
+  }
+
+  // 구슬 = gcolor(i, n) 색 원 + 흰 번호 (R19-6). 선두만 어두운 테두리로 강조한다 —
+  // 나머지의 흰 테두리는 구슬이 겹칠 때 경계를 남기는 용도다.
+  function drawMarble(i, x, y, lead){
+    ctx.beginPath(); ctx.arc(x, y, RACE_R, 0, Math.PI*2);
+    ctx.fillStyle = gcolor(i, n); ctx.fill();
+    ctx.lineWidth = lead ? 3 : 1.5;
+    ctx.strokeStyle = lead ? "#2b2118" : "rgba(255,255,255,.92)";
+    ctx.stroke();
+    // 두 자리 번호는 한 글자 크기로 그리면 원을 넘는다 — 10 이상만 줄인다(11명부터의 경로다)
+    ctx.font = "800 " + (i >= 9 ? 10 : 12.5) + "px " + RACE_FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff"; ctx.fillText(String(i+1), x, y+0.5);
+  }
+
+  /* ── 루프 ──
+     dt 를 64ms(≈4프레임)로 묶는다. 탭이 숨었다 돌아오면 now-last 가 몇 초가 되는데, 그대로
+     더하면 구슬이 화면 절반을 순간이동한다 (R19-14). 대가는 명확하다 — 숨어 있던 시간만큼
+     레이스가 실제 시각보다 뒤처진다. 벽시계를 맞추는 것보다 '이어서 보이는' 쪽을 고른 것이다. */
+  let t = 0, last = performance.now();
+  const ctl = {
+    raf: 0,
+    done: false,
+    stop(){ if(ctl.raf) cancelAnimationFrame(ctl.raf); ctl.raf = 0; ctl.done = true; },
+    finish(){
+      if(ctl.done) return;      // stop() 이 먼저 지나갔으면(중단) 결과를 만들지 않는다
+      ctl.done = true;
+      if(ctl.raf) cancelAnimationFrame(ctl.raf);
+      ctl.raf = 0;
+      drawHud(END, draw(END), true);   // 결승선 통과 상태를 마지막으로 그린다
+      if(typeof onDone === "function") onDone();
+    },
+    canvas: cv,
+    build: build
+  };
+  function frame(now){
+    ctl.raf = 0;
+    /* 오버레이가 닫힌 뒤 이미 예약돼 있던 프레임 방어. 정상 경로는 startRace 가 GS.teardown 에
+       걸어둔 stop() 에서 끊기지만, 그 등록이 빠진 경로가 하나라도 생기면 여기서 멈춘다 —
+       빈 캔버스에 계속 그리며 배터리를 먹는 상태를 남기지 않는다 (R19-13). */
+    if(!cv.isConnected){ ctl.stop(); return; }
+    const dt = Math.min(64, now - last);
+    last = now; t += dt;
+    if(t >= END){ ctl.finish(); return; }
+    drawHud(t, draw(t), false);
+    ctl.raf = requestAnimationFrame(frame);
+  }
+  // 첫 프레임은 즉시 그린다 — rAF 를 기다리면 출발 직전에 빈 캔버스가 한 번 보인다
+  drawHud(0, draw(0), true);
+  ctl.raf = requestAnimationFrame(frame);
+  return ctl;
+}
+
+/* startRace — 한 판으로서 필요한 나머지를 playRace 위에 얹는다 (16.3).
+   playRace 는 그리고 움직이는 일만 하고, 결과 발표·중단 처리·[건너뛰기]는 여기 모인다.
+   startGame 안에 인라인하지 않고 함수로 뺀 이유: 다른 두 게임의 분기가 한 줄씩이라 그 자리에
+   여섯 줄을 끼우면 '어떤 kind 가 어디로 가는지'가 한눈에 안 보인다.
+
+   푸터를 playRace 안이 아니라 여기서 다시 그리는 이유 — [건너뛰기]의 핸들러가 ctl.finish 를 부르고,
+   그 ctl 은 playRace 가 돌려준 뒤에야 존재한다. 푸터 HTML 만 인자로 넘겨도 배선은 결국 이 지점으로
+   내려와야 하므로, 마크업과 배선을 두 곳으로 쪼개지 않고 한 곳에서 한다.
+   두 버튼을 .row-2 로 한 줄에 놓는다 — .game-foot 은 형제 버튼을 위아래로 쌓아서, 그냥 두면
+   푸터가 한 줄 더 두꺼워지고 그만큼 캔버스(max-width:min(340px,45vh))가 줄어든다. */
+function startRace(players, winner){
+  const ctl = playRace(players, winner, ()=>showGameResult(winner));
+  /* 예약된 프레임을 없애는 정상 경로 (R19-13). ✕·뒤로가기·[그만두기]는 closeGame 이, [한 판 더]는
+     gvAgain 이 GS.teardown 을 부른다 — 네 경로가 모두 여기 등록한 stop 하나로 끊긴다.
+     playRace 의 frame() 이 보는 cv.isConnected 는 이 등록이 빠졌을 때를 위한 방어선이고,
+     그것만 믿으면 오버레이가 닫힌 뒤에도 프레임이 한 번 더 돈다.
+     ctl.stop 은 this 를 쓰지 않고 클로저의 ctl 을 보므로 메서드만 떼어 넘겨도 안전하고,
+     이미 멈춘 뒤에 다시 불려도 아무 일도 하지 않는다(teardown 이 두 번 들어오는 경로 대비). */
+  GS.teardown = ctl.stop;
+  // [건너뛰기]는 취소가 아니라 결과를 앞당기는 것이다 (R19-7). ctl.finish() 가 rAF 를 취소하고
+  // 결승선 통과 상태를 마지막으로 그린 뒤 onDone(=showGameResult) 을 부르므로, 여기서
+  // cancelAnimationFrame 을 따로 부를 것이 없다 — 취소 지점이 두 곳으로 갈리지 않는다.
+  setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvSkip">⏭ 건너뛰기</button>
+    <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
+  bind("gvSkip", ()=>ctl.finish());
+  // playRace 가 붙인 푸터를 갈아치웠으므로 [그만두기]도 새 노드에 다시 배선한다
+  bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 }
 
 /* ---------- 설정 ---------- */

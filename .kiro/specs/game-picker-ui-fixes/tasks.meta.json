@@ -1,0 +1,868 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 `index.html`에 마커 블록과 순수 함수 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526123
+      },
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503539753
+      },
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503916414
+      }
+    ],
+    "1.2 `tests/game-logic.test.mjs` 작성": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526235
+      },
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503921782
+      },
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504166900
+      }
+    ],
+    "1.3 속성 기반 테스트 작성": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526293
+      },
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504171860
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504599874
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504733262
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785505275641
+      }
+    ],
+    "2.1 `GS` 선언과 `gameEnsure` 도입, 기존 전역 제거": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526325
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504599925
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785505281351
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785505669604
+      }
+    ],
+    "2.2 참가자 파생 함수 연결": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526355
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504599961
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785505674661
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506483424
+      }
+    ],
+    "2.3 진입점 핸들러 교체": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526383
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504599994
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506488541
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506675411
+      }
+    ],
+    "3.1 `ignorePop`을 불리언에서 카운터로 변경": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526435
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600044
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506681931
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506805652
+      }
+    ],
+    "3.2 게임 오버레이가 자기 히스토리 항목을 소유하게 변경": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526472
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600081
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506813222
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785507111379
+      }
+    ],
+    "3.3 모달 포커스 관리와 라이브 리전": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526501
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600111
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785507118645
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785507669219
+      }
+    ],
+    "4.1 `db-migration-last-host.sql` 작성": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526530
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600141
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785507675854
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785508084676
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785509696594
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785509720533
+      }
+    ],
+    "4.2 프론트엔드 조회와 폴백 구현": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526557
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600167
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785509729626
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510026811
+      }
+    ],
+    "5.1 가중 추첨을 `startGame`에 배선": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526586
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600194
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510032206
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510258235
+      }
+    ],
+    "6.1 `.gsw` 토글 스위치 CSS와 마크업 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526612
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600232
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510264479
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510643259
+      }
+    ],
+    "6.2 `openRosterSheet`를 1회 렌더 + 부분 갱신으로 재작성": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526642
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600261
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510649917
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785511248947
+      }
+    ],
+    "7.1 `drawGameSheet`로 분리하고 참가자 카드 갱신": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526690
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600305
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785511255383
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785511635827
+      }
+    ],
+    "7.2 확률 정책 카드 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526720
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600336
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785511643292
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512078664
+      }
+    ],
+    "7.3 인원 상한 초과 시 게임 선택 비활성화": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526747
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600365
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512084310
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512383352
+      }
+    ],
+    "8.1 `gcolor` 호출부 3곳 갱신": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526774
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600394
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512388558
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512742296
+      }
+    ],
+    "8.2 번호 라벨 전환과 범례 렌더 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526801
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600428
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512747460
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785513220823
+      }
+    ],
+    "9. 사다리타기 — ☕ 선표시": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526828
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600459
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785513226884
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785513634429
+      }
+    ],
+    "10. 돌림판 — 애니메이션 시작 통일": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526877
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600488
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785513639790
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514138310
+      }
+    ],
+    "11.1 인라인 스타일 복원": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526905
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600519
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514145259
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514441936
+      }
+    ],
+    "11.2 경계 이탈 처리와 좌표 클램프": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526936
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600570
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514447416
+      }
+    ],
+    "11.3 카운트다운 안정화 대기 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526963
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600601
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514452849
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514757726
+      }
+    ],
+    "11.4 이름 칩과 정책 안내": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503526992
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600631
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514762982
+      }
+    ],
+    "12.1 확정 버튼 라벨과 처리 중 잠금": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527021
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600662
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514769871
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515032344
+      }
+    ],
+    "12.2 `commitGameWinner`의 렌더 순서와 탭 전환 수정": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527049
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600693
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515037953
+      }
+    ],
+    "13. 게임 진입점 조건과 문구 정리": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527076
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600724
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515044373
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515456887
+      }
+    ],
+    "14. 게임 중 실시간 갱신 처리": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527122
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600755
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515462320
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785516004273
+      }
+    ],
+    "15. `QA-TESTCASES.md`에 회귀 테스트케이스 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527151
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600785
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785516009976
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785516438172
+      }
+    ],
+    "16.1 코스·스케줄 순수 함수 추가와 테스트": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527178
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600836
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785516443653
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785517212759
+      }
+    ],
+    "16.2 캔버스 렌더러와 애니메이션 루프 구현": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527206
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600865
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785517219011
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785518222764
+      }
+    ],
+    "16.3 게임 등록·중단 처리·결과 흐름 연결": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527237
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600894
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785518228507
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785518622792
+      }
+    ],
+    "16.4 `QA-TESTCASES.md`에 구슬 레이스 케이스 추가": [
+      {
+        "executionId": "dbc1e3cb-880c-48e2-8258-ac6e7c87f47a",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785503527265
+      },
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600923
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785518628412
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519426526
+      }
+    ],
+    "17.1 `QA-TESTCASES.md`에 헤더 케이스 추가": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504600952
+      }
+    ],
+    "17.1 헤더에서 `공유중 · 마지막 갱신` 표시 제거": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504725283
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519092294
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519266647
+      }
+    ],
+    "17.2 `QA-TESTCASES.md`에 헤더 케이스 추가": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785504725316
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519271749
+      },
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519382727
+      }
+    ],
+    "1. 순수 로직 토대와 테스트 하네스 만들기": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785505275681
+      }
+    ],
+    "2. `GS` 상태 모델로 게임 전역 통합": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785506675451
+      }
+    ],
+    "3. 오버레이 생명주기 — 히스토리와 접근성": [
+      {
+        "executionId": "aedfca9b-3706-46dd-a86c-06661b195713",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785507669287
+      }
+    ],
+    "4. 직전에 섬긴 사람 조회": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510026846
+      }
+    ],
+    "5. 확률 정책과 가중 추첨": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785510258273
+      }
+    ],
+    "6. 토글 스위치와 참가자 고르기 시트": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785511248987
+      }
+    ],
+    "7. 게임 고르기 시트 재작성": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785512383397
+      }
+    ],
+    "8. 색 배정, 번호 라벨, 범례": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785513220865
+      }
+    ],
+    "11. 손가락 룰렛": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785514763021
+      }
+    ],
+    "12. 결과와 확정": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785515037988
+      }
+    ],
+    "17. 헤더 정리": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519382768
+      }
+    ],
+    "16. 🏁 구슬 레이스 추가 (약 20초)": [
+      {
+        "executionId": "c0bf3679-c386-4a06-9faf-027f79809d08",
+        "chatSessionId": "sess_5a618608-ed81-412b-9643-5237548df225",
+        "timestamp": 1785519402981
+      }
+    ]
+  }
+}
