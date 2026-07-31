@@ -53,6 +53,7 @@
     word-break: keep-all; overflow-wrap: break-word;   /* 한글은 어절 단위로 줄바꿈(모바일 가독성) · 긴 URL 등은 안전하게 끊김 */
   }
   #app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 0 16px 120px; }
+  body.no-bottom #app { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }   /* 하단바 없는 화면의 빈 여백 제거 */
   header { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 14px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .h-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .room-name { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -68,6 +69,9 @@
   .btn:active { transform: scale(.985); }
   .btn-brand { background: var(--brand); color: #fff; } .btn-soft { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--line); }
   .btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); } .btn-danger { background: #fff; color: var(--red); border: 1px solid #f0d4c8; }
+  /* '고를 수 있는 것' 전용 — 이 앱에서 누를 수 있는 건 전부 흰 카드다(메뉴 타일·사람 행).
+     btn-ghost(투명 배경 + --sub 회색)로 두면 배경에 묻혀 '닫기' 같은 부속으로 읽힌다. */
+  .btn-choice { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); box-shadow: 0 1px 3px rgba(80,55,30,.05); }
   .btn-sm { width: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; min-height: 44px; }
   .banner { text-align: center; padding: 26px 18px; } .banner .emoji { font-size: 44px; }
   .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: 14px; }
@@ -249,7 +253,13 @@
   .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
   .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
   .kpi .l { font-size:11px; color:var(--sub); font-weight:700; margin-top:2px; }
-  .dash-filter { margin:0 0 10px; }
+  /* 기간 프리셋 — 6개를 한 줄에 쭉. 좁은 화면에선 줄바꿈 대신 가로 스크롤(줄이 늘면 컨트롤 바가 화면을 먹는다).
+     스크롤바는 숨기되 선택된 버튼은 렌더 후 JS 로 보이는 자리까지 당겨온다. */
+  .dash-filter { margin:0 0 10px; gap:4px; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .dash-filter::-webkit-scrollbar { display:none; }
+  .dash-filter .tab { flex:0 0 auto; padding:9px 11px; font-size:13px; white-space:nowrap; }
+  .dash-ctl > .dash-filter:last-child { margin-bottom:0; }
   /* 컨트롤 바 — 달력 · 프리셋 · 통합 검색 */
   .dash-ctl { padding:12px 14px; margin-bottom:12px; }
   .dash-dates { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
@@ -296,6 +306,51 @@
   table.mx .mx-cell.srv { color:var(--accent-ink); font-size:13px; }
   table.mx td.mx-sum { font-weight:800; color:var(--ink); padding-left:8px; position:sticky; right:0; background:var(--card); }
   table.mx tr + tr td { border-top:1px solid var(--line); }
+  /* ===================== 랜덤 게임 =====================
+     센서(흔들기·기울이기)는 쓰지 않는다 — 카톡 인앱 브라우저에서 권한 프롬프트가 안 뜨는 사례가 많다.
+     멀티터치는 touch-action:none 이 없으면 브라우저가 핀치 줌으로 먹는다(뷰포트 확대는 접근성상 열어둬야 하므로
+     전역이 아니라 이 오버레이 안에서만 막는다). z-index 는 하단바(30)·시트(40) 위, 토스트(60)·확인창(70) 아래. */
+  /* pan-y = 세로 스크롤만 허용하고 핀치 줌·더블탭 줌은 막는다. 손가락 룰렛은 진행 중에만 none 으로 더 조인다. */
+  .game-ov { position:fixed; inset:0; z-index:55; display:none; flex-direction:column; background:var(--bg);
+    touch-action:pan-y; overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .game-ov.show { display:flex; }
+  .game-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line);
+    padding:calc(9px + env(safe-area-inset-top)) 16px 7px; }
+  .game-title { font-size:16px; font-weight:800; letter-spacing:-.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 인원이 많거나 화면이 짧으면 결과 블록까지 합쳐 세로가 넘친다. justify-content:center 로 가운데 두면
+     넘칠 때 위쪽이 잘려 못 보게 되므로, auto 마진 pseudo 로 '여유 있으면 가운데 · 넘치면 스크롤'을 만든다. */
+  .game-body { flex:1 1 auto; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center;
+    justify-content:flex-start; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:10px 16px; }
+  .game-body::before, .game-body::after { content:""; flex:none; margin:auto; }
+  .game-foot { flex:none; padding:8px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .game-foot > * + * { margin-top:8px; }
+  .game-say { position:relative; z-index:1; font-size:15px; font-weight:700; text-align:center; color:var(--sub); margin:0 0 10px; pointer-events:none; }
+  .game-hint { font-size:13px; color:var(--sub); text-align:center; font-weight:600; }
+  /* 사다리·돌림판은 세로가 긴 화면에서 잘리지 않도록 뷰포트 높이로도 폭을 묶는다 */
+  .game-stage { width:100%; max-width:min(400px, 50vh); }
+  .game-stage svg { display:block; width:100%; height:auto; }
+  .game-win { text-align:center; margin-top:12px; }
+  .game-win .we { font-size:38px; line-height:1.15; }
+  .game-win .wn { font-size:25px; font-weight:900; letter-spacing:-.6px; color:var(--brand); margin-top:2px; word-break:keep-all; }
+  .game-win .ws { font-size:13px; color:var(--sub); margin-top:5px; }
+  .game-pick { display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:var(--card);
+    border:1.5px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:8px; min-height:44px; transition:transform .05s ease; }
+  .game-pick:active { transform:scale(.99); }
+  .game-pick .gp-em { font-size:26px; flex:none; }
+  .game-pick b { display:block; font-size:15px; color:var(--ink); }
+  .game-pick small { display:block; font-size:12px; color:var(--sub); margin-top:1px; }
+  /* 손가락 룰렛 */
+  .fp-pad { position:absolute; inset:0; pointer-events:none; }
+  .fp-dot { position:absolute; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 5px 16px rgba(40,28,16,.25);
+    transition:opacity .3s ease, width .3s ease, height .3s ease; }
+  .fp-dot.lose { opacity:.16; }
+  .fp-dot.win { animation:fpwin .55s ease-out 3; }
+  @keyframes fpwin { 0%,100% { box-shadow:0 5px 16px rgba(40,28,16,.25); } 50% { box-shadow:0 0 0 16px rgba(111,78,55,.2); } }
+  .fp-mid { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; width:86%; }
+  .fp-cnt { font-size:62px; font-weight:900; color:var(--brand); letter-spacing:-3px; line-height:1; }
+  /* 돌림판 */
+  .wheel-wrap { position:relative; width:100%; max-width:min(320px, 50vh); margin:0 auto; padding-top:14px; }
+  .wheel-pin { position:absolute; left:50%; top:-2px; transform:translateX(-50%); font-size:26px; line-height:1; z-index:1; filter:drop-shadow(0 2px 3px rgba(40,28,16,.3)); }
 </style>
 </head>
 <body>
@@ -303,6 +358,7 @@
 <div id="bottom"></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <div class="cscrim" id="cscrim"></div>
+<div class="game-ov" id="gameOv" role="dialog" aria-modal="true" aria-label="섬길 사람 정하기"></div>
 <div class="toast" id="toast"></div>
 <div id="offline">⚠️ 오프라인 — 변경이 저장되지 않을 수 있어요</div>
 
@@ -315,7 +371,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.71";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.72";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -614,7 +670,7 @@ function servingDrinks(s){ let n=0; const o=s&&s.orders||{}; for(const k in o){ 
 
 // 동기화 신선도(실시간 대신 폴링이라 '언제 갱신됐는지' 표시)
 let lastSyncAt=0;
-function syncAgoText(){ if(!lastSyncAt) return "연결 중"; const s=Math.floor((Date.now()-lastSyncAt)/1000); if(s<5) return "방금"; if(s<60) return s+"초 전"; return Math.floor(s/60)+"분 전"; }
+function syncAgoText(){ if(!lastSyncAt) return "연결 중"; const d=new Date(lastSyncAt), p=n=>String(n).padStart(2,"0"); return `마지막 갱신 ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
 setInterval(()=>{ try{ const el=document.getElementById("syncAgo"); if(el) el.textContent=syncAgoText(); }catch(e){} }, 10000);
 
 /* ---- 단독(로컬) 모드 ---- */
@@ -736,6 +792,16 @@ window.addEventListener("online", updateOffline); window.addEventListener("offli
 // → 뒤로가기 한 번이면 그 하위 상태가 닫히고 주문화면으로. main(주문화면)에선 안 쌓으므로
 //   뒤로가기가 평소처럼 앱 밖으로 나간다(갇히지 않음).
 let sheetOpen=false, curView="main", subActive=false;
+// 열린 섬김 화면의 탭. 예전엔 '내 주문'과 '현황'이 서로를 오가는 별개 페이지였고, 현황 안에 또
+// [사람별 | 카페 주문서] 탭이 있었다(2단). 계층을 한 줄로 펴서 왕복도 중첩도 없앤다.
+let openTab="order", lastTabSeq=null;   // order | people | cafe
+function setOpenTab(t){
+  if(openTab===t) return;
+  if(t==="order"){ if(subActive){ history.back(); return; }   // 뒤로가기로 되돌린다 → popstate 가 render
+                   openTab="order"; render(); return; }
+  if(openTab==="order") pushSub();   // 기본 탭을 떠날 때만 히스토리 1칸(뒤로가기 = 내 주문으로)
+  openTab=t; render();
+}
 // 모바일 키보드가 가린 높이를 --kb 로, 실제 보이는 높이를 --vvh 로 노출한다.
 // --kb = innerHeight - (보이는 높이 + 위로 밀린 양). 두 경우 모두 자동으로 맞는다:
 //   Android(키보드가 레이아웃 뷰포트까지 줄임) → innerHeight 도 같이 줄어 --kb=0, inset:0 이 이미 정답
@@ -771,8 +837,9 @@ window.addEventListener("popstate",()=>{
   if(ignorePop){ ignorePop=false; return; }   // 버튼으로 확인창 닫을 때의 history.back() 무시
   if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
   subActive=false;   // 쌓아둔 하위 항목이 (뒤로가기로) 빠졌다
+  if(gameOpen){ closeGame(); return; }        // 게임 오버레이가 시트보다 위 — 뒤로가기 한 번이면 게임만 닫힌다
   if(sheetOpen){ $scrim.classList.remove("show"); sheetOpen=false; return; }  // 시트 닫기
-  if(curView==="host"){ render(); return; }              // 현황 → 주문
+  if(openTab!=="order"){ openTab="order"; render(); return; }   // 현황·주문서 탭 → 내 주문 탭
   if(curView==="pick" && ME){ render(); return; }         // 이름변경 → 주문
   if(curView==="adminmenu"){ renderAdminDash(); return; } // 메뉴관리 → 관리자
   if(curView==="admindash"){ renderAdminDash(); return; } // 대시보드 → 관리자
@@ -781,8 +848,10 @@ window.addEventListener("popstate",()=>{
 
 /* ===================== 렌더 ===================== */
 function render(){
-  if(!ME || !memberById(ME)){ curView="pick"; renderPickMe(); $bottom.innerHTML=""; return; }
+  if(!ME || !memberById(ME)){ curView="pick"; renderPickMe(); $bottom.innerHTML=""; document.body.classList.add("no-bottom"); return; }
   projectServing(viewSeq!=null ? viewSeq : activeSeq);   // 현재 볼 섬김으로 투영(활성 or 보고있는 것)
+  // 보는 섬김이 바뀌면 탭은 '내 주문'부터 — 남의 섬김을 주문서 탭으로 열고 시작하지 않는다
+  if(SESSION.seq!==lastTabSeq){ lastTabSeq=SESSION.seq; openTab="order"; }
   curView="main"; renderHeader();
   if(!SESSION.seq) renderIdle();            // 열린 섬김 없음 = 오늘의 섬김 개요
   else if(SESSION.state==="open") renderOpen();
@@ -810,7 +879,7 @@ function renderHeader(){
 function renderPickMe(){
   if(ME && curView!=="pick") pushSub();   // '이름 변경'으로 들어올 때만(초기 선택은 root)
   curView="pick";
-  $bottom.innerHTML=""; // 이전 화면의 하단바 제거 (확인 바와 중복 방지)
+  $bottom.innerHTML=""; document.body.classList.add("no-bottom"); // 이전 화면의 하단바 제거 (확인 바와 중복 방지)
   const list = MEMBERS.map(m=>{
     const o=ORDERS[m.id]; let badge="";
     if(o&&o.type==="drink") badge='<span class="pill ordered">주문함</span>';
@@ -902,19 +971,46 @@ function renderOpen(){
           <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}</div>${o.note?`<div class="pmenu">📝 ${esc(o.note)}</div>`:''}</div>
           <button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button></div>`;}).join("")}</div>`;
   }
+  /* '안 마실게요'는 메뉴와 나란한 갈림길이지 화면 아래 부속이 아니다.
+     그리드 밑에 회색 ghost 버튼으로 붙여두니 아무도 못 봤다 — .label 로 구역을 떼서
+     '메뉴 선택'과 같은 급의 섹션으로 올리고, 버튼도 흰 카드(누를 수 있는 것)로 바꾼다. */
+  const skipHtml = isSkip ? "" : `
+      <div class="label">음료를 안 드신다면</div>
+      <button class="btn btn-choice skip-btn">🙅 오늘은 안 마실게요</button>`;
   const gridHtml = showGrid ? `
       <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
-      ${ isSkip ? "" : `<div style="height:8px"></div><button class="btn btn-ghost skip-btn">오늘은 안 마실게요 🙅</button>` }` : "";
+      ${skipHtml}` : "";
   // 주문 후에도 '안 마실게요'를 실제 버튼으로 바로 옆에 둔다 — 기존 13px 텍스트 링크는 탭 타겟이 너무 작았음
   const changeLink = (myOrder && myOrder.type==="drink" && !forceGrid)
     ? `<div class="row-2" style="margin:10px 0 0"><button class="btn btn-soft" id="changeMenu">🔄 다른 메뉴로</button><button class="btn btn-ghost skip-btn">🙅 안 마실게요</button></div>` : "";
 
-  view().innerHTML=`
-    <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
-      <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
-      ${myOrder?'':'<p>드시고 싶은 메뉴를 골라주세요</p>'}</div>
-    ${myStatus}${changeLink}${gridHtml}${othersHtml}`;
+  // 탭 3개를 한 줄에 — 페이지를 떠나지 않으므로 '현황 보고 다시 돌아오기'가 없다
+  const tabs=`<div class="tabs" id="openTabs" role="tablist">
+    ${[["order","내 주문"],["people","현황 "+countDrinks()+"잔"],["cafe","주문서"]].map(([t,label])=>
+      `<button class="tab ${openTab===t?'on':''}" data-t="${t}" role="tab" aria-selected="${openTab===t}">${label}</button>`).join("")}</div>`;
+
+  if(openTab==="order"){
+    view().innerHTML=`
+      <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
+        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
+        ${myOrder?'':'<p>메뉴를 고르거나, 안 드실 땐 알려주세요</p>'}</div>
+      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}`;
+  } else {
+    // 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
+    // 주문이 1건 이상일 때만 연다: 주문이 없으면 호스트 교체(unclaim)가 섬김 자체를 지운다.
+    const canGame = SESSION.hostId===ME && Object.keys(ORDERS).length>0 && gameEligible();
+    view().innerHTML=`
+      <div class="muted" style="margin:0 2px 10px">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}섬기는 분: <b>${host?esc(hon(host.name)):"아직 없어요"}</b></div>
+      ${tabs}
+      ${openTab==="people"
+        ? dashStatsHtml()+dashPeopleHtml()+(canGame?`<button class="btn btn-soft" id="gamepick" style="margin-top:10px">🎲 게임으로 섬길 사람 정하기</button>`:"")
+        : dashCafeHtml()}`;
+  }
+  view().querySelectorAll("#openTabs .tab").forEach(el=> el.onclick=()=>setOpenTab(el.dataset.t));
+  wireDashboard();
+  bind("gamepick",()=>{ gameInit(); openGameSheet(); });
+  if(openTab!=="order") return;   // 아래 배선은 '내 주문' 탭 전용
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
@@ -1204,35 +1300,45 @@ function renderClosed(){
   wireDashboard();
 }
 
-/* ---------- 대시보드 ---------- */
+/* ---------- 대시보드 ----------
+   조각(stats·사람별·주문서)을 따로 두어 열린 섬김에서는 상위 탭이 직접 꺼내 쓰고,
+   마감 화면에서는 예전처럼 한 덩어리(dashboardHtml)로 쓴다. */
 let dashTab="people";
-function dashboardHtml(){
-  const ordered=MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink");
-  const skipped=MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="skip");
-  const pending=MEMBERS.filter(m=>!ORDERS[m.id]);
-  const stats=`<div class="stats">
+function dashSplit(){ return {
+  ordered: MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink"),
+  skipped: MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="skip"),
+  pending: MEMBERS.filter(m=>!ORDERS[m.id]) }; }
+function dashStatsHtml(){ const {ordered,skipped,pending}=dashSplit();
+  return `<div class="stats">
     <div class="stat"><div class="num" style="color:var(--green)">${ordered.length}</div><div class="lbl">주문</div></div>
     <div class="stat"><div class="num" style="color:var(--sub)">${skipped.length}</div><div class="lbl">안마심</div></div>
-    <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>`;
+    <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>`; }
+function dashPeopleHtml(){ const {ordered,skipped,pending}=dashSplit();
+  const row=(m,kind)=>{ const o=ORDERS[m.id]; let menu="",pill="";
+    if(kind==="ordered"){ const d=orderDisplay(o);
+      menu=`${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}${o.note?(' · 📝'+esc(o.note)):''}`;
+      pill=`<span class="pill ordered">주문</span>`; }
+    else if(kind==="skip"){ menu="오늘은 안 마심"; pill=`<span class="pill skip">안마심</span>`; }
+    else { menu="아직 응답 없음"; pill=`<span class="pill pending">미응답</span>`; }
+    return `<div class="person"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
+      <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
+  let body=`<div class="card" style="padding:6px 18px">${ordered.map(m=>row(m,"ordered")).join("")}${skipped.map(m=>row(m,"skip")).join("")}${pending.map(m=>row(m,"pending")).join("")}</div>`;
+  if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
+  return body; }
+function dashCafeHtml(){
+  return `<div class="card"><div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
+      <div class="order-box" id="orderBox">${esc(cafeText())}</div><div style="height:12px"></div>
+      <button class="btn btn-brand" id="copyCafe">📋 주문서 복사</button></div>`; }
+function dashboardHtml(){   // 마감 화면 전용 — 안쪽 탭 그대로
+  const stats=dashStatsHtml();
   const tabs=`<div class="tabs" id="dashTabs">
     <div class="tab ${dashTab==='people'?'on':''}" data-t="people">사람별 / 전달하기</div>
     <div class="tab ${dashTab==='cafe'?'on':''}" data-t="cafe">카페 주문서</div></div>`;
   let body;
   if(dashTab==="people"){
-    const row=(m,kind)=>{ const o=ORDERS[m.id]; let menu="",pill="";
-      if(kind==="ordered"){ const d=orderDisplay(o);
-        menu=`${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}${o.note?(' · 📝'+esc(o.note)):''}`;
-        pill=`<span class="pill ordered">주문</span>`; }
-      else if(kind==="skip"){ menu="오늘은 안 마심"; pill=`<span class="pill skip">안마심</span>`; }
-      else { menu="아직 응답 없음"; pill=`<span class="pill pending">미응답</span>`; }
-      return `<div class="person"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
-        <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
-    body=`<div class="card" style="padding:6px 18px">${ordered.map(m=>row(m,"ordered")).join("")}${skipped.map(m=>row(m,"skip")).join("")}${pending.map(m=>row(m,"pending")).join("")}</div>`;
-    if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
+    body=dashPeopleHtml();
   } else {
-    body=`<div class="card"><div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
-      <div class="order-box" id="orderBox">${esc(cafeText())}</div><div style="height:12px"></div>
-      <button class="btn btn-brand" id="copyCafe">📋 주문서 복사</button></div>`;
+    body=dashCafeHtml();
   }
   return stats+tabs+body;
 }
@@ -1243,7 +1349,7 @@ function wireDashboard(){
     const h=memberById(SESSION.hostId); const hostClause=h?`${hon(h.name)}이 `:"";   // host가 구성원에서 빠져도 안전
     copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${hostClause}오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
 }
-function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else renderHostView(); }
+function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else render(); }
 function countDrinks(){ return MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink").length; }
 function cafeText(){
   const map={};
@@ -1254,41 +1360,33 @@ function cafeText(){
   if(!total) return "아직 주문이 없습니다.";
   return lines.join("\n")+`\n────────────\n합계  ${total}잔`;
 }
-function renderHostView(){
-  if(curView!=="host") pushSub();   // 현황 진입 시 1회만 history 적재(실시간 재렌더 땐 안 함)
-  projectServing(viewSeq!=null ? viewSeq : activeSeq);
-  curView="host"; renderHeader();
-  const host=memberById(SESSION.hostId);
-  view().innerHTML=`<div class="row-between mobile-stack" style="margin-bottom:12px">
-      <div><b style="font-size:17px">${SESSION.seq?SESSION.seq+"번째 섬김 ":""}현황</b> <span class="muted">· 섬기는 분: ${host?esc(hon(host.name)):"—"}</span></div>
-      <button class="btn btn-sm btn-ghost" id="backToOrder">내 주문</button></div>${dashboardHtml()}`;
-  document.getElementById("backToOrder").onclick=()=>{ if(subActive) history.back(); else render(); };
-  wireDashboard(); renderBottom(true);
-}
+// 현황은 더 이상 별도 페이지가 아니라 '현황' 탭이다. 예전 호출부(폴링·외부 진입)를 위해 이름만 남긴다.
+function renderHostView(){ setOpenTab("people"); }
 
 /* ---------- 하단 액션바 ---------- */
-function renderBottom(inHostView){
+function renderBottom(){
   const s=SESSION; const amHost=s.hostId===ME; let html="";
   if(!s.seq){                                   // 열린 섬김 없음(개요) → 새 섬김 시작
     html=`<button class="btn btn-brand" id="startserv">☕ 오늘 섬기기 시작</button>`;
   } else if(s.state==="open"){
-    if(!s.hostId){                              // 호스트 없는(인계 대기) 열린 섬김 → 누구나 이어받기
-      html=`<button class="btn btn-brand" id="takeover">🙋 제가 이어서 섬길게요</button>`;
-    } else if(amHost){ html=inHostView
-        ? `<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`
-        : `<button class="btn btn-soft" id="hostView">📊 현황 (${countDrinks()}잔)</button><button class="btn btn-brand" id="close">마감</button>`;
-    } else html=`<button class="btn btn-soft" id="hostView">📊 현황 보기 · 총 ${countDrinks()}잔</button>`;
+    // 현황은 탭으로 올라갔으므로 하단바에서 뺀다 — 화면마다 버튼이 바뀌지 않아 예측 가능해진다.
+    if(!s.hostId){                              // 호스트 없는(인계 대기) 열린 섬김 → 누구나 이어받기 / 게임으로 정하기
+      html=`<button class="btn btn-soft" id="gamepickBar">🎲 게임으로 정하기</button><button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
+    } else if(amHost){
+      html=`<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`;
+    }                                           // 호스트가 아니면 하단 액션 없음 — 할 일은 화면 안(메뉴 고르기)에 있다
   } else {                                       // closed(섬김 보기 중)
     html = (amHost ? `<button class="btn btn-ghost btn-close" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`)
          + `<button class="btn btn-soft" id="toOverview">오늘의 섬김</button>`;
   }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
+  document.body.classList.toggle("no-bottom", !html);   // 하단바가 없으면 본문 아래 여백도 걷는다
   bind("startserv",()=>{ if(CAFE_LIST.length<=1) doStartServing((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
   bind("takeover",()=>doClaim(SESSION.cafeId||(CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
+  bind("gamepickBar",()=>{ gameInit(); openGameSheet(); });
   bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("이 섬김을 취소할까요?\n(주문이 있으면 다른 분이 이어받게 남고, 없으면 이 섬김은 사라져요)",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
   bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ viewSeq=seq; render(); } }});
   bind("reopen",async()=>{ const seq=SESSION.seq; if(await safeWrite(Sync.reopen(seq),"다시 열 수 없어요 — 다른 섬김이 진행 중입니다")){ viewSeq=null; render(); } });
-  bind("hostView",()=>renderHostView());
   bind("toOverview",()=>{ viewSeq=null; render(); });
 }
 function bind(id,fn){ const el=document.getElementById(id); if(el) el.onclick=fn; }
@@ -1327,6 +1425,312 @@ function openClaimCafeSheet(){
     document.getElementById("claimClose").onclick=closeSheet;
   }
   draw();
+}
+
+/* ===================== 랜덤 게임 — 섬길 사람 정하기 =====================
+   1) 절대 자동으로 뜨지 않는다. 자진해서 섬기려던 분의 마음을 게임이 가로채면 안 되므로,
+      [🎲 게임으로 정하기]를 직접 눌렀을 때만 시작한다. 호스트가 있는 섬김은 '그 호스트만' 열 수 있다.
+   2) 결과에 구속력이 없다. [확정]을 누르기 전에는 서버에 아무것도 쓰지 않고, [한 판 더]가 늘 있다.
+   3) 주문이 모인 뒤에 돌린다 — 안 마시는 분이 자동으로 빠져 후보가 정확해지고,
+      unclaim→claim 으로 호스트를 갈아끼워도 섬김이 사라지지 않는다(주문이 없으면 unclaim 이 섬김째 지운다).
+   4) 흔들기·기울이기(DeviceMotion)는 쓰지 않는다 — 카톡 인앱 브라우저에서 권한 프롬프트가 안 뜨는 사례가 많다. */
+const GAME_COLORS = ["#7a4a12","#1f6b3a","#2a5f8f","#97371c","#5b4080","#14615c","#8f2f2c","#35435c","#6b5220","#4a6b1f"];
+const gcolor = i => GAME_COLORS[i % GAME_COLORS.length];
+const lessMotion = ()=> !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+const pickOne = arr => arr[Math.floor(Math.random()*arr.length)];
+function shortName(n,k){ n=String(n||""); return n.length>k ? n.slice(0,k) : n; }
+function gvibe(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }   // iOS 는 진동 API 자체가 없다 — 시각 효과가 본체
+function $gv(){ return document.getElementById("gameOv"); }
+
+let gameOpen=false, gameOff=new Set(), gameKind=null, gameTimers=[], gameTeardown=null;
+
+// 오늘 안 마시는 분은 애초에 후보가 아니다. 그 외 제외는 gameOff 하나로만 관리한다.
+function gameRoster(){ return MEMBERS.filter(m=>{ const o=ORDERS[m.id]; return !(o&&o.type==="skip") && !gameOff.has(m.id); }); }
+function gameEligible(){ return MEMBERS.filter(m=>!(ORDERS[m.id]&&ORDERS[m.id].type==="skip")).length>=2; }
+function gameServedIds(){ return new Set(SERVINGS.map(s=>s.hostId).filter(Boolean)); }
+function gameInit(){   // 진입 때 기본 후보: 오늘 이미 섬긴 분을 빼되, 그래서 못 돌리게 되면 전원 참가로 되돌린다
+  gameOff = gameServedIds();
+  if(gameRoster().length<2) gameOff = new Set();
+}
+
+function gtimer(fn,ms){ const t=setTimeout(fn,ms); gameTimers.push(t); return t; }
+function clearGameTimers(){ gameTimers.forEach(clearTimeout); gameTimers=[]; }
+function openGameOv(title, bodyHtml){
+  const el=$gv();
+  el.innerHTML=`<div class="game-head"><div class="game-title">${title}</div>
+      <button class="sheet-x" id="gvX" aria-label="닫기">✕</button></div>
+    <div class="game-body" id="gvBody">${bodyHtml}</div>
+    <div class="game-foot" id="gvFoot"></div>`;
+  el.classList.add("show");
+  // 뒤로가기로 닫히도록 하위 상태 1칸 확보(시트에서 넘어왔으면 이미 있으므로 재사용)
+  if(!gameOpen){ gameOpen=true; pushSub(); }
+  document.getElementById("gvX").onclick=closeGame;
+}
+function setGameFoot(html){ const f=document.getElementById("gvFoot"); if(f) f.innerHTML=html; }
+function closeGame(){
+  clearGameTimers();
+  if(gameTeardown){ try{ gameTeardown(); }catch(e){} gameTeardown=null; }
+  const el=$gv(); el.classList.remove("show"); el.innerHTML=""; gameOpen=false;
+}
+
+/* ---------- 게임 고르기 시트 ---------- */
+function openGameSheet(){
+  const roster=gameRoster(), served=gameServedIds();
+  const enough=roster.length>=2;
+  openSheet(`
+    <h3>🎲 섬길 사람 정하기</h3>
+    <p class="muted" style="margin-top:0">결과는 <b>[확정하기]</b>를 누르기 전까진 아무것도 바꾸지 않아요. 마음에 안 들면 한 판 더 돌리면 됩니다.</p>
+    <div class="card" style="padding:13px 14px;margin-bottom:12px">
+      <div class="row-between"><b style="font-size:14px">참가자 ${roster.length}명</b>
+        <button class="btn btn-sm btn-soft" id="gRoster">바꾸기</button></div>
+      <div class="muted" style="margin-top:6px">${roster.length?roster.map(m=>esc(m.name)).join(" · "):"—"}</div>
+      ${served.size&&roster.length?`<div class="muted" style="margin-top:4px;font-size:12px">오늘 이미 섬긴 분은 기본으로 빠져 있어요</div>`:""}
+    </div>
+    ${enough?`
+      <div class="label">게임 고르기</div>
+      <button class="game-pick" data-g="ladder"><span class="gp-em">🪜</span><span><b>사다리타기</b><small>한 폰을 다 같이 보며 · 제일 두근거려요</small></span></button>
+      <button class="game-pick" data-g="finger"><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>폰 하나에 다 같이 손가락을 올려요</small></span></button>
+      <button class="game-pick" data-g="wheel"><span class="gp-em">🎡</span><span><b>돌림판</b><small>가장 빠르게 · 한 번에 끝</small></span></button>`
+    :`<div class="banner-warn">참가자가 2명 이상이어야 돌릴 수 있어요.</div>`}
+    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="gClose">닫기</button>`);
+  document.getElementById("gClose").onclick=closeSheet;
+  document.getElementById("gRoster").onclick=openRosterSheet;
+  $sheet.querySelectorAll(".game-pick").forEach(b=> b.onclick=()=>{ const k=b.dataset.g; closeSheet(); startGame(k); });
+}
+
+/* ---------- 참가자 바꾸기 ---------- */
+function openRosterSheet(){
+  const served=gameServedIds();
+  function draw(){
+    const rows=MEMBERS.map(m=>{
+      const o=ORDERS[m.id], skip=!!(o&&o.type==="skip"), on=!skip&&!gameOff.has(m.id);
+      const sub = skip ? "오늘은 안 마셔요 — 후보에서 빠짐"
+                : (served.has(m.id) ? "오늘 이미 섬기셨어요" : (o ? "주문 완료" : "아직 주문 전"));
+      return `<div class="person"><div class="avatar" style="${on?'':'background:var(--sub)'}">${esc(initials(m.name))}</div>
+        <div style="min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${sub}</div></div>
+        ${skip?`<span class="pill skip">안마심</span>`
+              :`<button class="btn btn-sm ${on?'btn-brand':'btn-ghost'} gtog" data-id="${esc(m.id)}">${on?'참가':'제외'}</button>`}</div>`;
+    }).join("");
+    openSheet(`
+      <h3>참가자 고르기</h3>
+      <p class="muted" style="margin-top:0">현재 <b>${gameRoster().length}명</b>. '안 마실게요' 하신 분은 넣을 수 없어요.</p>
+      <div class="row-2" style="margin-bottom:10px">
+        <button class="btn btn-sm btn-soft" id="gAll">전원 참가</button>
+        <button class="btn btn-sm btn-soft" id="gServed">오늘 섬긴 분 빼기</button></div>
+      <div class="card" style="padding:6px 14px">${rows}</div>
+      <div style="height:10px"></div><button class="btn btn-brand" id="gDone">완료</button>`);
+    $sheet.querySelectorAll(".gtog").forEach(b=> b.onclick=()=>{ const id=b.dataset.id;
+      if(gameOff.has(id)) gameOff.delete(id); else gameOff.add(id); draw(); });
+    document.getElementById("gAll").onclick=()=>{ gameOff=new Set(); draw(); };
+    document.getElementById("gServed").onclick=()=>{ gameOff=new Set(served); draw(); };
+    document.getElementById("gDone").onclick=openGameSheet;
+  }
+  draw();
+}
+
+/* ---------- 실행 ---------- */
+function startGame(kind){
+  const roster=gameRoster();
+  if(roster.length<2){ toast("참가자가 2명 이상이어야 해요"); return; }
+  gameKind=kind;
+  // 결과를 먼저 뽑고 그림이 그 결과를 향하게 한다 — 애니메이션이 결과를 만들면 확률이 고르지 않다
+  if(kind==="ladder") playLadder(roster, pickOne(roster));
+  else if(kind==="wheel") playWheel(roster, pickOne(roster));
+  else playFinger(roster);
+}
+
+function showGameResult(w){
+  gvibe([28,60,28]);
+  const box=document.getElementById("gvWin");
+  if(box) box.innerHTML=`<div class="game-win"><div class="we">☕</div>
+    <div class="wn">${esc(hon(w.name))}</div>
+    <div class="ws">오늘 음료로 섬겨주실 분${w.id===ME?" — 바로 나!":""}</div></div>`;
+  const say=document.getElementById("gvSay"); if(say) say.innerHTML="결과가 나왔어요";
+  const same = SESSION.hostId===w.id;
+  setGameFoot(`<button class="btn btn-brand" id="gvOk">${same?"확인":"✅ "+esc(hon(w.name))+"으로 확정하기"}</button>
+    <div class="row-2"><button class="btn btn-soft" id="gvAgain">🎲 한 판 더</button>
+      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
+  bind("gvOk",()=>{ if(same){ closeGame(); toast(hon(w.name)+"이 그대로 섬깁니다 🙏"); } else commitGameWinner(w); });
+  bind("gvAgain",()=>{ clearGameTimers(); if(gameTeardown){ try{ gameTeardown(); }catch(e){} gameTeardown=null; } startGame(gameKind); });
+  bind("gvCancel",closeGame);
+  // 인원이 많거나 화면이 짧으면 발표가 접힌 아래에 생긴다 — 끝까지 내려서 보여준다.
+  // 버튼 3개가 들어간 뒤라야 푸터 높이가 확정되므로 반드시 setGameFoot 다음, 레이아웃 한 프레임 뒤에 잰다.
+  requestAnimationFrame(()=>{ const bd=document.getElementById("gvBody"); if(!bd || bd.scrollHeight<=bd.clientHeight) return;
+    try{ bd.scrollTo({top:bd.scrollHeight, behavior:lessMotion()?"auto":"smooth"}); }catch(e){ bd.scrollTop=bd.scrollHeight; } });
+}
+
+// 확정 = 여기서 처음으로 서버에 쓴다. 호스트가 이미 있으면 비운 뒤(unclaim) 당첨자가 이어받는다(claim).
+// unclaim 은 주문이 없으면 섬김 자체를 지우므로, 게임 진입점은 주문이 1건 이상일 때만 노출한다.
+async function commitGameWinner(w){
+  const seq=SESSION.seq, prevHost=SESSION.hostId, cafeId=SESSION.cafeId||activeCafeId();
+  await guardWrite(async()=>{
+    toast("확정하는 중…");
+    try{
+      if(prevHost) await Sync.unclaim(seq);
+      const ok=await Sync.claim(w.id, cafeId);
+      closeGame(); viewSeq=null;
+      if(ok) toast(w.id===ME ? "🎲 제가 섬기게 됐어요 — 메뉴는 지금도 바꿀 수 있어요"
+                             : "🎲 "+hon(w.name)+"이 오늘의 섬김을 맡았어요");
+      else toast("앗, 방금 다른 분이 먼저 이어받으셨어요!");
+      render();
+      // 게임을 연 자리(현황 탭)에 그대로 둔다. 단 당첨자 본인은 메뉴를 다시 고를 수 있어야 하므로
+      // '내 주문' 탭으로 보낸다 — 사는 줄 모르고 고른 메뉴를 바꿀 기회를 주는 게 이 흐름의 예의다.
+      if(ok && w.id===ME){ forceGrid=true; setOpenTab("order"); }
+    }catch(e){ console.error(e); closeGame(); toast("확정 실패 — 네트워크 확인 후 다시 시도해주세요"); render(); }
+  });
+}
+
+/* ---------- 🪜 사다리타기 ---------- */
+function playLadder(roster, winner){
+  const n=roster.length, W=340, PAD=24, LABEL_Y=15, Y0=28, RUN=300;
+  const LEV=Math.min(14, Math.max(6, n*2)), STEP=RUN/LEV, Y1=Y0+RUN, BOX_Y=Y1+9, BOX_H=26, H=BOX_Y+BOX_H+6;
+  const colX=i=> PAD + i*(W-2*PAD)/(n-1);
+  // 세로줄 간격보다 이름이 넓으면 위쪽 이름이 서로 겹쳐 못 읽는다 → 인원에 맞춰 글자수·크기를 줄인다.
+  // 짧게 잘려도 전체 이름은 결과 발표와 <title> 에 그대로 나온다.
+  const GAP=(W-2*PAD)/(n-1), NCH= n<=7?4 : n<=9?3 : 2, NFS= n<=7?11 : n<=9?10 : 8.5;
+  const BOX_W=Math.min(30, GAP*0.82);
+  const rowY=l=> Y0 + (l+0.5)*STEP;
+  // 가로줄: 같은 높이에서 이웃끼리 겹치면 경로가 갈라지지 않는다 → 인접 금지.
+  // 가로줄이 너무 적거나, 아무도 자리를 안 바꾸는(제자리) 사다리는 그림이 밋밋해서 다시 만든다.
+  const trace=(rungs,start)=>{ let col=start; const pts=[[colX(col),Y0-6]];
+    for(let l=0;l<LEV;l++){ const row=rungs[l];
+      const to = row.indexOf(col)>=0 ? col+1 : (row.indexOf(col-1)>=0 ? col-1 : null);
+      if(to!==null){ pts.push([colX(col),rowY(l)]); pts.push([colX(to),rowY(l)]); col=to; } }
+    pts.push([colX(col),BOX_Y-2]); return {pts,end:col}; };
+  let rungs=[], paths=[];
+  for(let t=0;t<60;t++){
+    rungs=[]; let total=0;
+    for(let l=0;l<LEV;l++){ const row=[];
+      for(let i=0;i<n-1;i++){ if(row.indexOf(i-1)>=0) continue; if(Math.random()<0.45){ row.push(i); total++; } }
+      rungs.push(row); }
+    paths=roster.map((m,i)=>trace(rungs,i));
+    if(total>=n && paths.some((p,i)=>p.end!==i)) break;
+  }
+  const wi=roster.indexOf(winner), goal=paths[wi].end;   // ☕ 는 당첨자가 도착하는 칸에 놓는다
+  // 같은 가로줄을 두 사람이 지날 때 색이 덮이지 않도록 사람마다 아주 조금 어긋나게 그린다
+  const dOf=(pts,i)=>{ const off=(i-(n-1)/2)*0.8;
+    return pts.map((p,k)=>(k?"L":"M")+p[0].toFixed(1)+" "+(p[1]+off).toFixed(1)).join(" "); };
+
+  openGameOv("🪜 사다리타기", `
+    <div class="game-say" id="gvSay">한 폰을 다 같이 보세요 — 내려갑니다…</div>
+    <div class="game-stage"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="사다리타기 진행 중">
+      ${roster.map((m,i)=>`<text x="${colX(i)}" y="${LABEL_Y}" text-anchor="middle" font-size="${NFS}" font-weight="800" fill="${gcolor(i)}"><title>${esc(m.name)}</title>${esc(shortName(m.name,NCH))}</text>`).join("")}
+      ${roster.map((m,i)=>`<line x1="${colX(i)}" y1="${Y0}" x2="${colX(i)}" y2="${Y1}" stroke="#e7ddcf" stroke-width="3" stroke-linecap="round"/>`).join("")}
+      ${rungs.map((row,l)=>row.map(i=>`<line x1="${colX(i)}" y1="${rowY(l)}" x2="${colX(i+1)}" y2="${rowY(l)}" stroke="#e7ddcf" stroke-width="3" stroke-linecap="round"/>`).join("")).join("")}
+      ${roster.map((m,i)=>`<path class="lpath" d="${dOf(paths[i].pts,i)}" fill="none" stroke="${gcolor(i)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
+      ${roster.map((m,i)=>`<g class="lbox" data-c="${i}"><rect x="${(colX(i)-BOX_W/2).toFixed(1)}" y="${BOX_Y}" width="${BOX_W.toFixed(1)}" height="${BOX_H}" rx="9" fill="#fff" stroke="#e7ddcf" stroke-width="1.5"/>
+        <text x="${colX(i)}" y="${BOX_Y+18}" text-anchor="middle" font-size="14" font-weight="800" fill="#6f6253">?</text></g>`).join("")}
+    </svg></div>
+    <div id="gvWin"></div>`);
+  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  bind("gvCancel",closeGame);
+
+  const DUR = lessMotion() ? 10 : 2400, STAG = lessMotion() ? 0 : 130;
+  const els=[...$gv().querySelectorAll(".lpath")];
+  els.forEach(p=>{ const len=p.getTotalLength();
+    p.style.strokeDasharray=len; p.style.strokeDashoffset=len;
+    p.style.transition="stroke-dashoffset "+DUR+"ms cubic-bezier(.45,.05,.25,1)"; });
+  requestAnimationFrame(()=> els.forEach(p=> p.style.strokeDashoffset=0));
+
+  const boxes=[...$gv().querySelectorAll(".lbox")];
+  const openBox=(c,hit)=>{ const g=boxes[c]; if(!g) return;
+    g.querySelector("rect").setAttribute("fill", hit?"#fbe9e3":"#f6f1ea");
+    if(hit) g.querySelector("rect").setAttribute("stroke", "#c2552f");
+    const t=g.querySelector("text"); t.textContent=hit?"☕":"·"; t.setAttribute("fill", hit?"#a8401f":"#b6a99a"); };
+  gtimer(()=>{
+    const rest=roster.map((m,i)=>i).filter(i=>i!==goal);
+    rest.forEach((c,k)=> gtimer(()=>openBox(c,false), k*STAG));
+    gtimer(()=>{ openBox(goal,true); showGameResult(winner); }, rest.length*STAG + (lessMotion()?0:340));
+  }, DUR+120);
+}
+
+/* ---------- 🎡 돌림판 ---------- */
+function playWheel(roster, winner){
+  const n=roster.length, R=100, a=360/n, wi=roster.indexOf(winner);
+  const sectors=roster.map((m,i)=>{
+    const s=(i*a-90)*Math.PI/180, e=((i+1)*a-90)*Math.PI/180, big=a>180?1:0;
+    return `<path d="M0 0 L ${(R*Math.cos(s)).toFixed(2)} ${(R*Math.sin(s)).toFixed(2)} A ${R} ${R} 0 ${big} 1 ${(R*Math.cos(e)).toFixed(2)} ${(R*Math.sin(e)).toFixed(2)} Z" fill="${gcolor(i)}" stroke="#fff" stroke-width="1.2"/>`;
+  }).join("");
+  // 핀은 12시. 12시에서 시계방향 mid 만큼 떨어진 조각을 핀 아래로 보내려면 그만큼 되돌려 감는다.
+  const mid=(wi+0.5)*a, jitter=(Math.random()-0.5)*Math.max(0, a-10), spin=360*5 - mid + jitter;
+  // 이름은 판과 같이 돌면 멈췄을 때 거꾸로 선다. 판이 도는 만큼 글자를 제자리에서 되돌려 놔
+  // 멈춘 순간 항상 똑바로 읽히게 한다(폰에서는 가로로 놓인 2~4글자가 제일 잘 읽힌다).
+  const labels=roster.map((m,i)=>{ const t=((i+0.5)*a-90)*Math.PI/180, lr=R*0.62;
+    const x=lr*Math.cos(t), y=lr*Math.sin(t);
+    return `<text x="${x.toFixed(2)}" y="${(y+4).toFixed(2)}" transform="rotate(${(-spin).toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})" text-anchor="middle" font-size="${n>8?11:13}" font-weight="800" fill="#fff">${esc(shortName(m.name,4))}</text>`;
+  }).join("");
+  openGameOv("🎡 돌림판", `
+    <div class="game-say" id="gvSay">돌아갑니다…</div>
+    <div class="wheel-wrap"><div class="wheel-pin">🔻</div>
+      <div id="wRot" style="transform:rotate(0deg)"><svg viewBox="-108 -108 216 216" role="img" aria-label="돌림판 회전 중">
+        ${sectors}${labels}<circle cx="0" cy="0" r="13" fill="#fff" stroke="#e7ddcf" stroke-width="2"/></svg></div></div>
+    <div id="gvWin"></div>`);
+  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  bind("gvCancel",closeGame);
+
+  const slow=!lessMotion(), DUR= slow?4400:220;
+  const rot=document.getElementById("wRot");
+  if(slow) rot.style.transition="transform 4.2s cubic-bezier(.16,.72,.14,1)";
+  requestAnimationFrame(()=> rot.style.transform="rotate("+spin.toFixed(2)+"deg)");
+  gtimer(()=>showGameResult(winner), DUR);
+}
+
+/* ---------- ☝️ 손가락 룰렛 ---------- */
+function playFinger(roster){
+  openGameOv("☝️ 손가락 룰렛", `
+    <div class="game-say" id="gvSay">폰을 가운데 놓고 <b>다 같이 손가락</b>을 올려주세요</div>
+    <div class="fp-pad" id="fpPad"></div><div class="fp-mid" id="fpMid"></div>
+    <div id="gvWin"></div>`);
+  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  bind("gvCancel",closeGame);
+
+  const body=document.getElementById("gvBody"), pad=document.getElementById("fpPad"), mid=document.getElementById("fpMid");
+  // 이 게임만은 세로 스크롤도 막는다 — 손가락이 미끄러질 때 화면이 따라 움직이면 좌표가 어긋난다
+  body.style.touchAction="none"; body.style.overflowY="hidden";
+  const pts=new Map(); let seq=0, cdT=null, picked=false;
+  const stop=()=>{ if(cdT){ clearInterval(cdT); cdT=null; } };
+  function refresh(){
+    if(picked) return; stop();
+    if(pts.size>=2){
+      let k=3; mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12);
+      cdT=setInterval(()=>{ k--;
+        if(k<=0){ stop(); choose(); } else { mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12); } }, 800);
+    } else mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 두 개 이상 올리면 셉니다</div>`;
+  }
+  function choose(){
+    picked=true; mid.innerHTML="";
+    const win=pickOne([...pts.keys()]);
+    pts.forEach((p,id)=>{ if(id===win){ p.el.classList.add("win"); p.el.style.width="98px"; p.el.style.height="98px"; }
+                          else p.el.classList.add("lose"); });
+    gvibe([30,70,30]);
+    document.getElementById("gvSay").innerHTML="당첨된 손가락, <b>누구세요?</b>";
+    setGameFoot(`<div class="chips" style="justify-content:center;margin-bottom:2px">${roster.map(m=>`<div class="chip gwho" role="button" tabindex="0" data-id="${esc(m.id)}">${esc(m.name)}</div>`).join("")}</div>
+      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    $gv().querySelectorAll(".gwho").forEach(c=> c.onclick=()=>{ teardown(); showGameResult(roster.find(m=>m.id===c.dataset.id)); });
+    bind("gvCancel",closeGame);
+  }
+  const at=e=>{ const r=body.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+  const onDown=e=>{ if(picked) return; e.preventDefault();
+    const [x,y]=at(e), d=document.createElement("div"); d.className="fp-dot";
+    d.style.cssText=`left:${x}px;top:${y}px;width:74px;height:74px;background:${gcolor(seq++)}`;
+    pad.appendChild(d); pts.set(e.pointerId,{el:d}); refresh(); };
+  const onMove=e=>{ const p=pts.get(e.pointerId); if(picked||!p) return; e.preventDefault();
+    const [x,y]=at(e); p.el.style.left=x+"px"; p.el.style.top=y+"px"; };
+  const onUp=e=>{ const p=pts.get(e.pointerId); if(picked||!p) return; p.el.remove(); pts.delete(e.pointerId); refresh(); };
+  // touch-action:none 으로 막히지만, 인앱 웹뷰가 무시하는 경우가 있어 핀치 줌은 이벤트로도 한 번 더 막는다
+  const noGesture=e=>e.preventDefault();
+  body.addEventListener("pointerdown",onDown,{passive:false});
+  body.addEventListener("pointermove",onMove,{passive:false});
+  body.addEventListener("pointerup",onUp); body.addEventListener("pointercancel",onUp); body.addEventListener("pointerleave",onUp);
+  body.addEventListener("touchmove",noGesture,{passive:false});
+  document.addEventListener("gesturestart",noGesture); document.addEventListener("gesturechange",noGesture);
+  function teardown(){ stop();
+    body.removeEventListener("pointerdown",onDown); body.removeEventListener("pointermove",onMove);
+    body.removeEventListener("pointerup",onUp); body.removeEventListener("pointercancel",onUp); body.removeEventListener("pointerleave",onUp);
+    body.removeEventListener("touchmove",noGesture);
+    document.removeEventListener("gesturestart",noGesture); document.removeEventListener("gesturechange",noGesture); }
+  gameTeardown=teardown;
+  refresh();
 }
 
 /* ---------- 설정 ---------- */
@@ -1407,7 +1811,7 @@ async function enterCell(id){
 
 // 바 URL 랜딩 — 개발자 메시지 + 앱 안내만(셀 입장/리다이렉트 없음)
 function renderCellPicker(){
-  inPicker=true; curView="landing"; $bottom.innerHTML="";
+  inPicker=true; curView="landing"; $bottom.innerHTML=""; document.body.classList.add("no-bottom");
   const msg = '이 작은 도구가 섬김의 수고를 덜어드리고, 더 많은 시간과 마음을 교제와 나눔에 사용할 수 있도록 도움이 되기를 바랍니다.\n\n'
     + '모쪼록 모든 셀 모임 가운데 하나님의 은혜와 사랑이 풍성하시기를 기도하겠습니다. 🙏\n\n'
     + '사용 중 불편한 점이나 개선 아이디어가 있으시면 언제든 아래 이메일로 알려주세요.\n\n'
@@ -1531,7 +1935,7 @@ function showCellCreated(cell){
 
 /* ===================== 관리자 페이지 (숨은 경로 ?admin) ===================== */
 async function renderAdmin(){
-  adminMode=true; curView="admin"; $bottom.innerHTML="";
+  adminMode=true; curView="admin"; $bottom.innerHTML=""; document.body.classList.add("no-bottom");
   if(!SHARED){   // 운영은 키 내장으로 항상 SHARED — 로컬/미연결 시 안내만(키 붙여넣기 폼 없음)
     $app.innerHTML=`
       <header><div class="room-name" style="padding-top:6px">🔒 관리자</div>
@@ -1777,10 +2181,10 @@ function dashCardHtml(c, opts){ opts=opts||{};
 // 드릴다운 시트 + 기간 필터 — 문서에 한 번만 거는 위임 핸들러
 document.addEventListener("click", e=>{
   const pr=e.target.closest("[data-preset]");
-  if(pr){ const n=+pr.dataset.preset; dashTo=todayKey(); dashFrom=shiftDate(dashTo,-(n-1));
+  if(pr){ const r=presetRange(pr.dataset.preset); dashFrom=r[0]; dashTo=r[1];
     if(dashReload) dashReload(); return; }
   const cc=e.target.closest("[data-cell]");
-  if(cc){ dashSel=cc.dataset.cell; paintAdminDash(); return; }
+  if(cc){ dashSel=cc.dataset.cell; paintAdminDash(true); return; }
   const mx=e.target.closest("[data-mx]");
   if(mx){ const c=DASH_CELLS[mx.dataset.mx];
     if(c) openSheet(`<h3>📅 ${esc(c.name)} · 날짜별 출석</h3>
@@ -1802,10 +2206,12 @@ document.addEventListener("change", e=>{
   if(dashFrom>dashTo){ const tmp=dashFrom; dashFrom=dashTo; dashTo=tmp; }   // 뒤집힌 입력 교정
   if(dashReload) dashReload();
 });
-// 셀·사람 검색 — 서버를 다시 부르지 않고 캐시된 결과만 다시 그린다
+// 셀·사람 검색 — 서버를 다시 부르지 않고 캐시된 결과만 다시 그린다.
+// 조합 중(ㅎ→하→하ㅅ)에도 그대로 그린다 — 입력창은 갈아끼우지 않으므로 IME 가 끊기지 않고,
+// 자음 하나만 쳐도 초성 검색이 걸려 결과가 바로 좁혀진다.
 document.addEventListener("input", e=>{
   if(e.target.id!=="dQ") return;
-  dashQ=e.target.value; paintAdminDash();
+  dashQ=e.target.value; paintAdminDash(true);
 });
 // 탭 툴팁 — title= 은 터치에서 아예 안 뜬다. [data-tip] 을 누르면 화면 안쪽으로 물려 띄운다.
 (function tipLayer(){
@@ -1825,7 +2231,7 @@ document.addEventListener("input", e=>{
 })();
 // 셀 단위 대시보드 — ?cell=<id>&view=dashboard (관리자 로그인 없이 그 셀만)
 async function renderCellDashboard(cellId){
-  inPicker=false; adminMode=false; curView="celldash"; $bottom.innerHTML="";
+  inPicker=false; adminMode=false; curView="celldash"; $bottom.innerHTML=""; document.body.classList.add("no-bottom");
   const cellLink=`${esc(location.pathname)}?cell=${esc(cellId)}`;
   if(!SHARED){
     $app.innerHTML=`<header><div class="room-name" style="padding-top:6px">📊 대시보드</div>
@@ -1860,6 +2266,7 @@ async function renderCellDashboard(cellId){
     ${dashPeriodHtml()}
     ${dashCardHtml(c,{showCode:false})}
     <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
+  scrollPresetIntoView();
 }
 /* ---------- 관리자 대시보드: 컨트롤 → 셀 그리드 → 연동 상세 ----------
    그리드에서 셀을 고르면 아래 상세가 그 셀로 바뀐다. 검색·선택은 재집계 없이
@@ -1868,7 +2275,33 @@ let dashPayload=null, dashQ="", dashSel=null;
 
 function shiftDate(ds, n){ const d=new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function dashSpanDays(){ return Math.round((Date.parse(dashTo)-Date.parse(dashFrom))/86400000)+1; }
-function ensureDashRange(){ if(!dashTo) dashTo=todayKey(); if(!dashFrom) dashFrom=shiftDate(dashTo,-29); }
+
+/* 기간 프리셋 — '며칠치'가 아니라 달력 기준(이번주·이번달·올해…)이다.
+   기준일은 todayKey() 라 KST 고정이고, 계산은 'YYYY-MM-DD' 문자열 + UTC 로만 해서 시간대 밀림이 없다.
+   아직 안 온 날은 데이터가 없으므로 진행 중 구간(이번주·이번달·올해)의 끝은 오늘로 자른다. */
+const DASH_PRESETS=[["이번주","week"],["지난달","lastmon"],["이번달","month"],
+                    ["최근3개월","q3"],["올해","year"],["작년","lastyear"]];
+function presetRange(key){
+  const t=todayKey(), y=+t.slice(0,4), m=+t.slice(5,7);
+  const p=(yy,mm,dd)=>`${yy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
+  const lastDay=(yy,mm)=>new Date(Date.UTC(yy,mm,0)).getUTCDate();   // mm 은 1-based — 0일 = 그 달 말일
+  switch(key){
+    // 일요일 시작 — 교회 한 주가 주일부터라 달력과 감각이 맞는다
+    case "week":    return [shiftDate(t, -new Date(t+"T00:00:00Z").getUTCDay()), t];
+    case "month":   return [p(y,m,1), t];
+    case "lastmon":{ const yy=m===1?y-1:y, mm=m===1?12:m-1; return [p(yy,mm,1), p(yy,mm,lastDay(yy,mm))]; }
+    case "q3":      return [shiftDate(t,-89), t];   // 달력 분기가 아니라 오늘 기준 90일 롤링
+    case "year":    return [p(y,1,1), t];
+    case "lastyear":return [p(y-1,1,1), p(y-1,12,31)];
+  }
+  return [p(y,m,1), t];
+}
+function ensureDashRange(){ if(!dashFrom || !dashTo){ const r=presetRange("month"); dashFrom=r[0]; dashTo=r[1]; } }
+// 가로 스크롤 줄이라 선택한 버튼이 화면 밖으로 밀릴 수 있다 — 다시 그린 뒤 가운데로 당겨온다
+function scrollPresetIntoView(){
+  const row=document.querySelector(".dash-filter"), on=row&&row.querySelector(".tab.on");
+  if(row&&on) row.scrollLeft=Math.max(0, on.offsetLeft-(row.clientWidth-on.offsetWidth)/2);
+}
 
 // 기간 지정 RPC 를 먼저 시도하고, 없으면(마이그레이션 전) 레거시 p_days 로 떨어진다.
 // 폴백 시 실제 구간은 '오늘부터 N일 전'이고 서버가 31일로 자르므로 화면에 그 사실을 밝힌다.
@@ -1886,23 +2319,39 @@ async function fetchDash(cellId){
   return await Sync.client.rpc(fn,legacy);
 }
 
-// 컨트롤 바 — 달력 2개 + 프리셋 + 통합 검색
-function dashControlsHtml(){
-  ensureDashRange();
-  const span=dashSpanDays(), today=todayKey();
-  const presets=[["7일",7],["30일",30],["90일",90],["1년",365]];
-  return `<div class="card dash-ctl">
-    <div class="dash-dates">
+// 달력 2개 + 프리셋 줄 — 셀 대시보드와 관리자 대시보드가 함께 쓴다
+function dashDatesHtml(today){
+  return `<div class="dash-dates">
       <input type="date" id="dFrom" value="${dashFrom}" max="${today}" aria-label="시작일">
       <span class="muted" style="flex:none">~</span>
       <input type="date" id="dTo" value="${dashTo}" max="${today}" aria-label="종료일">
-    </div>
-    <div class="tabs dash-filter">${presets.map(([l,n])=>
-      `<button class="tab${span===n?' on':''}" data-preset="${n}">${l}</button>`).join("")}</div>
+    </div>`;
+}
+function dashPresetsHtml(){
+  return `<div class="tabs dash-filter" role="group" aria-label="기간 선택">${DASH_PRESETS.map(([l,k])=>{
+    const r=presetRange(k), on=(dashFrom===r[0] && dashTo===r[1]);
+    return `<button class="tab${on?' on':''}" data-preset="${k}" aria-pressed="${on}">${l}</button>`;
+  }).join("")}</div>`;
+}
+function dashWarnHtml(){
+  if(dashRangeRPC) return "";
+  return `<p class="dash-warn">⚠️ <b>db-migration-dashboard-range.sql</b> 미적용 — 서버가 최근 ${Math.min(31,dashSpanDays())}일까지만 집계합니다(오늘 기준). 날짜 지정과 지난달·최근3개월·올해·작년은 이 파일을 Supabase 에서 실행해야 동작해요.</p>`;
+}
+// 셀 단위 대시보드용 — 통합 검색은 없고 기간만
+function dashPeriodHtml(){
+  ensureDashRange();
+  return `<div class="card dash-ctl">${dashDatesHtml(todayKey())}${dashPresetsHtml()}${dashWarnHtml()}</div>`;
+}
+// 관리자 컨트롤 바 — 달력 2개 + 프리셋 + 통합 검색
+function dashControlsHtml(){
+  ensureDashRange();
+  return `<div class="card dash-ctl">
+    ${dashDatesHtml(todayKey())}
+    ${dashPresetsHtml()}
     <input type="search" id="dQ" value="${esc(dashQ)}" placeholder="🔍 셀·사람 이름 (예: 2셀, ㅎㅅ)"
       aria-label="셀 또는 사람 이름 검색 — 초성·오타 허용" autocomplete="off" autocorrect="off"
       autocapitalize="off" spellcheck="false" enterkeyhint="search">
-    ${dashRangeRPC?"":`<p class="dash-warn">⚠️ <b>db-migration-dashboard-range.sql</b> 미적용 — 서버가 최근 ${Math.min(31,span)}일까지만 집계합니다(오늘 기준). 날짜 지정과 90일·1년은 이 파일을 Supabase 에서 실행해야 동작해요.</p>`}
+    ${dashWarnHtml()}
   </div>`;
 }
 // 검색: 셀 이름이 걸리면 셀째로, 사람 이름이 걸리면 그 사람이 속한 셀을 남긴다.
@@ -1963,32 +2412,45 @@ function dashPeopleHitHtml(people){
       `<span class="logchip" style="font-size:12px">${esc(p.name)} <span class="muted">· ${esc(p.cell)}</span>${p.ct?` <b>☕${p.ct}</b>`:''}</span>`).join("")}</div>
     ${people.length>20?`<div class="muted" style="font-size:11.5px;padding-top:6px">그 외 ${people.length-20}명</div>`:''}</div>`;
 }
-// 캐시된 payload 로 다시 그리기 — 검색·셀 선택은 서버를 다시 부르지 않는다
-function paintAdminDash(){
+// 컨트롤 바 아래 본문 — 검색·셀 선택으로 바뀌는 건 전부 여기 안에 있다
+function dashBodyHtml(list, people, sel){
+  return `${dashPeopleHitHtml(people)}
+    ${dashTotalsHtml(list)}
+    ${cellGridHtml(list)}
+    <div style="height:14px"></div>
+    ${sel?dashCardHtml(sel,{showCode:true}):'<div class="card"><p class="muted center" style="margin:0;padding:10px 0">셀을 선택하면 상세가 보입니다</p></div>'}
+    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 것<br>누적은 표시 기간과 무관하게 전체</p>`;
+}
+/* 캐시된 payload 로 다시 그리기 — 검색·셀 선택은 서버를 다시 부르지 않는다.
+   bodyOnly=true 면 컨트롤 바를 건드리지 않고 #dashBody 만 갈아끼운다. 이게 한글 검색의 핵심 —
+   input 을 통째로 다시 만들면 조합 중이던 IME 가 끊겨 "하성"이 "ㅎㅏㅅㅓㅇ"으로 풀린다.
+   검색어·셀 선택은 컨트롤 바를 바꾸지 않으므로 다시 그릴 이유도 없다. */
+function paintAdminDash(bodyOnly){
   if(!dashPayload) return;
   const all=dashPayload.cells||[];
   const {list,people}=dashFilter(all);
   const sorted=list.slice().sort((a,b)=> (b.servings_total||0)-(a.servings_total||0));
   if(!sorted.some(c=>c.cell_id===dashSel)) dashSel = sorted.length?sorted[0].cell_id:null;
   const sel=sorted.find(c=>c.cell_id===dashSel);
-  const focused=document.activeElement && document.activeElement.id==="dQ";
+  const count=`${esc(dashPayload.from||dashFrom)} ~ ${esc(dashPayload.to||dashTo)} · 셀 ${list.length}/${all.length}개`;
+
+  const body=bodyOnly && document.getElementById("dashBody");
+  if(body){
+    body.innerHTML=dashBodyHtml(list, people, sel);
+    const h=document.getElementById("dashCount"); if(h) h.innerHTML=count;
+    return;
+  }
 
   $app.innerHTML=`
     <header><div class="h-row"><div style="min-width:0"><div class="room-name">📊 대시보드</div>
-      <div class="date">${esc(dashPayload.from||dashFrom)} ~ ${esc(dashPayload.to||dashTo)} · 셀 ${list.length}/${all.length}개</div></div>
+      <div class="date" id="dashCount">${count}</div></div>
       <button class="nav-link" id="dback">← 관리자</button></div></header>
     ${dashControlsHtml()}
-    ${dashPeopleHitHtml(people)}
-    ${dashTotalsHtml(list)}
-    ${cellGridHtml(list)}
-    <div style="height:14px"></div>
-    ${sel?dashCardHtml(sel,{showCode:true}):'<div class="card"><p class="muted center" style="margin:0;padding:10px 0">셀을 선택하면 상세가 보입니다</p></div>'}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 것<br>누적은 표시 기간과 무관하게 전체</p>`;
+    <div id="dashBody">${dashBodyHtml(list, people, sel)}</div>`;
 
   const b=document.getElementById("dback");
   if(b) b.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
-  // 검색 중이었다면 포커스와 캐럿을 되돌린다(재렌더로 잃지 않게)
-  if(focused){ const q=document.getElementById("dQ"); if(q){ q.focus(); const v=q.value; q.value=""; q.value=v; } }
+  scrollPresetIntoView();
 }
 async function renderAdminDashboard(){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
@@ -2222,11 +2684,11 @@ document.addEventListener("visibilitychange", async ()=>{
   else { try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } }catch(e){}   // 멤버(이름변경/추가) 최신화
          try{ await Sync.resubscribe(); }catch(e){}
          if(sheetOpen || confirmOpen) return;                    // 입력 중이면 화면 유지
-         if(curView==="pick") renderPickMe(); else if(curView==="host") renderHostView(); else render(); }   // 이름 선택 중이면 메인으로 튕기지 않음
+         if(curView==="pick") renderPickMe(); else render(); }   // 이름 선택 중이면 메인으로 튕기지 않음
 });
 function onRemote(){ if(inPicker || adminMode) return;
   if(curView==="pick" || sheetOpen || confirmOpen) return;   // 이름 선택/시트/확인창 사용 중엔 폴링이 화면을 갈아엎지 않음(선택 화면이 스스로 닫히던 문제)
-  if(curView==="host") renderHostView(); else render(); }
+  render(); }
 (async function boot(){
   console.log("[오늘은 제가 섬기겠습니다] build "+APP_VERSION);  // 캐시/배포 확인용
   updateOffline();   // 오프라인 초기 표시
