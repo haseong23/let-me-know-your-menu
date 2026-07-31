@@ -34,6 +34,13 @@
     --bg: #f6f1ea; --card: #ffffff; --ink: #2b2118; --sub: #6f6253; --line: #e7ddcf;
     --brand: #6f4e37; --brand-soft: #efe6da; --accent: #c98a3a; --green: #3f9d6b;
     --red: #c2552f; --gray: #b6a99a; --radius: 16px; --shadow: 0 6px 20px rgba(80,55,30,.08);
+    /* --accent(#c98a3a)는 흰 배경 대비 2.92:1 이라 글자에 못 쓴다. 칠(배지·점)에만 쓰고 글자는 --accent-ink.
+       --gray(2.05:1)도 글자 금지 — 보조문구는 --sub(5.27:1). */
+    --accent-ink: #96631f;
+  }
+  /* 움직임 최소화 설정을 켠 사용자에게는 전환을 끈다 */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; }
@@ -58,7 +65,7 @@
   .btn:active { transform: scale(.985); }
   .btn-brand { background: var(--brand); color: #fff; } .btn-soft { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--line); }
   .btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); } .btn-danger { background: #fff; color: var(--red); border: 1px solid #f0d4c8; }
-  .btn-sm { width: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; }
+  .btn-sm { width: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; min-height: 44px; }
   .banner { text-align: center; padding: 26px 18px; } .banner .emoji { font-size: 44px; }
   .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: 14px; }
   .host-name { color: var(--brand); font-weight: 800; }
@@ -66,7 +73,7 @@
   .menu-tile { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; font-weight: 700; font-size: 14px; position: relative; transition: .12s; }
   .menu-tile.sel { border-color: var(--brand); background: var(--brand-soft); }
   .menu-tile .em { display:block; font-size: 22px; margin-bottom: 4px; }
-  .menu-tile .cnt { display:block; font-size: 11px; color: var(--accent); margin-top: 3px; font-weight: 700; }
+  .menu-tile .cnt { display:block; font-size: 11px; color: var(--accent-ink); margin-top: 3px; font-weight: 700; }
   .menu-tile .ck { position: absolute; top: 6px; right: 9px; color: var(--brand); font-weight: 900; opacity: 0; } .menu-tile.sel .ck { opacity: 1; }
   .menu-tile.add { border-style: dashed; color: var(--brand); background: #fbf8f3; }
   .seg-temp { display:flex; gap:8px; }
@@ -77,7 +84,8 @@
   .seg { display:flex; gap:8px; }
   .sameas { flex:none; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .chip { padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
+  /* 온도·옵션 칩은 주문 핵심 경로 — 탭 영역 44px 확보 */
+  .chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
   .chip:active { transform: scale(.94); }
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
   .label { font-size: 13px; font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
@@ -128,7 +136,7 @@
   .menu-switch { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
   .menu-switch > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 14px; font-weight: 700; color: var(--sub); display: flex; align-items: center; justify-content: space-between; }
   .menu-switch > summary::-webkit-details-marker { display: none; }
-  .menu-switch > summary::after { content: "▾"; color: var(--gray); font-size: 12px; transition: transform .15s; }
+  .menu-switch > summary::after { content: "▾"; color: var(--sub); font-size: 12px; transition: transform .15s; }
   .menu-switch[open] > summary::after { transform: rotate(180deg); }
   .menu-switch > .grid { padding: 2px 12px 12px; }
   /* 주문 옵션 영역만 간격 촘촘화(온도~메모) — 옵션 그룹이 많은 메뉴도 스크롤 덜 하고 한눈에 */
@@ -139,13 +147,15 @@
   .idle-wrap { min-height: calc(100vh - 260px); display: flex; flex-direction: column; justify-content: center; }
   /* 닫기·취소 버튼 — 붉은 계열로 통일해 직관적으로(파괴적 액션인 danger 버튼은 이미 붉음) */
   .btn-close { color: var(--red); border-color: #f0d4c8; }
-  .sheet-x { background: none; border: none; font-size: 19px; line-height: 1; cursor: pointer; padding: 6px 4px; margin: -6px -4px -6px 0; flex: none; }
+  /* 44px 탭 영역을 확보하되 음수 마진으로 시각적 위치는 그대로 둔다(hit slop) */
+  .sheet-x { background: none; border: none; font-size: 19px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; margin: -6px -10px -6px 0; flex: none; }
   .chip:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
   .cdialog .cmsg { font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
   .cdialog .crow { display: flex; gap: 8px; } .cdialog .crow .btn { flex: 1; margin: 0; }
-  .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; }
+  /* 설정·뒤로가기·로그아웃 진입점. 글자는 13px 그대로 두고 탭 영역만 44px 로 넓힌다(음수 마진으로 줄높이 유지) */
+  .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 6px; margin: -11px -6px; }
   .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; min-width:0; }
   .row-between > :first-child { min-width:0; }
@@ -160,7 +170,7 @@
   @keyframes spin { to { transform:rotate(360deg); } }
   #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   #offline.show { display:block; }
-  .demo-badge { display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
+  .demo-badge { display:inline-block; background:var(--accent); color:var(--ink); font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
   /* iPhone/Galaxy 공통 모바일 폭(320~440px): 글자·아이콘·버튼의 가로 밀림 방지 */
   @media (max-width: 440px) {
     #app { padding-left: 14px; padding-right: 14px; }
@@ -219,17 +229,17 @@
   .ubar-n { font-size:10px; font-weight:800; color:var(--ink); line-height:1; }
   .ubar-b { width:24px; border-radius:5px 5px 0 0; }
   .ubar-d { font-size:9.5px; color:var(--sub); line-height:1.2; text-align:center; white-space:nowrap; }
-  .ubar-d .wk { color:var(--gray); }
+  .ubar-d .wk { color:var(--sub); }
   .mx-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   table.mx { border-collapse:collapse; font-size:12px; }
   table.mx th, table.mx td { padding:5px 3px; text-align:center; white-space:nowrap; }
   table.mx th.mx-date { font-weight:700; color:var(--sub); font-size:10px; line-height:1.15; }
-  table.mx th.mx-date .wk { color:var(--gray); }
+  table.mx th.mx-date .wk { color:var(--sub); }
   table.mx .mx-name { text-align:left; font-weight:700; color:var(--ink); padding-right:8px; position:sticky; left:0; background:var(--card); max-width:78px; overflow:hidden; text-overflow:ellipsis; }
   table.mx thead .mx-name, table.mx th.mx-sum { color:var(--sub); font-weight:700; font-size:10px; }
   table.mx .mx-cell { color:var(--line); font-size:13px; min-width:22px; }
   table.mx .mx-cell.att { color:var(--brand); }
-  table.mx .mx-cell.srv { color:var(--accent); font-size:13px; }
+  table.mx .mx-cell.srv { color:var(--accent-ink); font-size:13px; }
   table.mx td.mx-sum { font-weight:800; color:var(--ink); padding-left:8px; position:sticky; right:0; background:var(--card); }
   table.mx tr + tr td { border-top:1px solid var(--line); }
 </style>
@@ -251,7 +261,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.53";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.54";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1081,7 +1091,7 @@ function openFullMenuSheet(curId, carryNote){
   }).join("");
   openSheet(`
     <div style="flex:none;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
-      <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기" style="min-width:44px;min-height:44px;font-size:20px;margin:-6px -10px -6px 0">✕</button></div>
+      <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기">✕</button></div>
       <input type="search" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, 라떼, 콜드브루)" aria-label="메뉴 검색" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
     </div>
     <div class="sheet-scroll">
@@ -1140,8 +1150,8 @@ function dashboardHtml(){
   const pending=MEMBERS.filter(m=>!ORDERS[m.id]);
   const stats=`<div class="stats">
     <div class="stat"><div class="num" style="color:var(--green)">${ordered.length}</div><div class="lbl">주문</div></div>
-    <div class="stat"><div class="num" style="color:var(--gray)">${skipped.length}</div><div class="lbl">안마심</div></div>
-    <div class="stat"><div class="num" style="color:var(--accent)">${pending.length}</div><div class="lbl">미응답</div></div></div>`;
+    <div class="stat"><div class="num" style="color:var(--sub)">${skipped.length}</div><div class="lbl">안마심</div></div>
+    <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>`;
   const tabs=`<div class="tabs" id="dashTabs">
     <div class="tab ${dashTab==='people'?'on':''}" data-t="people">사람별 / 전달하기</div>
     <div class="tab ${dashTab==='cafe'?'on':''}" data-t="cafe">카페 주문서</div></div>`;
@@ -1350,7 +1360,7 @@ function renderCellPicker(){
       <div class="label" style="margin-top:0">이런 앱이에요</div>
       <p class="muted" style="margin:0;line-height:1.7">셀(모임)마다 <b>고유 링크</b>가 있고, 셀 리더가 공유해준 그 링크로 입장합니다.<br>본인 이름 선택 → 메뉴 담기 → 끝! <b>누가 어떤 메뉴를 원하는지·마시지 않는 분·메뉴별 몇 잔인지</b> 등이 자동으로 정리돼요.</p>
     </div>
-    <p class="center" style="margin-top:16px"><a href="${esc(location.pathname)}?admin" class="nav-link" style="font-size:12px;color:var(--sub)">관리자</a> <span style="font-size:11px;color:var(--gray)">· ${APP_VERSION}</span></p>`;
+    <p class="center" style="margin-top:16px"><a href="${esc(location.pathname)}?admin" class="nav-link" style="font-size:12px;color:var(--sub)">관리자</a> <span style="font-size:11px;color:var(--sub)">· ${APP_VERSION}</span></p>`;
 }
 
 function slugify(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,20); }
@@ -1555,7 +1565,7 @@ function usageBarsHtml(days){
   const max=Math.max(1, ...list.map(x=>x.servings));
   return `<div class="usage-wrap"><div class="usage">${list.map(x=>{
     const h=Math.max(8,Math.round(x.servings/max*54));
-    const col=x.closed>0?"var(--brand)":"var(--accent)";
+    const col=x.closed>0?"var(--brand)":"var(--accent-ink)";
     return `<div class="ubar" title="${esc(x.date)} · 섬김 ${x.servings}회${x.closed?` (마감 ${x.closed})`:''}">
       <div class="ubar-n">${x.servings}</div>
       <div class="ubar-b" style="height:${h}px;background:${col}"></div>
@@ -1619,7 +1629,7 @@ function dashCardHtml(c, opts){ opts=opts||{};
         <span class="muted" style="font-size:12px">${meta}</span></div>
       <span class="pill ${servings?'ordered':'skip'}">${used}일 · ${servings}회</span>
     </div>
-    <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--gray)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent)">진행중</span>)</span></div>
+    <div class="muted" style="font-size:12px;margin-bottom:2px">☕ 사용 빈도 <span style="color:var(--sub)">(색: <span style="color:var(--brand)">마감</span>/<span style="color:var(--accent-ink)">진행중</span>)</span></div>
     ${usageBarsHtml(c.days)}
     <div style="height:10px"></div>
     ${serveRankHtml(c)}
