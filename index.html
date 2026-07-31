@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- interactive-widget: 키보드가 뜨면 레이아웃 뷰포트까지 함께 줄인다(Chrome 108+/Android).
+     그러면 position:fixed·vh 가 그대로 정답이 되고, JS의 --kb 는 0이 되어 무해하다. 미지원 브라우저는 이 키를 무시한다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -108,8 +110,9 @@
   .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
   .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
-  /* 키보드가 올라오면 visualViewport 높이(--vvh)만큼만 차지 → 시트가 키보드 뒤로 밀리지 않음 */
-  .scrim { position: fixed; left: 0; right: 0; top: var(--vv-top, 0px); height: var(--vvh, 100%); background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
+  /* scrim 은 항상 화면 전체를 덮고, 키보드가 가린 높이(--kb)만큼 패딩으로 시트를 밀어올린다.
+     바닥을 계산으로 만들지 않으므로 측정이 어긋나도 딤 안 된 틈이 드러나지 않는다(최악이어도 시트가 조금 짧아질 뿐). */
+  .scrim { position: fixed; inset: 0; box-sizing: border-box; padding-bottom: var(--kb, 0px); background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
   .sheet { background: var(--bg); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); max-height: min(88vh, var(--vvh, 88vh)); overflow-y: auto; }
   /* 검색이 있는 시트: 시트 자체는 스크롤 안 하고 목록만 스크롤 → 타이핑 중에도 검색창·결과·하단바가 항상 보임 */
   .sheet.split { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
@@ -247,7 +250,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.51";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.52";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -668,14 +671,30 @@ window.addEventListener("online", updateOffline); window.addEventListener("offli
 // → 뒤로가기 한 번이면 그 하위 상태가 닫히고 주문화면으로. main(주문화면)에선 안 쌓으므로
 //   뒤로가기가 평소처럼 앱 밖으로 나간다(갇히지 않음).
 let sheetOpen=false, curView="main", subActive=false;
-// 모바일 키보드가 뷰포트를 줄이면 그 높이를 CSS 변수로 흘려보냄 → 시트가 키보드 위에 머문다
+// 모바일 키보드가 가린 높이를 --kb 로, 실제 보이는 높이를 --vvh 로 노출한다.
+// --kb = innerHeight - (보이는 높이 + 위로 밀린 양). 두 경우 모두 자동으로 맞는다:
+//   Android(키보드가 레이아웃 뷰포트까지 줄임) → innerHeight 도 같이 줄어 --kb=0, inset:0 이 이미 정답
+//   iOS(레이아웃 뷰포트는 그대로)              → --kb 가 곧 키보드 높이, 그만큼 시트를 밀어올림
 (function syncViewport(){
   const vv=window.visualViewport; if(!vv) return;
+  // ?vvdebug — 실기기에서 추측 말고 숫자를 보고 판단하려고 붙인 계측 표시줄
+  const dbg = /[?&]vvdebug/.test(location.search) ? document.createElement("div") : null;
+  let probe=null;
+  if(dbg){ dbg.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99;background:#2b2118;color:#fff;font:11px/1.5 ui-monospace,monospace;padding:4px 8px;text-align:center;pointer-events:none";
+    probe=document.createElement("div"); probe.style.cssText="position:fixed;bottom:0;width:0;visibility:hidden;pointer-events:none;height:env(safe-area-inset-bottom,0px)"; }
   const apply=()=>{ const r=document.documentElement.style;
+    const kb=Math.max(0, Math.round(window.innerHeight-(vv.height+vv.offsetTop)));
     r.setProperty("--vvh", Math.round(vv.height)+"px");
-    r.setProperty("--vv-top", Math.round(vv.offsetTop||0)+"px"); };
-  vv.addEventListener("resize", apply); vv.addEventListener("scroll", apply);
-  window.addEventListener("orientationchange", ()=>setTimeout(apply,250)); apply();
+    r.setProperty("--kb", kb+"px");
+    if(dbg){ if(!dbg.parentNode && document.body){ document.body.appendChild(probe); document.body.appendChild(dbg); }
+      dbg.textContent=`inner ${window.innerHeight} · vv ${Math.round(vv.height)} · top ${Math.round(vv.offsetTop)} · kb ${kb} · sab ${probe?probe.offsetHeight:0} · ${APP_VERSION}`; } };
+  // 삼성·구글 키보드는 자동완성/추천 줄이 뒤늦게 붙어 키보드가 더 높아진다. 한 번만 재면
+  // 그 증가분이 시트와 키보드 사이 틈으로 남으므로, 이벤트 후 잠깐 동안 다시 잰다.
+  const settle=()=>{ apply(); [60,160,320,600].forEach(ms=>setTimeout(apply,ms)); };
+  vv.addEventListener("resize", settle); vv.addEventListener("scroll", apply);
+  document.addEventListener("focusin", settle); document.addEventListener("focusout", settle);
+  window.addEventListener("orientationchange", ()=>setTimeout(settle,250));
+  settle();
 })();
 function pushSub(){ if(!subActive){ subActive=true; try{ history.pushState({sub:1},""); }catch(e){} } }
 function openSheet(h){ $sheet.innerHTML='<div class="grip"></div>'+h; $sheet.classList.toggle("has-foot", !!$sheet.querySelector(".sheet-foot")); $sheet.classList.toggle("split", !!$sheet.querySelector(".sheet-scroll")); $sheet.scrollTop=0; const sc=$sheet.querySelector(".sheet-scroll"); if(sc) sc.scrollTop=0; $scrim.classList.add("show"); sheetOpen=true; pushSub(); }
