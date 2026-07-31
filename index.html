@@ -249,7 +249,25 @@
   .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
   .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
   .kpi .l { font-size:11px; color:var(--sub); font-weight:700; margin-top:2px; }
-  .dash-filter { margin:0 0 14px; }
+  .dash-filter { margin:0 0 10px; }
+  /* 컨트롤 바 — 달력 · 프리셋 · 통합 검색 */
+  .dash-ctl { padding:12px 14px; margin-bottom:12px; }
+  .dash-dates { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .dash-dates input[type=date] { flex:1; min-width:0; width:auto; padding:10px 10px; border:1.5px solid var(--line); border-radius:11px; font-size:15px; font-family:inherit; background:#fff; color:var(--ink); min-height:44px; -webkit-appearance:none; appearance:none; }
+  .dash-warn { font-size:11.5px; line-height:1.55; color:var(--sub); background:#fbecdf; border-radius:10px; padding:8px 10px; margin:10px 0 0; }
+  /* 셀 활용도 그리드 — 누르면 아래 상세가 바뀐다 */
+  .cellgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .cellcard { text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:11px 12px; min-height:44px; cursor:pointer; transition:border-color .12s, background .12s; }
+  .cellcard.on { border-color:var(--brand); background:var(--brand-soft); }
+  .cc-top { display:flex; align-items:center; gap:6px; min-width:0; }
+  .cc-rank { flex:none; font-size:11px; font-weight:800; color:#fff; background:var(--brand); border-radius:99px; min-width:17px; height:17px; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; }
+  .cc-name { font-size:13.5px; font-weight:700; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cc-n { font-size:23px; font-weight:900; letter-spacing:-1px; color:var(--ink); line-height:1.1; margin-top:5px; }
+  .cc-n span { font-size:12px; font-weight:700; color:var(--sub); margin-left:2px; letter-spacing:0; }
+  .cc-spark { display:flex; align-items:flex-end; gap:2px; height:16px; margin:6px 0 4px; }
+  .cc-spark i { flex:1; min-width:2px; background:var(--data-1); border-radius:2px 2px 0 0; }
+  .cc-none { font-size:11px; color:var(--sub); }
+  .cc-meta { font-size:11px; color:var(--sub); font-weight:700; }
   /* ③ 사람별 참여 — 세로 목록이라 가로 스크롤이 없다 */
   .prow { padding:8px 2px; border-top:1px solid var(--line); }
   .prow-n { font-weight:700; font-size:13px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -297,7 +315,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.62";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.71";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1041,8 +1059,18 @@ function fuzzyDist(qn, hay){ if(qn.length>=hay.length) return editDistance(qn,ha
   return best; }
 function typoThreshold(len){ return len<=3?1 : len<=5?2 : 3; }
 function norm(s){ return (s||"").trim().toLowerCase().replace(/\s+/g,""); }
-// 이름 매칭: 정확/부분 일치 우선, 짧은 오타는 편집거리로 허용 — 전체메뉴판 검색·직접입력 공용
-function matchesName(mn,qn){ return mn===qn || mn.includes(qn) || qn.includes(mn) || (qn.length>=2 && fuzzyDist(qn,mn)<=typoThreshold(qn.length)); }
+// 이름 매칭: 정확/부분 일치 우선, 짧은 오타는 편집거리로 허용 — 메뉴 검색·직접입력·대시보드 공용.
+// 오타 허용은 3글자부터. 2글자에서 편집거리 1을 허용하면 절반이 틀려도 통과해
+// "2셀"이 "청년2부1셀"에, "하영"이 "하성"에 걸린다(다른 대상이지 오타가 아니다).
+function matchesName(mn,qn){ return mn===qn || mn.includes(qn) || qn.includes(mn) || (qn.length>=3 && fuzzyDist(qn,mn)<=typoThreshold(qn.length)); }
+// 초성 검색: "ㅇㅁㄹ" → 아메리카노. 한글 유니코드 0xAC00 + (초성×588) 규칙.
+const CHO=["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+function toCho(s){ return Array.from(String(s)).map(ch=>{ const c=ch.charCodeAt(0)-0xac00; return (c>=0&&c<=11171)?CHO[Math.floor(c/588)]:ch; }).join(""); }
+function isChoQuery(s){ return !!s && Array.from(s).every(ch=>CHO.indexOf(ch)>=0); }
+// 이름 매칭 정본 — 질의가 전부 자음이면 초성 모드, 아니면 오타 허용.
+// 메뉴 검색과 대시보드의 셀·사람 검색이 이 한 함수를 공유한다.
+function nameHit(name, ql){ if(!ql) return true; const n=norm(name);
+  return isChoQuery(ql) ? toCho(n).indexOf(ql)>=0 : matchesName(n, ql); }
 // 메뉴 대신 "주문완료/직접주문" 등을 적는 건 사실 오늘 생략 의사표시인 경우가 대부분 — 그쪽으로 자연스럽게 유도
 const DECLINE_WORDS=["주문완료","직접주문","따로주문","개별주문","생략","패스","스킵","노쇼"];
 
@@ -1143,15 +1171,11 @@ function openFullMenuSheet(curId, carryNote){
   // 오타 허용 검색: 직접입력과 같은 matchesName 기준 — "아메리카노"를 "아메리카노"로 오타쳐도 목록에서 바로 찾힘
   const count=document.getElementById("mCount");
   // 초성 검색: "ㅇㅁㄹ" → 아메리카노
-  const CHO=["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
-  const toCho=s=>Array.from(String(s)).map(ch=>{ const c=ch.charCodeAt(0)-0xac00; return (c>=0&&c<=11171)?CHO[Math.floor(c/588)]:ch; }).join("");
-  const isChoQuery=s=>!!s&&Array.from(s).every(ch=>CHO.indexOf(ch)>=0);
   function applyFilter(){
     const ql=norm(mq.value); let any=false, n=0;
-    const cho=isChoQuery(ql)?ql:null;
     results.querySelectorAll(".mcat").forEach(cat=>{
       let catVisible=false;
-      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=!ql||(cho?toCho(r.dataset.name).indexOf(cho)>=0:matchesName(r.dataset.name,ql)); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
+      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=nameHit(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
       cat.style.display=catVisible?"":"none"; if(catVisible) any=true;
     });
     empty.style.display=any?"none":"";
@@ -1594,8 +1618,9 @@ async function renderAdminDash(){
    (a) 상태를 색만으로 구분하지 않는다. 마감/진행중은 채움 vs 윤곽 + 라벨 범례.
        (--brand #6f4e37 와 --accent-ink #96631f 는 정상 시야 ΔE 10.2 로 기준 15 미달이었다)
    (b) 값 라벨은 최댓값·마지막만. 모든 막대에 숫자를 붙이지 않는다. */
-let dashDays = 30;      // 조회 기간(일) — 화면의 7/30/90 필터가 바꾼다
-let dashReload = null;  // 기간을 바꿨을 때 다시 부를 렌더 함수(화면마다 다름)
+let dashFrom = null, dashTo = null;   // 조회 구간 'YYYY-MM-DD' (기본 최근 30일)
+let dashRangeRPC = true;             // 기간 지정 RPC 사용 가능 여부(마이그레이션 적용 여부)
+let dashReload = null;               // 기간을 바꿨을 때 다시 부를 렌더 함수(화면마다 다름)
 const DASH_CELLS = {};  // 드릴다운 시트가 참조할 셀 원본. dashCardHtml 이 채운다
 let dashSeq = 0;
 
@@ -1604,12 +1629,6 @@ function dashColLabel(dateStr){
   const [y,m,d]=dateStr.split("-").map(Number); const dt=new Date(Date.UTC(y,m-1,d));
   const wk=["일","월","화","수","목","금","토"][dt.getUTCDay()];
   return `${m}/${d}<br><span class="wk">${wk}</span>`;
-}
-// 기간 필터 — 차트 위 한 줄. 누르면 해당 화면을 다시 집계한다.
-function dashPeriodHtml(){
-  // 서버 RPC 가 p_days 를 1~31 로 자른다 — 그 위 값을 넣으면 조용히 31일이 된다
-  return `<div class="tabs dash-filter">${[7,14,30].map(d=>
-    `<button class="tab${dashDays===d?' on':''}" data-days="${d}">최근 ${d}일</button>`).join("")}</div>`;
 }
 // ① 리드 숫자 하나 + KPI 4칸. 이전에는 "N일 · N회" pill 안에 파묻혀 있었다.
 function dashHeroHtml(c){
@@ -1654,19 +1673,28 @@ function usageBarsHtml(days){
 }
 // ③ 사람별 참여 — 세로로 읽히는 목록이라 가로 스크롤이 없다. 날짜별 매트릭스는 드릴다운으로.
 function peopleListHtml(c, key){
-  const used=c.used_days||0;
-  const rows=(c.members||[]).map(m=>({ name:m.name, a:(m.dates||[]).length,
-      s:(m.serve_dates||[]).length, t:m.attend_total||0 }))
+  const ms=c.members||[];
+  // 마이그레이션(db-migration-dashboard-range.sql) 적용 시 '횟수'가 온다. 없으면 날짜 개수로 폴백.
+  const byCt = ms.some(m=>m.attend_ct!=null);
+  const denom = byCt ? (c.servings_total||0) : (c.used_days||0);
+  const unit  = byCt ? "회" : "일";
+  const rows=ms.map(m=>({ name:m.name,
+      a: m.attend_ct!=null ? m.attend_ct : (m.dates||[]).length,
+      s: m.serve_ct!=null  ? m.serve_ct  : (m.serve_dates||[]).length,
+      t: m.attend_total||0 }))
     .sort((x,y)=> y.a-x.a || y.s-x.s || x.name.localeCompare(y.name,"ko"));
   const head=`<div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🙌 사람별 참여</b>
     <button class="nav-link" data-mx="${key}" style="font-size:12px">날짜별 보기</button></div>`;
   if(!rows.length) return head+`<p class="muted center" style="padding:8px 0">구성원이 없어요</p>`;
   return head+rows.map(r=>{
-    const pct=used?Math.round(r.a/used*100):0;
-    return `<div class="prow" data-tip="${esc(r.name)} · 활동한 ${used}일 중 ${r.a}일 출석 (${pct}%) · 섬긴 날 ${r.s}일 · 누적 출석 ${r.t}일 — 하루에 여러 번 섬겨도 날 기준으로 셉니다">
+    const pct=denom?Math.min(100,Math.round(r.a/denom*100)):0;
+    const tip = byCt
+      ? `${r.name} · 섬김 ${denom}회 중 ${r.a}회 참여 (${pct}%) · 직접 섬김 ${r.s}회 · 누적 참여 ${r.t}회`
+      : `${r.name} · 활동한 ${denom}일 중 ${r.a}일 출석 (${pct}%) · 섬긴 날 ${r.s}일 · 누적 ${r.t} — 하루에 여러 번 섬겨도 날 기준으로 셉니다`;
+    return `<div class="prow" data-tip="${esc(tip)}">
       <div class="row-between" style="margin-bottom:5px">
         <span class="prow-n">${esc(r.name)}</span>
-        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${used}일${r.s?` · ☕${r.s}일`:''} · 누적 ${r.t}</span></div>
+        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${denom}${unit}${r.s?` · ☕${r.s}${unit}`:''} · 누적 ${r.t}</span></div>
       <div class="meter"><i style="width:${pct}%"></i></div></div>`;
   }).join("");
 }
@@ -1748,8 +1776,11 @@ function dashCardHtml(c, opts){ opts=opts||{};
 }
 // 드릴다운 시트 + 기간 필터 — 문서에 한 번만 거는 위임 핸들러
 document.addEventListener("click", e=>{
-  const d=e.target.closest("[data-days]");
-  if(d){ const n=+d.dataset.days; if(n!==dashDays){ dashDays=n; if(dashReload) dashReload(); } return; }
+  const pr=e.target.closest("[data-preset]");
+  if(pr){ const n=+pr.dataset.preset; dashTo=todayKey(); dashFrom=shiftDate(dashTo,-(n-1));
+    if(dashReload) dashReload(); return; }
+  const cc=e.target.closest("[data-cell]");
+  if(cc){ dashSel=cc.dataset.cell; paintAdminDash(); return; }
   const mx=e.target.closest("[data-mx]");
   if(mx){ const c=DASH_CELLS[mx.dataset.mx];
     if(c) openSheet(`<h3>📅 ${esc(c.name)} · 날짜별 출석</h3>
@@ -1762,6 +1793,19 @@ document.addEventListener("click", e=>{
       <div class="sheet-scroll">${menuByMemberHtml(c)}</div>
       <div class="sheet-foot"><button class="btn btn-ghost btn-close" id="dmClose">닫기</button></div>`);
     const b2=document.getElementById("dmClose"); if(b2) b2.onclick=closeSheet; }
+});
+// 기간 달력 — 바꾸면 서버를 다시 부른다(집계 구간이 달라지므로)
+document.addEventListener("change", e=>{
+  const t=e.target; if(t.id!=="dFrom" && t.id!=="dTo") return;
+  const v=t.value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  if(t.id==="dFrom") dashFrom=v; else dashTo=v;
+  if(dashFrom>dashTo){ const tmp=dashFrom; dashFrom=dashTo; dashTo=tmp; }   // 뒤집힌 입력 교정
+  if(dashReload) dashReload();
+});
+// 셀·사람 검색 — 서버를 다시 부르지 않고 캐시된 결과만 다시 그린다
+document.addEventListener("input", e=>{
+  if(e.target.id!=="dQ") return;
+  dashQ=e.target.value; paintAdminDash();
 });
 // 탭 툴팁 — title= 은 터치에서 아예 안 뜬다. [data-tip] 을 누르면 화면 안쪽으로 물려 띄운다.
 (function tipLayer(){
@@ -1793,7 +1837,7 @@ async function renderCellDashboard(cellId){
       <a href="${cellLink}" class="nav-link" style="font-size:14px">← 셀로</a></div></header>
     <div class="loading"><div class="spinner"></div>집계하는 중…</div>`;
   let payload=null, err=null;
-  try{ const {data,error}=await Sync.client.rpc("get_cell_dashboard",{p_cell:cellId,p_days:dashDays}); if(error) throw error; payload=data; }
+  try{ const r=await fetchDash(cellId); if(r.error) throw r.error; payload=r.data; }
   catch(e){ err=e; }
   if(err){
     $app.innerHTML=`<header><div class="room-name" style="padding-top:6px">📊 대시보드</div><div class="date">불러오기 실패</div></header>
@@ -1817,43 +1861,158 @@ async function renderCellDashboard(cellId){
     ${dashCardHtml(c,{showCode:false})}
     <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
 }
+/* ---------- 관리자 대시보드: 컨트롤 → 셀 그리드 → 연동 상세 ----------
+   그리드에서 셀을 고르면 아래 상세가 그 셀로 바뀐다. 검색·선택은 재집계 없이
+   캐시된 payload 로 다시 그리므로 즉각 반응한다(기간 변경만 서버를 다시 부른다). */
+let dashPayload=null, dashQ="", dashSel=null;
+
+function shiftDate(ds, n){ const d=new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function dashSpanDays(){ return Math.round((Date.parse(dashTo)-Date.parse(dashFrom))/86400000)+1; }
+function ensureDashRange(){ if(!dashTo) dashTo=todayKey(); if(!dashFrom) dashFrom=shiftDate(dashTo,-29); }
+
+// 기간 지정 RPC 를 먼저 시도하고, 없으면(마이그레이션 전) 레거시 p_days 로 떨어진다.
+// 폴백 시 실제 구간은 '오늘부터 N일 전'이고 서버가 31일로 자르므로 화면에 그 사실을 밝힌다.
+async function fetchDash(cellId){
+  ensureDashRange();
+  const fn = cellId ? "get_cell_dashboard" : "get_admin_dashboard";
+  if(dashRangeRPC){
+    const args = cellId ? {p_cell:cellId, p_from:dashFrom, p_to:dashTo} : {p_from:dashFrom, p_to:dashTo};
+    const {data,error}=await Sync.client.rpc(fn,args);
+    if(!error) return {data:data, error:null};
+    dashRangeRPC=false;   // 이 시그니처가 없다 → 이후로는 레거시만 쓴다
+  }
+  const days=Math.min(31, Math.max(1, dashSpanDays()));
+  const legacy = cellId ? {p_cell:cellId, p_days:days} : {p_days:days};
+  return await Sync.client.rpc(fn,legacy);
+}
+
+// 컨트롤 바 — 달력 2개 + 프리셋 + 통합 검색
+function dashControlsHtml(){
+  ensureDashRange();
+  const span=dashSpanDays(), today=todayKey();
+  const presets=[["7일",7],["30일",30],["90일",90],["1년",365]];
+  return `<div class="card dash-ctl">
+    <div class="dash-dates">
+      <input type="date" id="dFrom" value="${dashFrom}" max="${today}" aria-label="시작일">
+      <span class="muted" style="flex:none">~</span>
+      <input type="date" id="dTo" value="${dashTo}" max="${today}" aria-label="종료일">
+    </div>
+    <div class="tabs dash-filter">${presets.map(([l,n])=>
+      `<button class="tab${span===n?' on':''}" data-preset="${n}">${l}</button>`).join("")}</div>
+    <input type="search" id="dQ" value="${esc(dashQ)}" placeholder="🔍 셀·사람 이름 (예: 2셀, ㅎㅅ)"
+      aria-label="셀 또는 사람 이름 검색 — 초성·오타 허용" autocomplete="off" autocorrect="off"
+      autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    ${dashRangeRPC?"":`<p class="dash-warn">⚠️ <b>db-migration-dashboard-range.sql</b> 미적용 — 서버가 최근 ${Math.min(31,span)}일까지만 집계합니다(오늘 기준). 날짜 지정과 90일·1년은 이 파일을 Supabase 에서 실행해야 동작해요.</p>`}
+  </div>`;
+}
+// 검색: 셀 이름이 걸리면 셀째로, 사람 이름이 걸리면 그 사람이 속한 셀을 남긴다.
+function dashFilter(cells){
+  const ql=norm(dashQ);
+  if(!ql) return {list:cells, people:[]};
+  const people=[];
+  const list=cells.filter(c=>{
+    const byCell=nameHit(c.name, ql);
+    const hits=(c.members||[]).filter(m=>nameHit(m.name, ql));
+    hits.forEach(m=>people.push({cell:c.name, name:m.name, ct:(m.serve_ct!=null?m.serve_ct:(m.serve_dates||[]).length)}));
+    return byCell || hits.length>0;
+  });
+  return {list, people};
+}
+// 14일치 미니 막대 — 그리드 타일에서 추세를 한눈에
+function sparkHtml(days, max){
+  const list=(days||[]).slice().sort((a,b)=> a.date<b.date?-1:1).slice(-14);
+  if(!list.length) return `<span class="cc-none">기록 없음</span>`;
+  return list.map(d=>`<i style="height:${Math.max(2,Math.round((d.servings||0)/max*16))}px"></i>`).join("");
+}
+// 전체 요약 — 필터가 걸리면 걸린 셀들만 합산한다
+function dashTotalsHtml(cells){
+  const sv=cells.reduce((a,c)=>a+(c.servings_total||0),0);
+  const cups=cells.reduce((a,c)=>a+(c.members||[]).reduce((s,m)=>s+(m.menus||[]).reduce((t,x)=>t+(x.count||0),0),0),0);
+  const active=cells.filter(c=>(c.servings_total||0)>0).length;
+  const multi=cells.reduce((a,c)=>a+(c.days||[]).filter(d=>(d.servings||0)>=2).length,0);
+  return `<div class="kpis" style="margin:0 0 14px">
+    <div class="kpi" data-tip="이 기간 모든 셀의 섬김 합계"><div class="n">${sv}</div><div class="l">총 섬김</div></div>
+    <div class="kpi" data-tip="한 번이라도 섬김을 연 셀"><div class="n">${active}</div><div class="l">활동 셀</div></div>
+    <div class="kpi"><div class="n">${cups}</div><div class="l">총 잔</div></div>
+    <div class="kpi" data-tip="하루에 2번 이상 섬긴 날(모든 셀 합)"><div class="n">${multi}</div><div class="l">2회+ 인 날</div></div>
+  </div>`;
+}
+// 셀 활용도 그리드 — 많이 쓴 순. 누르면 아래 상세가 바뀐다.
+function cellGridHtml(cells){
+  const sorted=cells.slice().sort((a,b)=> (b.servings_total||0)-(a.servings_total||0)
+    || (b.used_days||0)-(a.used_days||0) || a.name.localeCompare(b.name,"ko"));
+  const max=Math.max(1,...sorted.map(c=>c.servings_total||0));
+  const head=`<div class="row-between" style="padding:2px 2px 6px"><b style="font-size:13px">🏆 많이 활용한 셀</b>
+    <span class="muted" style="font-size:11.5px">누르면 아래 상세가 바뀝니다</span></div>`;
+  if(!sorted.length) return head+`<div class="card"><p class="muted center" style="margin:0;padding:10px 0">조건에 맞는 셀이 없어요</p></div>`;
+  return head+`<div class="cellgrid">${sorted.map((c,i)=>{
+    const n=c.servings_total||0;
+    return `<button class="cellcard${dashSel===c.cell_id?' on':''}" data-cell="${esc(c.cell_id)}" aria-pressed="${dashSel===c.cell_id}">
+      <div class="cc-top"><span class="cc-rank">${i+1}</span><span class="cc-name">${esc(c.name)}</span></div>
+      <div class="cc-n">${n}<span>회</span></div>
+      <div class="cc-spark">${sparkHtml(c.days,max)}</div>
+      <div class="cc-meta">${c.used_days||0}일 · ${c.member_count||0}명</div></button>`;
+  }).join("")}</div>`;
+}
+// 사람 검색이 걸렸을 때: 어느 셀의 누구인지 먼저 보여준다
+function dashPeopleHitHtml(people){
+  if(!people.length) return "";
+  return `<div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div class="muted" style="font-size:12px;margin-bottom:6px">🙋 이름이 걸린 사람 ${people.length}명</div>
+    <div class="logchips">${people.slice(0,20).map(p=>
+      `<span class="logchip" style="font-size:12px">${esc(p.name)} <span class="muted">· ${esc(p.cell)}</span>${p.ct?` <b>☕${p.ct}</b>`:''}</span>`).join("")}</div>
+    ${people.length>20?`<div class="muted" style="font-size:11.5px;padding-top:6px">그 외 ${people.length-20}명</div>`:''}</div>`;
+}
+// 캐시된 payload 로 다시 그리기 — 검색·셀 선택은 서버를 다시 부르지 않는다
+function paintAdminDash(){
+  if(!dashPayload) return;
+  const all=dashPayload.cells||[];
+  const {list,people}=dashFilter(all);
+  const sorted=list.slice().sort((a,b)=> (b.servings_total||0)-(a.servings_total||0));
+  if(!sorted.some(c=>c.cell_id===dashSel)) dashSel = sorted.length?sorted[0].cell_id:null;
+  const sel=sorted.find(c=>c.cell_id===dashSel);
+  const focused=document.activeElement && document.activeElement.id==="dQ";
+
+  $app.innerHTML=`
+    <header><div class="h-row"><div style="min-width:0"><div class="room-name">📊 대시보드</div>
+      <div class="date">${esc(dashPayload.from||dashFrom)} ~ ${esc(dashPayload.to||dashTo)} · 셀 ${list.length}/${all.length}개</div></div>
+      <button class="nav-link" id="dback">← 관리자</button></div></header>
+    ${dashControlsHtml()}
+    ${dashPeopleHitHtml(people)}
+    ${dashTotalsHtml(list)}
+    ${cellGridHtml(list)}
+    <div style="height:14px"></div>
+    ${sel?dashCardHtml(sel,{showCode:true}):'<div class="card"><p class="muted center" style="margin:0;padding:10px 0">셀을 선택하면 상세가 보입니다</p></div>'}
+    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 것<br>누적은 표시 기간과 무관하게 전체</p>`;
+
+  const b=document.getElementById("dback");
+  if(b) b.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
+  // 검색 중이었다면 포커스와 캐럿을 되돌린다(재렌더로 잃지 않게)
+  if(focused){ const q=document.getElementById("dQ"); if(q){ q.focus(); const v=q.value; q.value=""; q.value=v; } }
+}
 async function renderAdminDashboard(){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
   if(curView!=="admindash") pushSub();
-  curView="admindash";
+  curView="admindash"; dashReload=renderAdminDashboard; ensureDashRange();
   $app.innerHTML=`
     <header><div class="h-row"><div><div class="room-name">📊 대시보드</div><div class="date">불러오는 중…</div></div>
-      <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
+      <button class="nav-link" id="dback">← 관리자</button></div></header>
     <div class="loading"><div class="spinner"></div>집계하는 중…</div>`;
-  document.getElementById("dback").onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
+  const bk=document.getElementById("dback");
+  if(bk) bk.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
 
-  let payload=null, err=null;
-  try{ const {data,error}=await Sync.client.rpc("get_admin_dashboard",{p_days:dashDays}); if(error) throw error; payload=data; }
-  catch(e){ err=e; }
-
-  const back=()=>{ const b=document.getElementById("dback"); if(b) b.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); }; };
-  if(err){
+  const {data,error}=await fetchDash(null);
+  if(error){
     $app.innerHTML=`
       <header><div class="h-row"><div><div class="room-name">📊 대시보드</div><div class="date">불러오기 실패</div></div>
-        <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
-      <div class="card"><p class="muted" style="margin:0;line-height:1.7">집계 함수를 불러오지 못했어요.<br><b>db-migration-admin-dashboard.sql</b> 을 Supabase에서 실행했는지 확인해주세요.<br><br><span style="font-size:12px;color:var(--red)">${esc(err.message||String(err))}</span></p></div>`;
-    back(); return;
+        <button class="nav-link" id="dback">← 관리자</button></div></header>
+      <div class="card"><p class="muted" style="margin:0;line-height:1.7">집계 함수를 불러오지 못했어요.<br><b>db-migration-admin-dashboard.sql</b> 을 Supabase에서 실행했는지 확인해주세요.<br><br><span style="font-size:12px;color:var(--red)">${esc(error.message||String(error))}</span></p></div>`;
+    const b2=document.getElementById("dback");
+    if(b2) b2.onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
+    return;
   }
-
-  dashReload=renderAdminDashboard;
-  const cells=(payload&&payload.cells)||[];
-  const today=(payload&&payload.today)||todayKey();
-  const cardsHtml = cells.length ? cells.map(c=>dashCardHtml(c,{showCode:true})).join("")
-    : '<div class="card"><p class="muted center" style="margin:0;padding:10px 0">아직 셀이 없어요.</p></div>';
-
-  $app.innerHTML=`
-    <header><div class="h-row"><div><div class="room-name">📊 대시보드</div>
-      <div class="date">셀 ${cells.length}개 · ${esc(today)} 기준</div></div>
-      <button class="nav-link" id="dback" style="font-size:14px">← 관리자</button></div></header>
-    ${dashPeriodHtml()}
-    ${cardsHtml}
-    <p class="muted center" style="margin:14px 0 0;font-size:12px;line-height:1.7">사용 = 섬김 오픈/마감<br>출석 = 이 앱에서 주문·안마심으로 의사표현한 날<br>누적 출석은 표시 기간과 무관하게 전체</p>`;
-  back();
+  dashPayload=data||{cells:[]};
+  paintAdminDash();
 }
 
 // 셀별 구성원 수정 내역(관리자 전용 열람) — member_logs 최신순
