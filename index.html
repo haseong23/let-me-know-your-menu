@@ -939,7 +939,8 @@ function renderIdle(){
         <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
         <p>오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
       ${list}
-      <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.</p>
+      <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.<br>
+        섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.</p>
     </div>`;
   view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
@@ -990,16 +991,22 @@ function renderOpen(){
     ${[["order","내 주문"],["people","현황 "+countDrinks()+"잔"],["cafe","주문서"]].map(([t,label])=>
       `<button class="tab ${openTab===t?'on':''}" data-t="${t}" role="tab" aria-selected="${openTab===t}">${label}</button>`).join("")}</div>`;
 
+  // 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
+  // 주문이 1건 이상일 때만 연다: 주문이 없으면 호스트 교체(unclaim)가 섬김 자체를 지운다.
+  const canGame = SESSION.hostId===ME && Object.keys(ORDERS).length>0 && gameEligible();
+  // 기본 탭에도 둔다. '현황' 탭에만 뒀더니 기본 탭이 '내 주문'이라 아무도 못 봤다(G9).
+  // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
+  const gameHtml = canGame ? `
+      <div class="label">누가 섬길지 아직 안 정했다면</div>
+      <button class="btn btn-choice" id="gamepick">🎲 게임으로 섬길 사람 정하기</button>` : "";
+
   if(openTab==="order"){
     view().innerHTML=`
       <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
         <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
         ${myOrder?'':'<p>메뉴를 고르거나, 안 드실 땐 알려주세요</p>'}</div>
-      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}`;
+      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}${gameHtml}`;
   } else {
-    // 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
-    // 주문이 1건 이상일 때만 연다: 주문이 없으면 호스트 교체(unclaim)가 섬김 자체를 지운다.
-    const canGame = SESSION.hostId===ME && Object.keys(ORDERS).length>0 && gameEligible();
     view().innerHTML=`
       <div class="muted" style="margin:0 2px 10px">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}섬기는 분: <b>${host?esc(hon(host.name)):"아직 없어요"}</b></div>
       ${tabs}
