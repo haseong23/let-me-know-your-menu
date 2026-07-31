@@ -145,6 +145,8 @@
   .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; min-width:0; }
   .row-between > :first-child { min-width:0; }
+  /* 동등한 액션 2개를 나란히 — .bottombar .inner 와 같은 규칙(flex:1 + min-width:0) */
+  .row-2 { display:flex; gap:10px; } .row-2 > * { flex:1; min-width:0; }
   .inline-form { display:flex; gap:8px; min-width:0; }
   .inline-form > input { flex:1; min-width:0; }
   .header-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; min-width:0; }
@@ -174,7 +176,7 @@
     .sheet { padding-left: 14px; padding-right: 14px; }
     .sheet-foot { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; }
     .sheet h3 { font-size: 18px; }
-    .seg, .seg-temp, .row-between { gap: 6px; }
+    .seg, .seg-temp, .row-between, .row-2 { gap: 6px; }
     .stats { gap: 5px; }
     .stat { padding-left: 5px; padding-right: 5px; }
     .tab { padding-left: 5px; padding-right: 5px; font-size: 13px; }
@@ -245,7 +247,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.50";  // 배포 확인용 — 푸터/콘솔에 표시
+const APP_VERSION = "v9.51";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -819,9 +821,10 @@ function renderOpen(){
   const gridHtml = showGrid ? `
       <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
-      ${ isSkip ? "" : `<div style="height:8px"></div><button class="btn btn-ghost" id="skipBtn">오늘은 안 마실게요 🙅</button>` }` : "";
+      ${ isSkip ? "" : `<div style="height:8px"></div><button class="btn btn-ghost skip-btn">오늘은 안 마실게요 🙅</button>` }` : "";
+  // 주문 후에도 '안 마실게요'를 실제 버튼으로 바로 옆에 둔다 — 기존 13px 텍스트 링크는 탭 타겟이 너무 작았음
   const changeLink = (myOrder && myOrder.type==="drink" && !forceGrid)
-    ? `<p class="center" style="margin:2px 0 0"><span class="nav-link" id="changeMenu">다른 메뉴로 바꾸기 / 안 마시기</span></p>` : "";
+    ? `<div class="row-2" style="margin:10px 0 0"><button class="btn btn-soft" id="changeMenu">🔄 다른 메뉴로</button><button class="btn btn-ghost skip-btn">🙅 안 마실게요</button></div>` : "";
 
   view().innerHTML=`
     <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
@@ -831,7 +834,8 @@ function renderOpen(){
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
-  const sk=document.getElementById("skipBtn"); if(sk) sk.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
+  // 안 마실게요 버튼은 두 자리(그리드 아래 / 주문 후 버튼줄)에 나타난다 — 상호배타지만 클래스로 한 번에 배선
+  view().querySelectorAll(".skip-btn").forEach(b=> b.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }));
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
