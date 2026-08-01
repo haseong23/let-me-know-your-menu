@@ -25,6 +25,11 @@ const REQUIRED = [
   "ladderGeometry",
   "GS_SOFT_W",
   "GAME_MAX",
+  "wheelSpin",
+  // 아래 둘은 두 번째 마커 블록(대시보드 기간)에 있다. 여기 적어두면 그 블록이 통째로
+  // 사라졌을 때 "조용한 통과" 대신 심볼 누락으로 터진다.
+  "weekBackDays",
+  "q3Start",
 ];
 
 // 실패 원인을 구분하기 위한 접두어. "마커가 지워져 테스트가 조용히 통과"하는 사고를 막는 게
@@ -42,12 +47,25 @@ const ERR_MISSING = "심볼 누락:";
 // 아래 "시작 마커는 한 줄이어야 한다" 테스트가 이를 지킨다.
 //
 // source 를 인자로 받는 이유는 실패 모드를 실제 파일을 망가뜨리지 않고 검증하기 위함이다.
+//
+// 블록은 여러 개일 수 있고, 파일에 나온 순서대로 이어 붙여 한 번에 평가한다. 한 블록만
+// 읽으면 도메인이 다른 순수 함수(게임 · 대시보드 기간 …)가 전부 한 블록에 몰려 그 블록이
+// 잡동사니 서랍이 되고, 함수가 유일한 호출부에서 수천 행 떨어진다. 이어 붙이므로 블록 간에
+// 선언 이름이 겹치면 안 된다 — 겹치면 평가 단계에서 SyntaxError 로 터진다.
 function extractBlock(source) {
-  const afterStart = source.split(MARK_START);
-  assert.ok(afterStart.length >= 2, `${ERR_NO_START} '${MARK_START}' 를 index.html 에서 찾을 수 없다`);
-  const body = afterStart[1].split(MARK_END);
-  assert.ok(body.length >= 2, `${ERR_NO_END} '${MARK_END}' 를 index.html 에서 찾을 수 없다`);
-  return body[0].replace(/^[^\n]*\n/, ""); // 마커 첫 줄 제거
+  const parts = source.split(MARK_START);
+  assert.ok(parts.length >= 2, `${ERR_NO_START} '${MARK_START}' 를 index.html 에서 찾을 수 없다`);
+  return parts
+    .slice(1)
+    .map((seg, i) => {
+      const body = seg.split(MARK_END);
+      assert.ok(
+        body.length >= 2,
+        `${ERR_NO_END} '${MARK_END}' 를 index.html 에서 찾을 수 없다 (${i + 1}번째 블록)`
+      );
+      return body[0].replace(/^[^\n]*\n/, ""); // 마커 첫 줄 제거
+    })
+    .join("\n");
 }
 
 // 블록을 샌드박스에서 평가하고 기대 심볼을 꺼낸다.
@@ -103,30 +121,53 @@ test("마커 블록에서 기대 심볼이 모두 나온다", () => {
   }
 });
 
-test("시작 마커는 한 줄이어야 한다", () => {
+test("시작 마커는 (블록마다) 한 줄이어야 한다", () => {
   // 추출기가 마커 뒤 첫 줄을 버리므로, 시작 마커 주석이 그 줄에서 닫히지 않으면
   // 남은 설명 줄이 코드로 평가된다. 여러 줄로 흩어지는 순간 이 테스트가 잡는다.
-  const line = HTML.split("\n").find((l) => l.includes(MARK_START));
-  assert.ok(line, "시작 마커가 있는 줄을 찾을 수 없다");
-  assert.ok(
-    line.slice(line.indexOf(MARK_START) + MARK_START.length).includes("*/"),
-    `시작 마커 주석이 같은 줄에서 닫히지 않았다 — 한 줄로 유지할 것: ${line.trim()}`
-  );
+  // 블록이 여러 개이므로 하나만 보지 않고 전부 본다.
+  const lines = HTML.split("\n").filter((l) => l.includes(MARK_START));
+  assert.ok(lines.length >= 1, "시작 마커가 있는 줄을 찾을 수 없다");
+  for (const line of lines) {
+    assert.ok(
+      line.slice(line.indexOf(MARK_START) + MARK_START.length).includes("*/"),
+      `시작 마커 주석이 같은 줄에서 닫히지 않았다 — 한 줄로 유지할 것: ${line.trim()}`
+    );
+  }
+});
+
+test("마커 블록이 둘 이상이고 시작·종료 개수가 맞는다", () => {
+  // 블록을 하나로 되돌리는 변경이 조용히 들어오면 여기서 잡힌다. 개수가 어긋나면
+  // 추출기가 엉뚱한 구간을 코드로 평가하므로 짝이 맞는지도 함께 본다.
+  const starts = HTML.split(MARK_START).length - 1;
+  const ends = HTML.split(MARK_END).length - 1;
+  assert.ok(starts >= 2, `마커 블록이 ${starts}개다 — 게임과 대시보드 기간 두 벌이 있어야 한다`);
+  assert.equal(ends, starts, `시작 마커 ${starts}개 · 종료 마커 ${ends}개 — 짝이 안 맞는다`);
 });
 
 // 아래 네 개는 "조용한 통과"를 막는 안전장치가 실제로 동작하는지 본다.
 // 실제 index.html 은 건드리지 않고, 로더에 깨진 소스를 넣어 확인한다.
 const wrap = (body) => `${MARK_START} */\n${body}\n${MARK_END} */\n`;
 
+// 블록이 여러 개라 replace(첫 번째만) 로는 픽스처가 안 만들어진다 — 전부 지운다.
+const dropAll = (s, needle) => s.split(needle).join("");
+
 test("시작 마커가 없으면 실패한다", () => {
-  const broken = HTML.replace(`${MARK_START} */`, "");
+  const broken = dropAll(HTML, `${MARK_START} */`);
   assert.ok(!broken.includes(MARK_START), "테스트 픽스처가 시작 마커를 지우지 못했다");
   assert.throws(() => loadGameLogic(broken), new RegExp(ERR_NO_START));
 });
 
 test("종료 마커가 없으면 실패한다", () => {
-  const broken = HTML.replace(`${MARK_END} */`, "");
+  const broken = dropAll(HTML, `${MARK_END} */`);
   assert.ok(!broken.includes(MARK_END), "테스트 픽스처가 종료 마커를 지우지 못했다");
+  assert.throws(() => loadGameLogic(broken), new RegExp(ERR_NO_END));
+});
+
+test("한 블록의 종료 마커만 사라져도 실패한다", () => {
+  // 이어 붙이기로 바꾼 뒤 새로 생긴 실패 모드다. 마지막 블록의 종료 마커가 사라지면
+  // 그 앞 블록들은 멀쩡하므로, 블록별로 확인하지 않으면 조용히 통과할 수 있다.
+  const idx = HTML.lastIndexOf(`${MARK_END} */`);
+  const broken = HTML.slice(0, idx) + HTML.slice(idx + `${MARK_END} */`.length);
   assert.throws(() => loadGameLogic(broken), new RegExp(ERR_NO_END));
 });
 
@@ -764,4 +805,161 @@ test("경계값 — 구슬 레이스 24/25 (R19-12)", () => {
   assert.equal(RACE_N_MAX, GAME_MAX.race, "테스트가 상한과 다른 인원까지만 검증하고 있다");
   // 상한이 돌림판과 같은 이유: 색·번호 구분이 한계이고, 구슬 지름 기준은 그보다 여유가 있다.
   assert.equal(GAME_MAX.race, GAME_MAX.wheel, "구슬 레이스 상한은 돌림판과 같은 근거(색 구분)를 쓴다");
+});
+
+// ===================== 대시보드 기간 프리셋 (R1, R2) =====================
+// 달·해 경계에서 틀리기 쉬운 산수라 경계를 직접 짚는다. 계산은 'YYYY-MM-DD' 문자열과 UTC
+// Date 로만 이뤄지므로 로컬 시간대와 무관하게 결과가 같다 (R1-5).
+const { weekBackDays, q3Start } = gameLogic;
+
+const ymd = (y, m, d) =>
+  `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const shiftDate = (ds, n) => {
+  const d = new Date(ds + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const dow = (ds) => new Date(ds + "T00:00:00Z").getUTCDay(); // 0=일 … 1=월
+
+test("weekBackDays — 월~일 7일 전부에서 0~6 이 나온다 (R1-1, R1-3, R1-4)", () => {
+  // 2026-08-03 은 월요일이다. 거기서 하루씩 밀며 월→0 … 일→6 을 확인한다.
+  const mon = "2026-08-03";
+  assert.equal(dow(mon), 1, "픽스처가 월요일이 아니다");
+  for (let i = 0; i < 7; i++) {
+    const day = shiftDate(mon, i);
+    assert.equal(weekBackDays(day), i, `${day}(요일 ${dow(day)}) 의 되돌릴 일수가 ${i} 가 아니다`);
+  }
+  assert.equal(weekBackDays(mon), 0, "월요일이면 되돌릴 일수가 0 이라 시작=종료다 (R1-3)");
+  assert.equal(weekBackDays(shiftDate(mon, 6)), 6, "일요일이면 6 이라 범위가 7일이다 (R1-4)");
+});
+
+test("weekBackDays — 임의의 날짜에서 시작일이 항상 월요일이다 (R1-1)", () => {
+  // 2년치를 전부 밟는다. 윤년(2028)과 연·월 경계가 그 안에 다 들어온다.
+  let ds = "2026-01-01";
+  for (let i = 0; i < 730; i++) {
+    const from = shiftDate(ds, -weekBackDays(ds));
+    assert.equal(dow(from), 1, `${ds} → 시작일 ${from} 이 월요일이 아니다`);
+    assert.ok(from <= ds, `${ds} → 시작일 ${from} 이 미래다`);
+    ds = shiftDate(ds, 1);
+  }
+});
+
+test("weekBackDays — 범위 길이가 1~7일이라 31일 상한에 안 걸린다 (R1-10)", () => {
+  let ds = "2026-01-01";
+  for (let i = 0; i < 400; i++) {
+    const span = weekBackDays(ds) + 1; // from~to 양끝 포함
+    assert.ok(span >= 1 && span <= 7, `${ds} 의 범위 길이가 ${span} 일이다`);
+    ds = shiftDate(ds, 1);
+  }
+});
+
+// vm 샌드박스가 만든 배열은 다른 realm 의 Array 라서 deepStrictEqual 이 프로토타입에서
+// 걸린다(값은 같은데 실패한다). 값만 비교한다.
+const ym = (pair) => `${pair[0]}-${pair[1]}`;
+
+test("q3Start — 1월·2월은 전년으로 넘어간다 (R2-1 ~ R2-4)", () => {
+  assert.equal(ym(q3Start(2026, 1)), "2025-11", "1월 → (y-1)-11 (R2-2)");
+  assert.equal(ym(q3Start(2026, 2)), "2025-12", "2월 → (y-1)-12 (R2-3)");
+  for (let m = 3; m <= 12; m++) {
+    assert.equal(ym(q3Start(2026, m)), `2026-${m - 2}`, `${m}월 → y-(m-2) (R2-4)`);
+  }
+  // 연도가 바뀌어도 같은 규칙이다 — 2026 한 해에만 맞는 산수가 아닌지 확인한다.
+  assert.equal(ym(q3Start(2030, 1)), "2029-11");
+  assert.equal(ym(q3Start(2030, 2)), "2029-12");
+});
+
+test("q3Start — 시작일은 항상 1일이고 길이는 92일 이하다 (R2-5, R2-6)", () => {
+  // 366일 상한(v_from := greatest(v_from, v_to - 365))에 걸리는지 보는 게 목적이다.
+  for (let y = 2024; y <= 2028; y++) {
+    for (let m = 1; m <= 12; m++) {
+      const [qy, qm] = q3Start(y, m);
+      const from = ymd(qy, qm, 1);
+      assert.ok(from.endsWith("-01"), `${y}-${m} 의 시작일 ${from} 이 1일이 아니다`);
+      // 그 달의 마지막 날을 종료일로 잡으면 그게 이 프리셋이 가질 수 있는 최대 길이다.
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const to = ymd(y, m, lastDay);
+      const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+      assert.ok(span <= 92, `${y}-${m}: ${from}~${to} 가 ${span} 일이다 — 92 일을 넘었다`);
+      assert.ok(span >= 89, `${y}-${m}: ${span} 일 — 달력 3개월이 아니다`);
+    }
+  }
+});
+
+// ===================== 돌림판 정보 누출 (R6) =====================
+// 이 회귀는 조용히 돌아올 수 있는 종류다 — labelStart 를 상수 −spin 으로 되돌리면 화면은
+// 멀쩡해 보이는데 정지 상태의 기울기가 곧 당첨자다. 그래서 값 자체를 못 박아 둔다.
+const { wheelSpin } = gameLogic;
+const WHEEL_NS = [2, 3, 5, 10, 11, 24];
+const norm360 = (deg) => ((deg % 360) + 360) % 360;
+
+test("wheelSpin — 시작 시점 라벨 각도가 wi 와 무관하게 항상 같다 (R6-1, R6-2, R6-8)", () => {
+  for (const n of WHEEL_NS) {
+    const seen = new Set();
+    for (let wi = 0; wi < n; wi++) {
+      // 난수도 함께 흔든다 — wi 뿐 아니라 jitter 와도 무관해야 한다 (R6-2).
+      for (const r of [0, 0.13, 0.5, 0.87, 0.999]) {
+        seen.add(wheelSpin(n, wi, () => r).labelStart);
+      }
+    }
+    assert.equal(
+      seen.size,
+      1,
+      `n=${n}: 시작 시점 라벨 각도가 ${[...seen].join(", ")} 로 갈린다 — 여기서 당첨자가 샌다`
+    );
+    assert.equal([...seen][0], 0, `n=${n}: 시작 각도는 0(똑바로)이어야 한다`);
+  }
+});
+
+test("wheelSpin — 종료 시점 글자의 절대 각도가 0 으로 수렴한다 (R6-3, R6-9)", () => {
+  for (const n of WHEEL_NS) {
+    for (let wi = 0; wi < n; wi++) {
+      for (const r of [0, 0.5, 0.999]) {
+        const { spin, labelEnd } = wheelSpin(n, wi, () => r);
+        assert.equal(
+          Math.round(norm360(spin + labelEnd) * 1e6) / 1e6,
+          0,
+          `n=${n} wi=${wi} r=${r}: 멈춘 뒤 글자가 ${norm360(spin + labelEnd)}° 기울어 있다`
+        );
+      }
+    }
+  }
+});
+
+test("wheelSpin — 멈춘 순간 승자 조각이 핀(12시) 아래에 온다 (R6-6)", () => {
+  for (const n of WHEEL_NS) {
+    const a = 360 / n;
+    for (let wi = 0; wi < n; wi++) {
+      for (const r of [0, 0.25, 0.75, 0.999]) {
+        const { spin, mid } = wheelSpin(n, wi, () => r);
+        // 조각 wi 는 [mid−a/2, mid+a/2] 를 차지한다. spin 만큼 돌린 뒤 그 구간이 0°(12시)를 품어야 한다.
+        const lo = norm360(mid - a / 2 + spin), hi = norm360(mid + a / 2 + spin);
+        const covers = lo <= hi ? lo <= 360 && hi >= 360 - 1e-9 || (lo <= 0 + 1e-9 && hi >= 0) : true;
+        assert.ok(
+          covers || lo > hi, // 구간이 0° 를 넘어가며 감싸는 경우
+          `n=${n} wi=${wi} r=${r}: 승자 조각 [${lo.toFixed(2)}, ${hi.toFixed(2)}] 가 12시를 안 품는다`
+        );
+        // 조각 중심과 12시의 거리가 반칸(a/2) 이내여야 한다 — jitter 범위가 (a−10)/2 라 항상 성립한다.
+        const d = Math.min(norm360(mid + spin), 360 - norm360(mid + spin));
+        assert.ok(
+          d <= a / 2 + 1e-9,
+          `n=${n} wi=${wi} r=${r}: 승자 조각 중심이 12시에서 ${d.toFixed(2)}° 떨어져 반칸(${(a / 2).toFixed(2)}°)을 넘었다`
+        );
+      }
+    }
+  }
+});
+
+test("wheelSpin — 5바퀴 이상 돌고 jitter 가 조각 안에 머문다", () => {
+  for (const n of WHEEL_NS) {
+    const a = 360 / n;
+    for (let wi = 0; wi < n; wi++) {
+      const lo = wheelSpin(n, wi, () => 0).spin, hi = wheelSpin(n, wi, () => 1).spin;
+      const jit = (hi - lo) / 2;
+      assert.ok(
+        Math.abs(jit) <= Math.max(0, a - 10) / 2 + 1e-9,
+        `n=${n}: jitter 반경 ${jit} 가 (a−10)/2 를 넘었다 — 옆 조각으로 넘어갈 수 있다`
+      );
+      assert.ok(lo > 360 * 4, `n=${n} wi=${wi}: 회전량 ${lo} 가 5바퀴에 못 미친다`);
+    }
+  }
 });

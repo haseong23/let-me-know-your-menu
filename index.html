@@ -37,10 +37,41 @@
     /* --accent(#c98a3a)는 흰 배경 대비 2.92:1 이라 글자에 못 쓴다. 칠(배지·점)에만 쓰고 글자는 --accent-ink.
        --gray(2.05:1)도 글자 금지 — 보조문구는 --sub(5.27:1). */
     --accent-ink: #96631f;
+    /* ---- 타입 스케일 (R13-7) ----
+       142개로 흩어져 있던 font-size 를 일곱 값으로 모은다. <style> 블록에 리터럴로 남는 값은
+       아래 열넷뿐이고, 각각 자기 letter-spacing·line-height 나 폭 예산과 한 세트로 조정된
+       값이라 스케일에 넣으면 그 결합이 끊어진다.
+         디스플레이 — 46(.hero-n) · 62(.fp-cnt) · 25(.game-win .wn) · 24(.stat .num) ·
+                      23(.cc-n) · 21(.banner h2)
+         아이콘·상자 — 44(.banner .emoji) · 38(.game-win .we) · 26(gp-em·wheel-pin) ·
+                      22(.menu-tile .em) · 18(.sheet-x ✕)
+         폭 예산    — 17(.kpi .n · 4칸 ≈65px 에 12px "%" 가 붙는다) ·
+                      16(.game-title · 오버레이 제목은 화면 제목보다 한 단계 작다) ·
+                      11(.gl-it · 범례 줄 수 예산, 위 R13-4 주석 참조)
+       블록 밖에도 셋 있다 — 돌림판 SVG 의 11/13, 사다리의 NFS/LFS/BFS, 레이스 캔버스의 ctx.font.
+       셋 다 px 이 아니라 사용자 단위·논리 px 이라 이 토큰이 닿을 수 없다.
+       인라인 스타일 54곳은 이번 범위 밖이다 — 대부분 클래스와 싸우는 override 라 기계적 치환이
+       안 되고 하나하나 판단이 필요하다.
+       px 를 쓰는 이유: rem 으로 바꾸면 min-height:44px · .avatar 38px · .cc-rank 17px ·
+       .mx-name 78px 같은 고정 치수가 전부 끌려 들어온다. 뷰포트 메타(7행)에 user-scalable=no 도
+       maximum-scale 도 없어 WCAG 1.4.4 는 이미 충족이므로 급하지 않다.
+       vw/vh/vmin 은 쓰지 않는다 — 확대가 뷰포트 단위를 바꾸지 않아 1.4.4 가 즉시 깨진다. */
+    --fs-xs: 11px;      /* 배지 · 축 라벨 · 표 헤더 (숫자 위주) */
+    --fs-sm: 12px;      /* 보조문구 · 메타 · 칩 수치 */
+    --fs-md: 13px;      /* 라벨 · 이름 행 · 캡션 */
+    --fs-base: 14px;    /* 본문 · 탭 · 칩 · 소형 버튼 */
+    --fs-lg: 15px;      /* 사람 이름 · 다이얼로그 본문 · 온도 토글 */
+    /* 16px 미만이면 iOS 가 포커스 시 화면을 확대한다 — 폼과 주 버튼의 하한이다. 줄이지 말 것. */
+    --fs-input: 16px;
+    --fs-title: 18px;   /* 화면·시트 제목 — 아래 두 티어에서 램프된다 */
     /* 차트 마크 전용. --brand 는 채도 0.057 이라 데이터 막대로 쓰면 회색으로 읽힌다(UI 색으로는 문제없음).
        #94520c 는 채도 0.104 로 floor 통과 + 흰 배경 대비 3:1 이상. */
     --data-1: #94520c;
   }
+  /* --fs-title 만 티어마다 다시 정의한다 — 이 한 줄이 .room-name 과 .sheet h3 의 축소 계단을
+     흡수해서 아래 미디어쿼리의 개별 override 를 없앤다 (R13-7). */
+  @media (max-width: 440px){ :root{ --fs-title: 17px; } }
+  @media (max-width: 330px){ :root{ --fs-title: 16px; } }
   /* 움직임 최소화 설정을 켠 사용자에게는 전환을 끈다 */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
@@ -56,35 +87,35 @@
   body.no-bottom #app { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }   /* 하단바 없는 화면의 빈 여백 제거 */
   header { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 14px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .h-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .room-name { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .date { font-size: 12px; color: var(--sub); margin-top: 1px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
+  .room-name { margin: 0; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .date { font-size: var(--fs-sm); color: var(--sub); margin-top: 1px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
   .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
   .dot.off { background: var(--accent); }
-  .me-chip { font-size: 13px; font-weight: 600; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .me-chip { font-size: var(--fs-md); font-weight: 600; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
   .me-chip small { color: var(--sub); font-weight: 500; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
-  .muted { color: var(--sub); font-size: 13px; } .center { text-align: center; }
+  .muted { color: var(--sub); font-size: var(--fs-md); } .center { text-align: center; }
   button { font-family: inherit; cursor: pointer; border: none; }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; transition: transform .05s ease, filter .15s; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px; border-radius: 14px; font-size: var(--fs-input); font-weight: 700; transition: transform .05s ease, filter .15s; }
   .btn:active { transform: scale(.985); }
   .btn-brand { background: var(--brand); color: #fff; } .btn-soft { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--line); }
   .btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); } .btn-danger { background: #fff; color: var(--red); border: 1px solid #f0d4c8; }
   /* '고를 수 있는 것' 전용 — 이 앱에서 누를 수 있는 건 전부 흰 카드다(메뉴 타일·사람 행).
      btn-ghost(투명 배경 + --sub 회색)로 두면 배경에 묻혀 '닫기' 같은 부속으로 읽힌다. */
   .btn-choice { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); box-shadow: 0 1px 3px rgba(80,55,30,.05); }
-  .btn-sm { width: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; min-height: 44px; }
+  .btn-sm { width: auto; padding: 9px 14px; font-size: var(--fs-base); border-radius: 10px; min-height: 44px; }
   .banner { text-align: center; padding: 26px 18px; } .banner .emoji { font-size: 44px; }
-  .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: 14px; }
+  .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: var(--fs-base); }
   .host-name { color: var(--brand); font-weight: 800; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .menu-tile { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; font-weight: 700; font-size: 14px; position: relative; transition: .12s; }
+  .menu-tile { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; font-weight: 700; font-size: var(--fs-base); position: relative; transition: .12s; }
   .menu-tile.sel { border-color: var(--brand); background: var(--brand-soft); }
   .menu-tile .em { display:block; font-size: 22px; margin-bottom: 4px; }
-  .menu-tile .cnt { display:block; font-size: 11px; color: var(--accent-ink); margin-top: 3px; font-weight: 700; }
+  .menu-tile .cnt { display:block; font-size: var(--fs-xs); color: var(--accent-ink); margin-top: 3px; font-weight: 700; }
   .menu-tile .ck { position: absolute; top: 6px; right: 9px; color: var(--brand); font-weight: 900; opacity: 0; } .menu-tile.sel .ck { opacity: 1; }
   .menu-tile.add { border-style: dashed; color: var(--brand); background: #fbf8f3; }
   .seg-temp { display:flex; gap:8px; }
-  .tbtn { flex:1; padding:14px; border-radius:12px; font-weight:800; font-size:15px; border:2px solid var(--line); background:#fff; color:var(--sub); }
+  .tbtn { flex:1; padding:14px; border-radius:12px; font-weight:800; font-size:var(--fs-lg); border:2px solid var(--line); background:#fff; color:var(--sub); }
   .tbtn.ice.on { background:#e8f1fb; border-color:#3b82c4; color:#2b6aa3; }
   .tbtn.hot.on { background:#fbe9e3; border-color:#c2552f; color:#a8401f; }
   .tbtn[disabled] { opacity:.95; }
@@ -92,12 +123,16 @@
   .sameas { flex:none; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   /* 온도·옵션 칩은 주문 핵심 경로 — 탭 영역 44px 확보 */
-  .chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
+  .chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-base); font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
   .chip:active { transform: scale(.94); }
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
-  .label { font-size: 13px; font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
-  /* font-size 16px 미만이면 iOS가 포커스 시 자동 확대한다 — 줄이지 말 것 */
-  input[type=text], input[type=search], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); -webkit-appearance: none; appearance: none; }
+  .label { font-size: var(--fs-md); font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
+  /* 16px 하한의 근거는 :root 의 --fs-input 옆에 적어 뒀다 (R13-12) */
+  input[type=text], input[type=search], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: var(--fs-input); font-family: inherit; background: #fff; color: var(--ink); -webkit-appearance: none; appearance: none; }
+  /* select 도 body 폰트를 물려받게 한다 (R13-2). 위 규칙이 input/textarea 만 덮고 있어서
+     앱의 유일한 드롭다운이 UA 기본 폰트로 렌더됐다 — 같은 줄에 선 입력들과 서체가 갈렸다.
+     인라인 스타일 한 곳을 고치는 대신 여기 두는 이유: 앞으로 생길 <select> 까지 함께 덮는다. */
+  select { font-family: inherit; }
   input, textarea, select { max-width: 100%; min-width: 0; }
   /* 테두리 색만 바꾸면 1.5px 변화라 포커스 표시가 약하다. box-shadow 링은 레이아웃을 밀지 않는다.
      키보드 사용자에게는 :focus-visible 로 더 진한 외곽선을 추가로 준다. */
@@ -105,27 +140,27 @@
   input:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
   .person { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
   .person:last-child { border-bottom: none; }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff; background: var(--brand); }
-  .person .pname { font-weight: 700; font-size: 15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .person .pmenu { font-size: 13px; color: var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: var(--fs-base); color: #fff; background: var(--brand); }
+  .person .pname { font-weight: 700; font-size: var(--fs-lg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .person .pmenu { font-size: var(--fs-md); color: var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .person > div { min-width: 0; }
   .logrow { padding: 9px 2px; border-bottom: 1px solid var(--line); }
   .logrow:last-child { border-bottom: none; }
-  .logmeta { font-size: 12px; color: var(--sub); margin-bottom: 5px; }
+  .logmeta { font-size: var(--fs-sm); color: var(--sub); margin-bottom: 5px; }
   .logchips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .logchip { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); color: var(--ink); }
+  .logchip { font-size: var(--fs-md); font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); color: var(--ink); }
   .logchip.add { background: #e6f4ea; color: #1e7a37; }
   .logchip.rem { background: #fdeaea; color: #b3261e; }
   .logchip.ren { background: #eaeef6; color: #33415c; }
-  .pill { margin-left: auto; flex: none; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill { margin-left: auto; flex: none; font-size: var(--fs-sm); font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
   .pill.ordered { background: #e7f4ec; color: #1e7a37; } .pill.skip { background: #f1eee9; color: var(--sub); } .pill.pending { background: #fbecdf; color: #8a5a1f; }
   .person.picksel { background: var(--brand-soft); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--brand); }
   .stats { display: flex; gap: 8px; margin-bottom: 6px; }
   .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 8px; text-align: center; }
-  .stat .num { font-size: 24px; font-weight: 900; letter-spacing: -1px; } .stat .lbl { font-size: 12px; color: var(--sub); margin-top: 2px; } .stat.total .num { color: var(--brand); }
+  .stat .num { font-size: 24px; font-weight: 900; letter-spacing: -1px; line-height: 1.1; } .stat .lbl { font-size: var(--fs-sm); color: var(--sub); margin-top: 2px; } .stat.total .num { color: var(--brand); }
   .tabs { display: flex; gap: 6px; background: var(--brand-soft); padding: 5px; border-radius: 12px; margin-bottom: 14px; }
   /* div·button 둘 다로 쓰인다 — button 의 UA 기본 배경을 지우고 탭 영역 44px 을 보장한다 */
-  .tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; padding: 9px; border-radius: 9px; font-size: 14px; font-weight: 700; color: var(--sub); background: none; } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-  .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
+  .tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; padding: 9px; border-radius: 9px; font-size: var(--fs-base); font-weight: 700; color: var(--sub); background: none; } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-base); line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
   .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
   /* scrim 은 항상 화면 전체를 덮고, 키보드가 가린 높이(--kb)만큼 패딩으로 시트를 밀어올린다.
@@ -135,17 +170,17 @@
   /* 검색이 있는 시트: 시트 자체는 스크롤 안 하고 목록만 스크롤 → 타이핑 중에도 검색창·결과·하단바가 항상 보임 */
   .sheet.split { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
   .sheet.split .sheet-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  .sheet-count { font-size: 12.5px; font-weight: 700; color: var(--sub); padding: 2px 2px 0; }
-  .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: 19px; }
+  .sheet-count { font-size: var(--fs-sm); font-weight: 700; color: var(--sub); padding: 2px 2px 0; }
+  .sheet .grip { width: 44px; height: 5px; background: var(--line); border-radius: 99px; margin: 8px auto 14px; } .sheet h3 { margin: 4px 0 4px; font-size: var(--fs-title); }
   /* 하단 고정 액션 바 — 긴 옵션 목록에서도 스크롤 없이 주문/취소 가능. 푸터가 있는 시트는 하단 패딩 0으로 밀착 */
   .sheet.has-foot { padding-bottom: 0; }
   .sheet-foot { position: sticky; bottom: 0; z-index: 3; background: var(--bg); margin: 16px -16px 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -10px 22px -12px rgba(40,28,16,.22); }
-  .ord-sum { font-size: 13px; font-weight: 700; color: var(--brand); text-align: center; margin: 0 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ord-sum { font-size: var(--fs-md); font-weight: 700; color: var(--brand); text-align: center; margin: 0 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* 메뉴 바꾸기 — 기본 접힘. 시트 열리면 온도·옵션이 바로 보이도록(카톡 등 짧은 화면 대응) */
   .menu-switch { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
-  .menu-switch > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 14px; font-weight: 700; color: var(--sub); display: flex; align-items: center; justify-content: space-between; }
+  .menu-switch > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: var(--fs-base); font-weight: 700; color: var(--sub); display: flex; align-items: center; justify-content: space-between; }
   .menu-switch > summary::-webkit-details-marker { display: none; }
-  .menu-switch > summary::after { content: "▾"; color: var(--sub); font-size: 12px; transition: transform .15s; }
+  .menu-switch > summary::after { content: "▾"; color: var(--sub); font-size: var(--fs-sm); transition: transform .15s; }
   .menu-switch[open] > summary::after { transform: rotate(180deg); }
   .menu-switch > .grid { padding: 2px 12px 12px; }
   /* 주문 옵션 영역만 간격 촘촘화(온도~메모) — 옵션 그룹이 많은 메뉴도 스크롤 덜 하고 한눈에 */
@@ -157,15 +192,15 @@
   /* 닫기·취소 버튼 — 붉은 계열로 통일해 직관적으로(파괴적 액션인 danger 버튼은 이미 붉음) */
   .btn-close { color: var(--red); border-color: #f0d4c8; }
   /* 44px 탭 영역을 확보하되 음수 마진으로 시각적 위치는 그대로 둔다(hit slop) */
-  .sheet-x { background: none; border: none; font-size: 19px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; margin: -6px -10px -6px 0; flex: none; }
+  .sheet-x { background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; margin: -6px -10px -6px 0; flex: none; }
   .chip:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .cscrim { position: fixed; inset: 0; background: rgba(40,28,16,.5); z-index: 70; display: none; align-items: center; justify-content: center; padding: 26px; } .cscrim.show { display: flex; }
   .cdialog { background: var(--card); width: 100%; max-width: 320px; border-radius: 18px; padding: 22px 20px 16px; box-shadow: 0 20px 50px rgba(40,28,16,.3); }
-  .cdialog .cmsg { font-size: 15px; line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
+  .cdialog .cmsg { font-size: var(--fs-lg); line-height: 1.65; color: var(--ink); white-space: pre-line; margin-bottom: 18px; }
   .cdialog .crow { display: flex; gap: 8px; } .cdialog .crow .btn { flex: 1; margin: 0; }
   /* 설정·뒤로가기·로그아웃 진입점. 글자는 13px 그대로 두고 탭 영역만 44px 로 넓힌다(음수 마진으로 줄높이 유지) */
-  .nav-link { font-size: 13px; color: var(--sub); text-decoration: underline; cursor: pointer; background: none; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 6px; margin: -11px -6px; }
-  .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: 14px; font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
+  .nav-link { font-size: var(--fs-md); color: var(--sub); text-decoration: underline; cursor: pointer; background: none; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 6px; margin: -11px -6px; }
+  .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #2b2118; color: #fff; padding: 11px 18px; border-radius: 20px; font-size: var(--fs-base); font-weight: 600; line-height: 1.45; z-index: 60; opacity: 0; transition: opacity .2s, bottom .2s; pointer-events: none; max-width: min(88%, 340px); text-align:center; } .toast.show { opacity: 1; bottom: 110px; }
   .row-between { display:flex; align-items:center; justify-content: space-between; gap: 10px; min-width:0; }
   .row-between > :first-child { min-width:0; }
   /* 동등한 액션 2개를 나란히 — .bottombar .inner 와 같은 규칙(flex:1 + min-width:0) */
@@ -173,13 +208,13 @@
   .inline-form { display:flex; gap:8px; min-width:0; }
   .inline-form > input { flex:1; min-width:0; }
   .header-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; min-width:0; }
-  .banner-warn { background:#fbecdf; border:1px solid #f0d9c2; color:#8a5a1f; border-radius:12px; padding:10px 14px; font-size:13px; margin-bottom:14px; }
+  .banner-warn { background:#fbecdf; border:1px solid #f0d9c2; color:#8a5a1f; border-radius:12px; padding:10px 14px; font-size:var(--fs-md); margin-bottom:14px; }
   .loading { text-align:center; padding:80px 20px; color:var(--sub); }
   .spinner { width:34px; height:34px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--brand); margin:0 auto 14px; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:13px; font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
+  #offline { position:fixed; left:0; right:0; bottom:0; z-index:80; display:none; background:var(--red); color:#fff; text-align:center; font-size:var(--fs-md); font-weight:700; padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   #offline.show { display:block; }
-  .demo-badge { display:inline-block; background:var(--accent); color:var(--ink); font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
+  .demo-badge { display:inline-block; background:var(--accent); color:var(--ink); font-size:var(--fs-xs); font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:middle; }
   /* iPhone/Galaxy 공통 모바일 폭(320~440px): 글자·아이콘·버튼의 가로 밀림 방지 */
   @media (max-width: 440px) {
     #app { padding-left: 14px; padding-right: 14px; }
@@ -187,22 +222,22 @@
     .h-row { gap: 6px; }
     .h-row > :first-child { min-width: 0; overflow:hidden; }
     .h-row > :last-child { flex-shrink:0; }
-    .room-name { font-size: 17px; }
+    /* .room-name 17px 은 :root 의 --fs-title 램프가 대신한다 (R13-7) */
     .me-chip { max-width: 42vw; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
     .card { padding: 15px; }
     .person { gap: 8px; padding-left: 2px; padding-right: 2px; }
-    .avatar { width: 34px; height: 34px; font-size: 13px; }
-    .btn { min-width: 0; max-width:100%; gap: 5px; padding: 14px 10px; font-size: 15px; line-height: 1.25; white-space: normal; overflow-wrap:anywhere; }
-    .btn-sm { padding: 8px 10px; font-size: 13px; border-radius: 9px; }
+    .avatar { width: 34px; height: 34px; font-size: var(--fs-md); }
+    .btn { min-width: 0; max-width:100%; gap: 5px; padding: 14px 10px; font-size: var(--fs-lg); line-height: 1.25; white-space: normal; overflow-wrap:anywhere; }
+    .btn-sm { padding: 8px 10px; font-size: var(--fs-md); border-radius: 9px; }
     .bottombar { padding-left: 14px; padding-right: 14px; }
     .bottombar .inner { gap: 7px; }
     .sheet { padding-left: 14px; padding-right: 14px; }
     .sheet-foot { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; }
-    .sheet h3 { font-size: 18px; }
+    /* .sheet h3 18px 도 --fs-title 램프가 대신한다 — 이 티어에서 17px 이 된다 (R13-7, R13-10) */
     .seg, .seg-temp, .row-between, .row-2 { gap: 6px; }
     .stats { gap: 5px; }
     .stat { padding-left: 5px; padding-right: 5px; }
-    .tab { padding-left: 5px; padding-right: 5px; font-size: 13px; }
+    .tab { padding-left: 5px; padding-right: 5px; font-size: var(--fs-md); }
     .serving-actions { gap: 4px !important; flex-wrap: wrap; justify-content: flex-end; max-width: 132px; }
     .serving-actions .btn-sm { padding-left: 8px; padding-right: 8px; }
     .dash-card-head { align-items:flex-start; }
@@ -224,10 +259,10 @@
     .serving-row .serving-actions { width:100%; max-width:none; justify-content:flex-end; }
   }
   @media (max-width: 330px) {
-    .room-name { font-size:16px; }
-    .date { font-size:11px; }
-    .btn { font-size:14px; padding-left:8px; padding-right:8px; }
-    .tab { font-size:12px; }
+    /* .room-name 16px 도 --fs-title 램프가 대신한다 (R13-7) */
+    .date { font-size:var(--fs-xs); }
+    .btn { font-size:var(--fs-base); padding-left:8px; padding-right:8px; }
+    .tab { font-size:var(--fs-sm); }
     .row-between.mobile-stack { align-items:stretch; flex-direction:column; }
     .row-between.mobile-stack > .btn { width:100%; }
   }
@@ -235,76 +270,93 @@
   .usage-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0 2px; }
   .usage { display:inline-flex; gap:8px; align-items:flex-end; height:66px; min-width:100%; padding-bottom:2px; }
   .ubar { flex:0 0 auto; width:38px; display:flex; flex-direction:column; align-items:center; gap:3px; }
-  .ubar-n { font-size:11px; font-weight:800; color:var(--ink); line-height:1; }
+  .ubar-n { font-size:var(--fs-xs); font-weight:800; color:var(--ink); line-height:1; }
   /* 막대는 한 색. 마감/진행중은 채움 vs 윤곽으로 구분한다(색만으로 상태를 나누지 않는다) */
   .ubar-b { width:24px; border-radius:5px 5px 0 0; overflow:hidden; display:flex; flex-direction:column-reverse; gap:2px; }
   .ubar-b > i { display:block; width:100%; box-sizing:border-box; }
   .ubar-b > i.cl { background:var(--data-1); }
   .ubar-b > i.op { background:transparent; border:2px solid var(--data-1); }
-  .legend { display:flex; gap:11px; align-items:center; font-size:11px; color:var(--sub); font-weight:700; flex:none; }
+  .legend { display:flex; gap:11px; align-items:center; font-size:var(--fs-xs); color:var(--sub); font-weight:700; flex:none; }
   .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; vertical-align:-1px; margin-right:4px; background:var(--data-1); }
   .legend i.open { background:transparent; border:2px solid var(--data-1); }
   /* ① 히어로 + KPI */
   .hero { text-align:center; padding:8px 0 2px; }
   .hero-n { font-size:46px; font-weight:900; letter-spacing:-2px; color:var(--ink); line-height:1.02; }
-  .hero-l { font-size:13px; color:var(--sub); font-weight:700; margin-top:3px; }
-  .hero-sub { font-size:12px; color:var(--sub); margin-top:3px; }
+  .hero-l { font-size:var(--fs-md); color:var(--sub); font-weight:700; margin-top:3px; }
+  .hero-sub { font-size:var(--fs-sm); color:var(--sub); margin-top:3px; }
   .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0 10px; }
   .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
   .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
-  .kpi .l { font-size:11px; color:var(--sub); font-weight:700; margin-top:2px; }
+  .kpi .l { font-size:var(--fs-xs); color:var(--sub); font-weight:700; margin-top:2px; }
   /* 기간 프리셋 — 6개를 한 줄에 쭉. 좁은 화면에선 줄바꿈 대신 가로 스크롤(줄이 늘면 컨트롤 바가 화면을 먹는다).
-     스크롤바는 숨기되 선택된 버튼은 렌더 후 JS 로 보이는 자리까지 당겨온다. */
-  .dash-filter { margin:0 0 10px; gap:4px; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
+     스크롤바는 숨기되 선택된 버튼은 렌더 후 JS 로 보이는 자리까지 당겨온다.
+     320px 폰에서 여섯 개가 밀리지 않고 다 보여야 한다. 가용 폭은
+       320 − #app 좌우 12×2 − .dash-ctl 좌우 14×2 = 268px
+     이고(#app 패딩을 빼먹으면 292px 로 잘못 잡힌다), 한글 어드밴스가 1em 이므로 12px 기준
+     글자 합계는 이번주 36 + 지난달 36 + 이번달 36 + 3개월 31 + 올해 24 + 작년 24 ≈ 187px 이다.
+       361~440px: 187 + 패딩 7×2×6 84 + 간격 3×5 15 = 286  (가용 305)
+       ~360px   : 187 + 패딩 5×2×6 60 + 간격 2×5 10 = 257  (가용 308 · 320px 에서 268)
+     가로 스크롤과 scrollPresetIntoView() 는 지운 게 아니라 남겨둔 안전망이다 — 글자를 키운
+     사용자(브라우저 글꼴 확대)나 앞으로 늘어날 라벨이 여기에 걸린다.
+     탭 영역 높이는 .tab 본체의 min-height:44px 이 그대로 준다(WCAG 2.5.8 의 24px 을 넘는다). */
+  .dash-filter { margin:0 0 10px; gap:3px; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain;
     -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .dash-filter::-webkit-scrollbar { display:none; }
-  .dash-filter .tab { flex:0 0 auto; padding:9px 11px; font-size:13px; white-space:nowrap; }
+  /* 변경은 이 선택자 안으로만 한정한다 — .tab 은 메인 내비게이션과 공유하는 클래스라
+     밖으로 새면 내비 탭까지 작아진다. 덤으로 330px 특이도 버그도 여기서 사라진다:
+     예전엔 330px 티어의 .tab(특이도 0-1-0, 12px)이 .dash-filter .tab(0-2-0, 13px)에 져서
+     프리셋 칩만 13px 로 남아 있었다. 이제 둘 다 --fs-sm 이라 그 버그가 성립하지 않는다. */
+  .dash-filter .tab { flex:0 0 auto; padding:9px 7px; font-size:var(--fs-sm); white-space:nowrap; }
+  @media (max-width:360px){
+    .dash-filter { gap:2px; }
+    .dash-filter .tab { padding-left:5px; padding-right:5px; }
+  }
   .dash-ctl > .dash-filter:last-child { margin-bottom:0; }
   /* 컨트롤 바 — 달력 · 프리셋 · 통합 검색 */
   .dash-ctl { padding:12px 14px; margin-bottom:12px; }
   .dash-dates { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-  .dash-dates input[type=date] { flex:1; min-width:0; width:auto; padding:10px 10px; border:1.5px solid var(--line); border-radius:11px; font-size:15px; font-family:inherit; background:#fff; color:var(--ink); min-height:44px; -webkit-appearance:none; appearance:none; }
-  .dash-warn { font-size:11.5px; line-height:1.55; color:var(--sub); background:#fbecdf; border-radius:10px; padding:8px 10px; margin:10px 0 0; }
+  .dash-dates input[type=date] { flex:1; min-width:0; width:auto; padding:10px 10px; border:1.5px solid var(--line); border-radius:11px; font-size:var(--fs-lg); font-family:inherit; background:#fff; color:var(--ink); min-height:44px; -webkit-appearance:none; appearance:none; }
+  .dash-warn { font-size:var(--fs-sm); line-height:1.55; color:var(--sub); background:#fbecdf; border-radius:10px; padding:8px 10px; margin:10px 0 0; }
   /* 셀 활용도 그리드 — 누르면 아래 상세가 바뀐다 */
   .cellgrid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   .cellcard { text-align:left; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:11px 12px; min-height:44px; cursor:pointer; transition:border-color .12s, background .12s; }
   .cellcard.on { border-color:var(--brand); background:var(--brand-soft); }
   .cc-top { display:flex; align-items:center; gap:6px; min-width:0; }
-  .cc-rank { flex:none; font-size:11px; font-weight:800; color:#fff; background:var(--brand); border-radius:99px; min-width:17px; height:17px; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; }
-  .cc-name { font-size:13.5px; font-weight:700; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cc-rank { flex:none; font-size:var(--fs-xs); font-weight:800; color:#fff; background:var(--brand); border-radius:99px; min-width:17px; height:17px; display:inline-flex; align-items:center; justify-content:center; padding:0 4px; }
+  .cc-name { font-size:var(--fs-md); font-weight:700; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cc-n { font-size:23px; font-weight:900; letter-spacing:-1px; color:var(--ink); line-height:1.1; margin-top:5px; }
-  .cc-n span { font-size:12px; font-weight:700; color:var(--sub); margin-left:2px; letter-spacing:0; }
+  .cc-n span { font-size:var(--fs-sm); font-weight:700; color:var(--sub); margin-left:2px; letter-spacing:0; }
   .cc-spark { display:flex; align-items:flex-end; gap:2px; height:16px; margin:6px 0 4px; }
   .cc-spark i { flex:1; min-width:2px; background:var(--data-1); border-radius:2px 2px 0 0; }
-  .cc-none { font-size:11px; color:var(--sub); }
-  .cc-meta { font-size:11px; color:var(--sub); font-weight:700; }
+  .cc-none { font-size:var(--fs-xs); color:var(--sub); }
+  .cc-meta { font-size:var(--fs-xs); color:var(--sub); font-weight:700; }
   /* ③ 사람별 참여 — 세로 목록이라 가로 스크롤이 없다 */
   .prow { padding:8px 2px; border-top:1px solid var(--line); }
-  .prow-n { font-weight:700; font-size:13px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .prow-n { font-weight:700; font-size:var(--fs-md); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .meter { height:7px; border-radius:99px; background:var(--brand-soft); overflow:hidden; }
   .meter > i { display:block; height:100%; background:var(--data-1); border-radius:99px; }
   /* ④ 메뉴 Top — 가로 막대 */
   .hbar { padding:6px 0 2px; }
-  .hbar-name { font-size:13px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .hbar-n { font-size:12px; font-weight:800; color:var(--sub); flex:none; }
+  .hbar-name { font-size:var(--fs-md); font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hbar-n { font-size:var(--fs-sm); font-weight:700; color:var(--sub); flex:none; }
   .hbar-track { height:8px; border-radius:99px; background:var(--brand-soft); margin-top:4px; }
   .hbar-track > i { display:block; height:100%; background:var(--data-1); border-radius:99px; }
   /* title= 은 모바일에서 안 뜬다. 탭·호버 모두 되는 툴팁 하나를 문서에 띄운다 */
-  .tip { position:fixed; z-index:80; background:#2b2118; color:#fff; font-size:12px; font-weight:600; line-height:1.45; padding:7px 10px; border-radius:9px; max-width:min(78vw,270px); pointer-events:none; opacity:0; transition:opacity .12s; box-shadow:0 6px 18px rgba(40,28,16,.28); }
+  .tip { position:fixed; z-index:80; background:#2b2118; color:#fff; font-size:var(--fs-sm); font-weight:600; line-height:1.45; padding:7px 10px; border-radius:9px; max-width:min(78vw,270px); pointer-events:none; opacity:0; transition:opacity .12s; box-shadow:0 6px 18px rgba(40,28,16,.28); }
   .tip.show { opacity:1; }
-  .ubar-d { font-size:11px; color:var(--sub); line-height:1.2; text-align:center; white-space:nowrap; }
+  .ubar-d { font-size:var(--fs-xs); color:var(--sub); line-height:1.2; text-align:center; white-space:nowrap; }
   .ubar-d .wk { color:var(--sub); }
   .mx-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  table.mx { border-collapse:collapse; font-size:12px; }
+  table.mx { border-collapse:collapse; font-size:var(--fs-sm); }
   table.mx th, table.mx td { padding:5px 3px; text-align:center; white-space:nowrap; }
-  table.mx th.mx-date { font-weight:700; color:var(--sub); font-size:11px; line-height:1.15; }
+  table.mx th.mx-date { font-weight:700; color:var(--sub); font-size:var(--fs-xs); line-height:1.15; }
   table.mx th.mx-date .wk { color:var(--sub); }
   table.mx .mx-name { text-align:left; font-weight:700; color:var(--ink); padding-right:8px; position:sticky; left:0; background:var(--card); max-width:78px; overflow:hidden; text-overflow:ellipsis; }
-  table.mx thead .mx-name, table.mx th.mx-sum { color:var(--sub); font-weight:700; font-size:11px; }
-  table.mx .mx-cell { color:var(--line); font-size:13px; min-width:22px; }
+  table.mx thead .mx-name, table.mx th.mx-sum { color:var(--sub); font-weight:700; font-size:var(--fs-xs); }
+  table.mx .mx-cell { color:var(--line); font-size:var(--fs-md); min-width:22px; }
   table.mx .mx-cell.att { color:var(--brand); }
-  table.mx .mx-cell.srv { color:var(--accent-ink); font-size:13px; }
-  table.mx td.mx-sum { font-weight:800; color:var(--ink); padding-left:8px; position:sticky; right:0; background:var(--card); }
+  table.mx .mx-cell.srv { color:var(--accent-ink); font-size:var(--fs-md); }
+  table.mx td.mx-sum { font-weight:700; color:var(--ink); padding-left:8px; position:sticky; right:0; background:var(--card); }
   table.mx tr + tr td { border-top:1px solid var(--line); }
   /* ===================== 랜덤 게임 =====================
      센서(흔들기·기울이기)는 쓰지 않는다 — 카톡 인앱 브라우저에서 권한 프롬프트가 안 뜨는 사례가 많다.
@@ -316,7 +368,7 @@
   .game-ov.show { display:flex; }
   .game-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line);
     padding:calc(9px + env(safe-area-inset-top)) 16px 7px; }
-  .game-title { font-size:16px; font-weight:800; letter-spacing:-.3px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .game-title { font-size:16px; font-weight:800; letter-spacing:-.006em; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* 인원이 많거나 화면이 짧으면 결과 블록까지 합쳐 세로가 넘친다. justify-content:center 로 가운데 두면
      넘칠 때 위쪽이 잘려 못 보게 되므로, auto 마진 pseudo 로 '여유 있으면 가운데 · 넘치면 스크롤'을 만든다. */
   .game-body { flex:1 1 auto; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center;
@@ -324,8 +376,8 @@
   .game-body::before, .game-body::after { content:""; flex:none; margin:auto; }
   .game-foot { flex:none; padding:8px 16px calc(12px + env(safe-area-inset-bottom)); }
   .game-foot > * + * { margin-top:8px; }
-  .game-say { position:relative; z-index:1; font-size:15px; font-weight:700; text-align:center; color:var(--sub); margin:0 0 10px; pointer-events:none; }
-  .game-hint { font-size:13px; color:var(--sub); text-align:center; font-weight:600; }
+  .game-say { position:relative; z-index:1; font-size:var(--fs-lg); font-weight:700; text-align:center; color:var(--sub); margin:0 0 10px; pointer-events:none; }
+  .game-hint { font-size:var(--fs-md); color:var(--sub); text-align:center; font-weight:600; }
   /* 사다리·돌림판은 세로가 긴 화면에서 잘리지 않도록 뷰포트 높이로도 폭을 묶는다 */
   .game-stage { width:100%; max-width:min(400px, 50vh); }
   .game-stage svg { display:block; width:100%; height:auto; }
@@ -337,9 +389,14 @@
      max-width 는 .game-stage 와 같은 400px 로 맞춰 그림 폭에서 벗어나지 않게 한다. 다만 50vh
      상한은 두지 않는다 — 창이 낮을 때 폭까지 좁아지면 줄 수만 늘어난다. */
   .game-legend { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 6px; width:100%; max-width:400px; margin-top:10px; }
+  /* 11px 은 아래 줄 수 예산에 묶인 값이다 (R13-4). n>10 이면 이 칩이 이름을 읽을 수 있는
+     유일한 자리인데도 이 파일에서 가장 작은 글자라는 건 진짜 절충이지 실수가 아니다 —
+     12px 로 올리면 24명 범례가 7~8줄이 되어 결과 블록을 화면 밖으로 민다.
+     실기기에서 24명 줄 수와 11px 한글 가독성을 재기 전에는 크기를 올리지 않는다. 대신 줄 수·폭에
+     영향이 없는 굵기(700→800)만 올려 획을 굵힌다. 미측정 사실을 여기 남겨 둔다. */
   .game-legend .gl-it { display:inline-flex; align-items:center; gap:5px; min-width:0; max-width:100%;
     background:var(--card); border:1px solid var(--line); border-radius:9px; padding:3px 7px;
-    font-size:11px; font-weight:700; color:var(--ink); line-height:1.35; }
+    font-size:11px; font-weight:800; color:var(--ink); line-height:1.35; }
   .game-legend .gl-sw { flex:none; width:9px; height:9px; border-radius:3px; }
   .game-legend .gl-no { flex:none; color:var(--sub); font-weight:800; font-variant-numeric:tabular-nums; }
   /* 긴 이름은 칩 안에서 접는다. 잘라내면 '잘린 이름을 온전히 읽는 자리'라는 범례의 존재 이유가 없어진다. */
@@ -349,18 +406,18 @@
      실패(--red)가 아니라 주의라서 --accent 계열을 쓴다. 글자는 흰 배경 대비 2.92:1 인 --accent 가
      아니라 --accent-ink 로 — 배지가 아니라 읽어야 하는 문장이다. */
   .game-warn { max-width:340px; margin:6px auto 0; background:#fdf4e6; border:1px solid var(--accent);
-    border-radius:12px; padding:8px 11px; font-size:13px; font-weight:700; line-height:1.45;
+    border-radius:12px; padding:8px 11px; font-size:var(--fs-md); font-weight:700; line-height:1.45;
     color:var(--accent-ink); text-align:center; word-break:keep-all; }
   .game-win { text-align:center; margin-top:12px; }
   .game-win .we { font-size:38px; line-height:1.15; }
-  .game-win .wn { font-size:25px; font-weight:900; letter-spacing:-.6px; color:var(--brand); margin-top:2px; word-break:keep-all; }
-  .game-win .ws { font-size:13px; color:var(--sub); margin-top:5px; }
+  .game-win .wn { font-size:25px; font-weight:900; letter-spacing:-.6px; line-height:1.1; color:var(--brand); margin-top:2px; word-break:keep-all; }
+  .game-win .ws { font-size:var(--fs-md); color:var(--sub); margin-top:5px; }
   .game-pick { display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:var(--card);
     border:1.5px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:8px; min-height:44px; transition:transform .05s ease; }
   .game-pick:active { transform:scale(.99); }
   .game-pick .gp-em { font-size:26px; flex:none; }
-  .game-pick b { display:block; font-size:15px; color:var(--ink); }
-  .game-pick small { display:block; font-size:12px; color:var(--sub); margin-top:1px; }
+  .game-pick b { display:block; font-size:var(--fs-lg); color:var(--ink); }
+  .game-pick small { display:block; font-size:var(--fs-sm); color:var(--sub); margin-top:1px; }
   /* 인원 상한을 넘어 막힌 게임 (R10-4). 눌리지 않는 것은 disabled 속성이 하고, 여기서는 '눌러도
      안 된다'를 보이게만 만든다 — 살아 있는 버튼과 똑같이 보이면 사용자는 자기 탭이 씹혔다고 읽는다.
      :active 의 scale 도 되돌린다(disabled 라 뜨지 않지만 규칙이 남아 있으면 나중에 되살아난다).
@@ -414,8 +471,35 @@
   .fp-dot.win { animation:fpwin .55s ease-out 3; }
   @keyframes fpwin { 0%,100% { box-shadow:0 5px 16px rgba(40,28,16,.25); } 50% { box-shadow:0 0 0 16px rgba(111,78,55,.2); } }
   .fp-mid { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; width:86%; }
+  /* 가운데 문구·카운트다운은 74px 색 원들과 같은 공간을 쓴다. 반투명 판은 뒤에 무엇이 오느냐에
+     따라 대비가 달라져 4.5:1 을 보장할 수 없으므로 불투명 판을 쓴다 — 그러면 글자 뒤 배경이
+     항상 --card(#fff) 라서 --brand 7.36:1 · --sub 5.27:1 이 확정된다 (R5-2).
+     대신 판이 손가락을 가리지 않도록 inline-block 으로 글자만큼만 차지하게 둔다 (R5-7) —
+     .fp-mid 는 width:86% 라 그 자체에 배경을 주면 화면 가운데 띠가 생긴다.
+     .fp-mid 가 아니라 그 '안쪽'에 두는 이유가 하나 더 있다: choose() 가 .fp-mid 를 비우면
+     판도 함께 사라져 당첨 점을 가리지 않는다 (R5-9).
+     transition 은 넣지 않는다 — 넣으면 맨 위 전역 reduced-motion 블록이 !important 로 끄게 되어
+     규칙이 둘로 갈린다 (R5-8). */
+  .fp-plate { display:inline-block; max-width:100%; background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:8px 14px; box-shadow:0 4px 14px rgba(40,28,16,.18); }
+  .fp-plate .fp-nums { font-size:var(--fs-md); font-weight:800; color:var(--ink); }
+  .fp-plate .fp-why { font-size:var(--fs-md); font-weight:600; color:var(--sub); margin-top:2px; word-break:keep-all; }
+  /* 컨테이너(.fp-mid)는 계속 통과시키고 이 버튼만 입력을 받는다 (R5-3) */
+  .fp-plate .fp-go { pointer-events:auto; margin-top:9px; width:auto; padding:9px 16px; font-size:var(--fs-base);
+    border-radius:10px; min-height:44px; background:var(--brand); color:#fff; font-weight:700; }
   .fp-cnt { font-size:62px; font-weight:900; color:var(--brand); letter-spacing:-3px; line-height:1; }
   /* 돌림판 */
+  /* 라벨 역회전은 시간에 따라 변해야 한다 — 정지 상태에서 고정 0, 멈출 때 −spin 이어야
+     당첨자가 기울기로 새지 않는다(근거는 wheelSpin 주석). 회전축은 판 중심이 아니라 글자
+     자신이어야 하고(중심 기준으로 돌리면 라벨이 조각을 벗어나 역방향으로 궤도를 돈다),
+     그래서 transform-box:fill-box 가 필요하다 — 기본값 view-box 는 축이 viewBox 좌상단이다.
+     @supports 로 감싼 이유: 미지원 브라우저에서 이 규칙이 살아 있으면 축이 viewBox 좌상단이
+     되어 라벨이 판 밖으로 날아간다. 그 경로에서도 누출은 막는다 — playWheel 이 라벨을
+     rotate(0) 으로 그려 두고(정지 상태에서 새는 것이 없다) 회전이 한창일 때 최종 역회전을
+     한 번에 넣는다. 자세한 근거는 playWheel 의 폴백 주석에 있다. */
+  @supports (transform-box: fill-box) {
+    .wlab { transform-box:fill-box; transform-origin:center; transform:rotate(0deg); }
+  }
   .wheel-wrap { position:relative; width:100%; max-width:min(320px, 50vh); margin:0 auto; padding-top:14px; }
   .wheel-pin { position:absolute; left:50%; top:-2px; transform:translateX(-50%); font-size:26px; line-height:1; z-index:1; filter:drop-shadow(0 2px 3px rgba(40,28,16,.3)); }
   /* 🏁 구슬 레이스 (R19)
@@ -427,7 +511,7 @@
   .race-wrap { position:relative; width:100%; max-width:min(340px, 45vh); margin:0 auto; }
   .race-wrap canvas { display:block; width:100%; height:auto; border-radius:12px;
                       background:#fffdf9; border:1.5px solid var(--line); }
-  .race-hud { margin-top:8px; font-size:12px; color:var(--sub); font-weight:600; line-height:1.5; }
+  .race-hud { margin-top:8px; font-size:var(--fs-sm); color:var(--sub); font-weight:600; line-height:1.5; }
   .race-hud .bar { height:6px; border-radius:3px; background:var(--brand-soft); overflow:hidden; margin-bottom:6px; }
   /* 200ms 마다만 갱신하므로 그 간격만큼 선형 보간을 걸어 바가 계단처럼 튀지 않게 한다.
      prefers-reduced-motion 은 이 파일 맨 위 전역 블록이 모든 transition 을 끄므로 여기 미디어쿼리를 또 두지 않는다. */
@@ -459,7 +543,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.80";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.81";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -882,7 +966,7 @@ window.addEventListener("online", updateOffline); window.addEventListener("offli
 let sheetOpen=false, curView="main", subActive=false;
 // 열린 섬김 화면의 탭. 예전엔 '내 주문'과 '현황'이 서로를 오가는 별개 페이지였고, 현황 안에 또
 // [사람별 | 카페 주문서] 탭이 있었다(2단). 계층을 한 줄로 펴서 왕복도 중첩도 없앤다.
-let openTab="order", lastTabSeq=null;   // order | people | cafe
+let openTab="order", lastTabSeq=null;   // order(내 주문 + 현황) | cafe(카페 주문서)
 function setOpenTab(t){
   if(openTab===t) return;
   if(t==="order"){ if(subActive){ history.back(); return; }   // 뒤로가기로 되돌린다 → popstate 가 render
@@ -930,7 +1014,7 @@ window.addEventListener("popstate",()=>{
   if(GS && GS.open){ closeGame({fromPop:true}); return; }
   subActive=false;   // 쌓아둔 하위 항목이 (뒤로가기로) 빠졌다
   if(sheetOpen){ $scrim.classList.remove("show"); sheetOpen=false; return; }  // 시트 닫기
-  if(openTab!=="order"){ openTab="order"; render(); return; }   // 현황·주문서 탭 → 내 주문 탭
+  if(openTab!=="order"){ openTab="order"; render(); return; }   // 카페 주문서 탭 → 합친 화면(기본 탭)
   if(curView==="pick" && ME){ render(); return; }         // 이름변경 → 주문
   if(curView==="adminmenu"){ renderAdminDash(); return; } // 메뉴관리 → 관리자
   if(curView==="admindash"){ renderAdminDash(); return; } // 대시보드 → 관리자
@@ -1053,22 +1137,15 @@ function renderOpen(){
   }
   const isSkip = myOrder && myOrder.type==="skip";
   const showGrid = !myOrder || isSkip || forceGrid;
-  // 다른 분 주문 ("나도" 버튼)
-  const others=MEMBERS.filter(m=>m.id!==ME && ORDERS[m.id] && ORDERS[m.id].type==="drink");
-  let othersHtml="";
-  if(others.length){
-    othersHtml=`<div class="label">다른 분 주문 · [나도] 누르면 같은 걸로</div>
-      <div class="card" style="padding:6px 14px">${others.map(m=>{ const o=ORDERS[m.id], d=orderDisplay(o);
-        return `<div class="person"><div class="avatar">${esc(initials(m.name))}</div>
-          <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}</div>${o.note?`<div class="pmenu">📝 ${esc(o.note)}</div>`:''}</div>
-          <button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button></div>`;}).join("")}</div>`;
-  }
+  /* '다른 분 주문' 블록은 없앴다 (R12-5, R12-6). 아래 로스터(dashPeopleHtml)의 ordered 그룹이
+     같은 .person 마크업에 같은 세 필드를 이미 그리고 있어서, 두 화면을 합치면 주문한 사람이
+     두 번 그려졌다. [나도] 버튼은 그 로스터 행으로 옮겨갔다. */
   /* '안 마실게요'는 메뉴와 나란한 갈림길이지 화면 아래 부속이 아니다.
      그리드 밑에 회색 ghost 버튼으로 붙여두니 아무도 못 봤다 — .label 로 구역을 떼서
      '메뉴 선택'과 같은 급의 섹션으로 올리고, 버튼도 흰 카드(누를 수 있는 것)로 바꾼다. */
   const skipHtml = isSkip ? "" : `
       <div class="label">음료를 안 드신다면</div>
-      <button class="btn btn-choice skip-btn">🙅 오늘은 안 마실게요</button>`;
+      <button class="btn btn-choice skip-btn">🙅 안 마실게요, 감사합니다</button>`;
   const gridHtml = showGrid ? `
       <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
@@ -1077,10 +1154,21 @@ function renderOpen(){
   const changeLink = (myOrder && myOrder.type==="drink" && !forceGrid)
     ? `<div class="row-2" style="margin:10px 0 0"><button class="btn btn-soft" id="changeMenu">🔄 다른 메뉴로</button><button class="btn btn-ghost skip-btn">🙅 안 마실게요</button></div>` : "";
 
-  // 탭 3개를 한 줄에 — 페이지를 떠나지 않으므로 '현황 보고 다시 돌아오기'가 없다
-  const tabs=`<div class="tabs" id="openTabs" role="tablist">
-    ${[["order","내 주문"],["people","현황 "+countDrinks()+"잔"],["cafe","주문서"]].map(([t,label])=>
-      `<button class="tab ${openTab===t?'on':''}" data-t="${t}" role="tab" aria-selected="${openTab===t}">${label}</button>`).join("")}</div>`;
+  /* 탭 2개. '내 주문'과 '현황 n잔'을 합쳤다 (R12-1) — 내가 뭘 골랐는지 확인하고 다른 분이 다
+     골랐는지 보려고 탭을 왕복하던 동선이 사라진다. 합친 탭은 키 order 를 그대로 쓰고 cafe 가
+     유일한 비기본 탭으로 남으므로, '기본 탭을 떠날 때만 히스토리 1칸'이라는 불변식이 글자
+     하나 안 바뀌고 성립한다 (R12-2).
+     role="tab"/"tablist" 를 뗀 이유 (R12-20). (1) 지금 구조는 미완성 탭 패턴이다 — tablist 의
+     aria-label, id/aria-controls, 패널의 role="tabpanel", roving tabindex, 좌우 방향키가 전부
+     없다. (2) 남은 둘은 동급 형제 뷰가 아니다. 하나는 '지금 하는 일 전부'이고 다른 하나는
+     '카페에 건넬 출력물'이다. 다섯 가지를 새로 들여 탭 패턴을 완성하는 것보다, 정확한 토글
+     버튼 둘이 낫다.
+     라벨 길이 제약: .tab 에는 white-space:nowrap 이 없고 330px 에서 글자가 12px 이라 길면 두
+     줄로 접혀 min-height:44px 인 바가 두 배가 된다. 두 칸의 가용 폭이 ≈145px 이고 아래 두
+     라벨은 패딩 포함 78·81px 이다. n잔 숫자는 dashStatsHtml() 의 주문 KPI 가 잇는다 (R12-18). */
+  const tabs=`<div class="tabs" id="openTabs" role="group" aria-label="화면 선택">
+    ${[["order","주문 · 현황"],["cafe","카페 주문서"]].map(([t,label])=>
+      `<button class="tab ${openTab===t?'on':''}" data-t="${t}" aria-pressed="${openTab===t}">${label}</button>`).join("")}</div>`;
 
   /* 게임은 절대 저절로 뜨지 않는다 — 자진해서 섬기려던 분은 이 버튼을 그냥 안 누르면 된다.
      노출 조건은 '돌릴 수 있는가(gameEligible)' + '내가 결정권을 가진 자리인가'다.
@@ -1096,8 +1184,9 @@ function renderOpen(){
   const amHostNow = SESSION.hostId===ME;
   const gameLabel = amHostNow ? "섬길 사람을 다시 정하려면" : "누가 섬길지 아직 안 정했다면";
   const gameBtnText = amHostNow ? "🎲 다른 분에게 넘길지 게임으로 정하기 [test]" : "🎲 게임으로 섬길 사람 정하기 [test]";
-  // 기본 탭에도 둔다. '현황' 탭에만 뒀더니 기본 탭이 '내 주문'이라 아무도 못 봤다(G9).
   // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
+  // 자리는 로스터 '위'다 (R12-11). 아래에 두면 버튼이 ~1,200px 지점으로 밀려, 예전에 탭 문제로
+  // 나타났던 G9("기본 탭에 없어서 아무도 못 봤다")가 스크롤 깊이 문제로 되돌아온다.
   const gameHtml = canGame ? `
       <div class="label">${gameLabel}</div>
       <button class="btn btn-choice" id="gamepick">${gameBtnText}</button>` : "";
@@ -1109,26 +1198,33 @@ function renderOpen(){
     ? `<p class="muted center" style="margin-top:10px">🎲 ${esc(gameShortReason().why)} — 참가할 분이 2명 이상 모이면 게임으로 정할 수 있어요.</p>` : "";
 
   if(openTab==="order"){
+    /* 합친 화면의 순서 (R12-11, R12-6).
+         배너 → 탭 → 내 주문(액션 카드) → 주문 바꾸기 → 메뉴 그리드 → 게임 → 현황 KPI → 다른 분들
+       내 주문 블록을 로스터 행으로 접어 넣지(absorb) 않고 위에 그대로 둔(lift) 이유: 이건 상태
+       행이 아니라 [수정]·[🔄 다른 메뉴로]·[🙅 안 마실게요] 세 동작을 진 액션 카드이고,
+       67px 짜리 .person 행 하나에 320px 로 그 셋을 넣을 수 없다(16px 강조와 여러 줄 옵션·메모도
+       함께 잃는다). 대신 아래 로스터가 나를 빼서 중복을 없앤다. */
     view().innerHTML=`
       <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
         <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
         ${myOrder?'':'<p>메뉴를 고르거나, 안 드실 땐 알려주세요</p>'}</div>
-      ${tabs}${myStatus}${changeLink}${gridHtml}${othersHtml}${gameHtml}${gameWhyHtml}`;
+      ${tabs}${myStatus}${changeLink}${gridHtml}${gameHtml}${gameWhyHtml}
+      <div class="label">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}지금 현황</div>
+      ${dashStatsHtml()}
+      <div class="label">다른 분들 · [나도] 누르면 같은 걸로</div>
+      ${dashPeopleHtml()}`;
   } else {
     view().innerHTML=`
       <div class="muted" style="margin:0 2px 10px">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}섬기는 분: <b>${host?esc(hon(host.name)):"아직 없어요"}</b></div>
-      ${tabs}
-      ${openTab==="people"
-        ? dashStatsHtml()+dashPeopleHtml()+gameHtml+gameWhyHtml
-        : dashCafeHtml()}`;
+      ${tabs}${dashCafeHtml()}`;
   }
   view().querySelectorAll("#openTabs .tab").forEach(el=> el.onclick=()=>setOpenTab(el.dataset.t));
   wireDashboard();
   // 누른 버튼을 그대로 넘긴다 — 오버레이가 닫힐 때 포커스를 여기로 되돌려야 한다(R13-3).
-  // e.currentTarget 은 onclick 이 걸린 그 엘리먼트다. #gamepick 은 '내 주문'과 '현황' 두 자리에
-  // 나오는데(한 번에 하나만 존재) 이렇게 하면 어느 쪽이 잡혔는지 따로 몰라도 맞는 버튼이 넘어간다.
+  // e.currentTarget 은 onclick 이 걸린 그 엘리먼트다. 합친 화면에서 #gamepick 은 정확히 하나다
+  // (예전엔 '내 주문'과 '현황' 두 자리에 갈려 있었다 — R12-10).
   bind("gamepick",e=>{ gameEnsure(e.currentTarget); openGameSheet(); });
-  if(openTab!=="order") return;   // 아래 배선은 '내 주문' 탭 전용
+  if(openTab!=="order") return;   // 아래 배선은 합친 화면 전용(카페 주문서 탭에는 없다)
 
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
@@ -1327,7 +1423,7 @@ function openCustomSheet(existing, prefillName, prefillNote){
         <div style="font-size:19px;width:24px;text-align:center">${esc(m.emoji||"🥤")}</div>
         <div class="pname" style="font-size:14px">${esc(m.name)}</div></div>`).join("")}</div>` : "";
     if(isDecline){
-      addBtn.textContent = "🙅 오늘은 생략하시는 거죠? — 안 마실게요로 저장";
+      addBtn.textContent = "🙅 오늘은 생략하시는 거죠? — '안 마실게요, 감사합니다'로 저장";
       addBtn.classList.remove("btn-brand"); addBtn.classList.add("btn-soft");
     } else if(exactMatch){
       addBtn.textContent = `✋ 이미 있는 메뉴예요 — ${exactMatch.emoji||"🥤"} ${exactMatch.name}로 주문`;
@@ -1431,16 +1527,34 @@ function dashStatsHtml(){ const {ordered,skipped,pending}=dashSplit();
     <div class="stat"><div class="num" style="color:var(--green)">${ordered.length}</div><div class="lbl">주문</div></div>
     <div class="stat"><div class="num" style="color:var(--sub)">${skipped.length}</div><div class="lbl">안마심</div></div>
     <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>`; }
+/* 열린 화면과 닫힌 화면이 같은 함수를 쓴다. 시그니처를 바꾸지 않고 두 화면을 가르는 조건은
+   SESSION.state==="open" 하나다 (R12-12) — #nudge 가 이미 쓰던 조건이라 새 개념이 늘지 않고,
+   닫힌 화면(renderClosed → dashboardHtml)은 코드 경로가 예전 그대로다.
+   열린 화면에서만 달라지는 두 가지:
+     ① 로스터에서 나를 뺀다 — 내 주문은 화면 위 액션 카드에 이미 있다 (R12-6).
+        그래서 카드 제목이 '다른 분들'이다. KPI 는 전원 기준이라 목록이 n−1 행인데,
+        그 비대칭은 제목으로 말한다(KPI 를 나 제외로 바꾸면 countDrinks() 와 닫힌 화면 집계가
+        어긋난다 — 의도적으로 받아들인 비대칭이다).
+     ② ordered 행의 '주문' 알약을 [나도] 로 바꾼다 (R12-9). 나란히 두지 않는 이유 둘 —
+        같은 행에 음료 이름이 이미 있어 '주문' 알약은 정보를 더하지 않고, 320px 에서
+        아바타 34 + 간격 16 + 알약 ~50 + 버튼 ~56 을 빼면 이름·메뉴에 ~150px 밖에 안 남는다.
+        정보를 가진 '안마심'·'미응답' 알약은 그대로 둔다. */
 function dashPeopleHtml(){ const {ordered,skipped,pending}=dashSplit();
+  const openNow = SESSION.state==="open";
+  const mine = m => openNow && m.id===ME;
   const row=(m,kind)=>{ const o=ORDERS[m.id]; let menu="",pill="";
     if(kind==="ordered"){ const d=orderDisplay(o);
       menu=`${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}${o.note?(' · 📝'+esc(o.note)):''}`;
-      pill=`<span class="pill ordered">주문</span>`; }
+      pill = openNow ? `<button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button>`
+                     : `<span class="pill ordered">주문</span>`; }
     else if(kind==="skip"){ menu="오늘은 안 마심"; pill=`<span class="pill skip">안마심</span>`; }
     else { menu="아직 응답 없음"; pill=`<span class="pill pending">미응답</span>`; }
     return `<div class="person"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
       <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
-  let body=`<div class="card" style="padding:6px 18px">${ordered.map(m=>row(m,"ordered")).join("")}${skipped.map(m=>row(m,"skip")).join("")}${pending.map(m=>row(m,"pending")).join("")}</div>`;
+  const rows=`${ordered.filter(m=>!mine(m)).map(m=>row(m,"ordered")).join("")}${skipped.filter(m=>!mine(m)).map(m=>row(m,"skip")).join("")}${pending.filter(m=>!mine(m)).map(m=>row(m,"pending")).join("")}`;
+  let body = rows
+    ? `<div class="card" style="padding:6px 18px">${rows}</div>`
+    : `<div class="card center muted">${openNow?"아직 다른 분이 없어요":"구성원이 없어요"}</div>`;   // 혼자인 셀 — 빈 카드만 남지 않게
   if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
   return body; }
 function dashCafeHtml(){
@@ -1478,8 +1592,9 @@ function cafeText(){
   if(!total) return "아직 주문이 없습니다.";
   return lines.join("\n")+`\n────────────\n합계  ${total}잔`;
 }
-// 현황은 더 이상 별도 페이지가 아니라 '현황' 탭이다. 예전 호출부(폴링·외부 진입)를 위해 이름만 남긴다.
-function renderHostView(){ setOpenTab("people"); }
+// renderHostView() 는 지웠다 (R12-16). '현황'이 별도 페이지에서 탭으로 내려온 뒤 남겨둔
+// 호환용 껍데기였는데, 그 탭마저 '주문 · 현황'으로 합쳐지면서 가리킬 대상이 없어졌고
+// 파일 전체에 호출부도 없었다.
 
 /* ---------- 하단 액션바 ---------- */
 function renderBottom(){
@@ -1604,6 +1719,25 @@ function rosterFrom(members, orders, on, off){
 function playersFrom(roster, policy, lastHostId){
   if(policy==="skip" && lastHostId) return roster.filter(m=>m.id!==lastHostId);
   return roster;
+}
+
+/* 돌림판의 회전량과 라벨 각도 (R6).
+   판을 A, 라벨 글리프의 역회전을 L 이라 하면 멈춘 순간 두 식이 동시에 성립해야 한다.
+     ① 이름이 똑바로:  A(end) + L(end) ≡ 0 (mod 360)
+     ② 승자가 핀 아래:  mid + A(end) ≡ 0 (mod 360)
+   두 식에서 L(end) ≡ mid 다. 그런데 정지 상태에서 관찰자가 못 보는 값은 A(end) 하나뿐이고
+   (조각 배치는 눈앞에 그대로 있다), L 이 상수면 L(0)=L(end)≡mid 가 그 값을 그대로 알려준다.
+   그게 예전 버그였다 — 눈썰미가 아니라 산수로 당첨자를 알 수 있었다. 조각 배치를 통째로
+   돌리는 상수를 더해도 그건 시작 상태에서 보이므로 소용이 없다. 즉 L 은 시간에 따라 변해야
+   하고, 이 함수는 그 시작값과 끝값을 준다.
+   labelStart 가 0(상수)인 것이 이 설계의 전부다. wi 와도 jitter 와도 무관하므로 정지 상태에서
+   샐 것이 없다. 난수를 인자로 받는 이유도 그 성질을 결정론적으로 검증하기 위해서다. */
+function wheelSpin(n, wi, rnd){
+  const a=360/n;
+  const mid=(wi+0.5)*a;
+  const jitter=((rnd||Math.random)()-0.5)*Math.max(0, a-10);
+  const spin=360*5 - mid + jitter;
+  return { a, mid, spin, labelStart:0, labelEnd:-spin };
 }
 
 // 사다리 치수. 인원 상한(16)이 실제 한계와 맞는지 이 값으로 역검증한다
@@ -2502,8 +2636,9 @@ async function commitGameWinner(w){
       toast(w.id===ME ? "🎲 제가 섬기게 됐어요 — 메뉴는 지금도 바꿀 수 있어요"
                       : "🎲 "+hon(w.name)+"이 오늘의 섬김을 맡았어요");
       // 게임을 연 자리에 그대로 둔다(R12-4). 단 당첨자 본인은 메뉴를 다시 고를 수 있어야 하므로
-      // '내 주문' 탭으로 보낸다 — 사는 줄 모르고 고른 메뉴를 바꿀 기회를 주는 게 이 흐름의 예의다.
-      // setOpenTab 을 쓰지 않는 이유가 둘이다: openTab 이 이미 "order"(내 주문 탭에서 게임을 열었을 때)면
+      // 합친 화면(기본 탭 order)으로 보낸다 — 사는 줄 모르고 고른 메뉴를 바꿀 기회를 주는 게
+      // 이 흐름의 예의다.
+      // setOpenTab 을 쓰지 않는 이유가 둘이다: openTab 이 이미 "order"(합친 화면에서 게임을 열었을 때)면
       // 즉시 return 해서 forceGrid 가 화면에 반영되지 않고, 다른 탭이면 history.back() 이라는 부수효과가
       // 방금 closeGame() 이 맞춰둔 히스토리 장부와 부딪힌다. 그래서 직접 대입한다.
       if(w.id===ME){          // 여기까지 왔으면 성공 경로다 — 실패는 위에서 이미 return 했다
@@ -2523,6 +2658,12 @@ function playLadder(roster, winner){
   const colX=i=> PAD + i*(W-2*PAD)/(n-1);
   // 세로줄 간격보다 이름이 넓으면 위쪽 이름이 서로 겹쳐 못 읽는다 → 인원에 맞춰 글자수·크기를 줄인다.
   // 짧게 잘려도 전체 이름은 결과 발표와 <title> 에 그대로 나온다.
+  /* 미측정 (R13-5): 이 값들은 SVG 사용자 단위다. viewBox 340 을 .game-stage(max-width
+     min(400px,50vh))에 맞추므로 320px 화면에서 배율이 0.84 이고, n=10 의 NFS 8.5u 는
+     CSS 7.1px 로 렌더된다(375px 화면에서 8.3px). 번호로 바뀌는 시점이 n>10 이라 n=10 이
+     최악이면서 두 글자 한글을 그 크기로 그린다.
+     크기를 올리면 GAP·BOX_W 와 겹치므로 단독으로 못 바꾼다 — 실기기에서 판독 여부를 잰 뒤,
+     안 읽히면 크기가 아니라 GAME_LABEL_MAX 를 9 로 내려 번호+범례 경로로 보내는 게 맞다. */
   const GAP=(W-2*PAD)/(n-1), NCH= n<=7?4 : n<=9?3 : 2, NFS= n<=7?11 : n<=9?10 : 8.5;
   const BOX_W=Math.min(30, GAP*0.82);
   // 11명부터는 라벨을 번호로 바꾼다. 이름 축소는 2글자·8.5px 에서 멈추므로 그 아래로는 겹칠 뿐이고,
@@ -2612,18 +2753,27 @@ function playWheel(roster, winner){
     return `<path d="M0 0 L ${(R*Math.cos(s)).toFixed(2)} ${(R*Math.sin(s)).toFixed(2)} A ${R} ${R} 0 ${big} 1 ${(R*Math.cos(e)).toFixed(2)} ${(R*Math.sin(e)).toFixed(2)} Z" fill="${gcolor(i, n)}" stroke="#fff" stroke-width="1.2"/>`;
   }).join("");
   // 핀은 12시. 12시에서 시계방향 mid 만큼 떨어진 조각을 핀 아래로 보내려면 그만큼 되돌려 감는다.
-  const mid=(wi+0.5)*a, jitter=(Math.random()-0.5)*Math.max(0, a-10), spin=360*5 - mid + jitter;
+  const { spin, labelEnd } = wheelSpin(n, wi, Math.random);
   // 이름은 판과 같이 돌면 멈췄을 때 거꾸로 선다. 판이 도는 만큼 글자를 제자리에서 되돌려 놔
   // 멈춘 순간 항상 똑바로 읽히게 한다(폰에서는 가로로 놓인 2~4글자가 제일 잘 읽힌다).
+  // 다만 그 되돌림을 '상수'로 박아 두면 정지 상태의 기울기가 곧 당첨 조각의 각도가 되어
+  // 산수로 답이 샌다 (R6). 그래서 라벨은 어느 경로에서든 rotate(0) 으로 그려 두고, 되돌림은
+  // 나중에 넣는다 — 판과 같은 이징으로 0 → labelEnd 로 보간하거나(주 경로), 회전이 한창일 때
+  // 한 번에 바꾸거나(폴백). 최종 역회전 값은 data-rot 에 실어 둔다.
   // 11명부터는 조각 라벨도 번호만 넣는다 — 조각 각도가 15°(24명)까지 좁아지면 2글자 이름조차
-  // 이웃 조각으로 넘어간다. 역회전(-spin)은 번호에도 그대로 걸어야 멈춘 순간 똑바로 선다 (R14-4).
+  // 이웃 조각으로 넘어간다. 역회전은 번호에도 그대로 걸어야 멈춘 순간 똑바로 선다 (R14-4, R6-4).
   // 글자 크기는 기존 식(n>8?11:13)을 건드리지 않는다. 번호 경로는 항상 n>10 이라 그 식이 이미
   // 11px 을 주고, 두 자리 숫자가 ≈12px 이라 24명의 라벨 간격(반지름 62 · 15° ≈ 16px)에 들어간다.
   // 더 줄일 이유가 없으니 줄이지 않는다.
   const NUMS = n > GAME_LABEL_MAX;
   const labels=roster.map((m,i)=>{ const t=((i+0.5)*a-90)*Math.PI/180, lr=R*0.62;
     const x=lr*Math.cos(t), y=lr*Math.sin(t);
-    return `<text x="${x.toFixed(2)}" y="${(y+4).toFixed(2)}" transform="rotate(${(-spin).toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})" text-anchor="middle" font-size="${n>8?11:13}" font-weight="800" fill="#fff">${NUMS ? (i+1) : esc(shortName(m.name,4))}</text>`;
+    // font-size 는 SVG 사용자 단위다 — viewBox 216 을 .wheel-wrap(max-width min(320px,50vh))에
+    // 맞추므로 배율이 1.31~1.48 이고 화면에서는 CSS 14.5~19.3px 로 렌더된다. 이 파일에서 가장
+    // 큰 본문급 글자이며, 값 자체는 위 폭 예산에 묶여 있어 바꾸지 않는다 (R13-23).
+    // transform 을 아예 안 건다 = rotate(0) = 똑바로. 최종 역회전은 data-rot 에만 실어 두고
+    // 아래에서 시간이 흐른 뒤에 적용한다 — 여기에 박아 넣는 순간 정지 화면이 답을 말한다.
+    return `<text class="wlab" x="${x.toFixed(2)}" y="${(y+4).toFixed(2)}" data-rot="${labelEnd.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)}" text-anchor="middle" font-size="${n>8?11:13}" font-weight="800" fill="#fff">${NUMS ? (i+1) : esc(shortName(m.name,4))}</text>`;
   }).join("");
   openGameOv("🎡 돌림판", `
     <div class="game-say" id="gvSay" aria-live="polite">돌아갑니다…</div>
@@ -2644,13 +2794,35 @@ function playWheel(roster, winner){
   // 커밋한 뒤에 끝값을 준다. 믿을 수 있는 건 rAF 가 아니라 리플로우다 — rAF 는 '다음 프레임 직전'
   // 이라는 시점만 잡아주고 그 사이 스타일이 커밋됐음을 보장하지 않아서, 브라우저가 두 변경을 한
   // 재계산으로 합쳐버릴 수 있다. offsetHeight 읽기는 레이아웃을 그 자리에서 강제로 확정시킨다.
+  /* 라벨의 역회전을 넣는 방법이 둘이다. 어느 쪽이든 정지 상태는 rotate(0) 이라 거기서 새는
+     것이 없고(R6-1, R6-5), 멈추면 똑바로 선다(R6-3). 갈리는 건 그 사이뿐이다.
+       ① transform-box:fill-box 를 아는 브라우저 — 판과 같은 시간·같은 이징으로 0 → labelEnd
+          를 보간한다. 글자의 절대 각도가 내내 0 이라 조각만 돌고 이름은 서 있는 관람차 모양.
+       ② 모르는 브라우저 — CSS transform 을 걸면 회전축이 viewBox 좌상단이 되어 라벨이 판
+          밖으로 날아간다. 그래서 SVG transform 속성을 쓰되, 그 값을 처음부터 박아 넣지 않고
+          회전이 한창일 때 한 번에 바꾼다. 바꾸는 순간 라벨은 초당 1,000° 넘게 도는 구간이라
+          (반지름 62 기준 프레임당 18px 이동) 값이 튀는 게 눈에 안 띄고, 그 뒤로는 판과 함께
+          0 으로 수렴하므로 멈출 때 튀지도 않는다. 정지 화면이 답을 말하지 않는 쪽을 택한 것이며,
+          '이름이 읽힌다'는 성질도 함께 지킨다. */
+  const labelsAnimate = !!(window.CSS && CSS.supports && CSS.supports("transform-box","fill-box"));
+  const labs = [...$gv().querySelectorAll(".wlab")];
+  const EASE="transform 4.2s cubic-bezier(.16,.72,.14,1)";
   rot.style.transition="none";
   rot.style.transform="rotate(0deg)";
-  void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
+  if(labelsAnimate) labs.forEach(el=>{ el.style.transition="none"; el.style.transform="rotate(0deg)"; });
+  void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회) — 판과 라벨을 한 덩어리로 묶는다
   // lessMotion() 이면 transition 을 아예 걸지 않는다 — 위에서 넣은 "none" 이 그대로 남아 끝값이
   // 즉시 적용되고, DUR(220ms) 뒤에 결과가 뜬다. 회전 연출만 사라지고 결과는 바로 나온다 (R14-2).
-  if(slow) rot.style.transition="transform 4.2s cubic-bezier(.16,.72,.14,1)";
+  if(slow){ rot.style.transition=EASE; if(labelsAnimate) labs.forEach(el=> el.style.transition=EASE); }
   rot.style.transform="rotate("+spin.toFixed(2)+"deg)";
+  if(labelsAnimate){
+    labs.forEach(el=> el.style.transform="rotate("+labelEnd.toFixed(2)+"deg)");
+  }else{
+    // 폴백 ②. lessMotion 이면 판이 이미 끝값으로 뛴 뒤라 같은 프레임에 바로 넣는다 — 기다리면
+    // 글자만 기울어 있는 프레임이 생긴다. 아니면 회전이 가장 빠른 구간(350ms)에 넣는다.
+    const swap=()=>labs.forEach(el=> el.setAttribute("transform","rotate("+el.dataset.rot+")"));
+    if(slow) gtimer(swap, 350); else swap();
+  }
   gtimer(()=>showGameResult(winner), DUR);
 }
 
@@ -2669,7 +2841,7 @@ function playFinger(){
   openGameOv("☝️ 손가락 룰렛", `
     <div class="game-say" id="gvSay" aria-live="polite">폰을 가운데 놓고 <b>다 같이 손가락</b>을 올려주세요</div>
     ${policyNote}
-    <div class="fp-pad" id="fpPad"></div><div class="fp-mid" id="fpMid"></div>
+    <div class="fp-pad" id="fpPad"></div><div class="fp-mid" id="fpMid" role="status" aria-live="polite"></div>
     <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
@@ -2692,19 +2864,61 @@ function playFinger(){
   const stop=()=>{ if(cdT){ clearInterval(cdT); cdT=null; } if(settleT){ clearTimeout(settleT); settleT=null; } };
   // 안정화가 끝난 뒤의 3·2·1. 문구를 안정화 단계와 갈라놓아 "언제 세기 시작하는가"라는 규칙이 화면에
   // 드러나게 한다 — 한 화면에 둘을 같이 띄우면 다시 규칙이 안 보인다.
+  /* 손가락 수와 참가자 수가 다르면 카운트다운을 걸지 않고 한 번 묻는다 (R4).
+     예전에는 pts.size<2 만 봤다 — 참가자 5명인데 3명만 올려도 그대로 3·2·1 이 돌고 당첨자는
+     애초에 그 3명 중에서만 나왔다. 반대로 한 사람이 두 개 올려도 아무 말이 없었다.
+     승인은 불리언이 아니라 '승인 당시의 손가락 수'로 들고 있는다 (okAt). 그래야 손가락이
+     하나라도 늘거나 줄면 okAt !== pts.size 가 되어 승인이 저절로 무효가 된다 (R4-9) —
+     지우는 자리를 따로 두면 빠뜨릴 수 있다.
+     참가자 수는 시작 시점 스냅샷이 아니라 그 순간의 gamePlayers() 를 읽는다 (R4-1) —
+     renderWho() 가 같은 이유로 이미 그렇게 한다. */
+  let okAt=null;
+  // 불일치를 다시 보는 지점은 셋뿐이라 감시자를 따로 걸지 않는다 (R4-11).
+  //   ① refresh()      — 손가락이 늘거나 줄 때
+  //   ② countdown() 진입 — SETTLE 이 끝나 세기 직전
+  //   ③ 3·2·1 매 틱     — 세는 동안 폴링으로 참가자가 바뀌는 경우. 이미 도는 타이머 위에서
+  //                      보므로 비용이 없고, 카운트다운을 소리 없이 방치하지 않는다.
+  const mismatch=()=>{
+    if(picked || pts.size<2) return null;               // '두 개 이상' 안내가 우선한다 (R4-10)
+    const need=gamePlayers().length;
+    if(need===pts.size || okAt===pts.size) return null;  // 같거나, 이 손가락 수로 이미 승인받았다
+    return need;
+  };
+  function askMismatch(need){
+    stop();
+    const why = pts.size < need
+      ? "아직 안 올린 분이 있어요?"
+      : "한 분이 두 개 올렸거나, 참가자가 아닌 분이 올렸을 수 있어요";
+    mid.innerHTML=`<div class="fp-plate">
+      <div class="fp-nums">손가락 ${pts.size}개 · 참가자 ${need}명</div>
+      <div class="fp-why">${why}</div>
+      <button type="button" class="fp-go" id="fpGo">이대로 시작</button></div>`;
+    const go=document.getElementById("fpGo"); if(!go) return;
+    // 이 버튼의 pointerdown 은 body 까지 올려보내지 않는다 — 올라가면 onDown 이 점을 하나 만들고
+    // setPointerCapture 까지 걸어 '버튼을 눌렀는데 손가락이 하나 늘었다'가 된다 (R5-4).
+    // stopPropagation 만 하고 preventDefault 는 하지 않는다 — 터치에서 click 은 pointerdown 의
+    // 호환 이벤트라, 여기서 기본 동작을 막으면 버튼이 아예 안 눌리는 기기가 생긴다.
+    go.addEventListener("pointerdown",e=>{ e.stopPropagation(); });
+    go.onclick=()=>{ okAt=pts.size; refresh(); };
+  }
   function countdown(){
     settleT=null;                      // 이미 발화한 타이머 — 남겨두면 stop() 이 죽은 id 를 지운다
     if(picked || pts.size<2){ refresh(); return; }   // 타이머와 포인터 사이의 틈을 세기 직전에 한 번 더 확인
-    let k=3; mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12);
-    cdT=setInterval(()=>{ k--;
-      if(k<=0){ stop(); choose(); } else { mid.innerHTML=`<div class="fp-cnt">${k}</div>`; gvibe(12); } }, 800);
+    const bad=mismatch(); if(bad!==null){ askMismatch(bad); return; }        // ②
+    let k=3; mid.innerHTML=`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`; gvibe(12);
+    cdT=setInterval(()=>{
+      const late=mismatch(); if(late!==null){ stop(); askMismatch(late); return; }   // ③
+      k--;
+      if(k<=0){ stop(); choose(); }
+      else { mid.innerHTML=`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`; gvibe(12); } }, 800);
   }
   // 손가락이 늘 때(onDown)와 줄 때(onUp) 모두 여기로 온다. 어느 쪽이든 stop() 으로 진행 중인 카운트다운을
   // 버리고 처음부터 다시 기다리므로, 카운트다운 중에 2명 미만으로 떨어지면 '두 개 이상' 안내로 돌아간다.
   function refresh(){
     if(picked) return; stop();
-    if(pts.size<2){ mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 두 개 이상 올려주세요</div>`; return; }
-    mid.innerHTML=`<div class="game-hint">손가락 ${pts.size}개 — 다 올리셨으면 곧 시작해요</div>`;
+    if(pts.size<2){ mid.innerHTML=`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 두 개 이상 올려주세요</div></div>`; return; }
+    const bad=mismatch(); if(bad!==null){ askMismatch(bad); return; }        // ①
+    mid.innerHTML=`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 다 올리셨으면 곧 시작해요</div></div>`;
     settleT=setTimeout(countdown, SETTLE);
   }
   function choose(){
@@ -2845,8 +3059,11 @@ const RACE_DPR_MAX = 3;          // 화면 캔버스 dpr 상한
    1.5 로 묶으면 510×3600 = 1.84MP × 4B ≈ 7.3MB 이고 한 변도 3600 < 4096 이라 안전하다.
    흐려지는 것은 장식인 벽선·페그뿐이고, 읽어야 하는 구슬 번호는 매 프레임 화면 dpr 그대로 그린다. */
 const RACE_CACHE_DPR = 1.5;
-// 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body 의 스택과 같은 순서다
-const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', sans-serif";
+// 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body 의 스택과 같은
+// 순서로 맞춘다. 예전 주석은 "같은 순서다"라고 적어 놓고 실제로는 'Malgun Gothic' 이 빠져
+// 있었다 — Windows·일부 Android 에서 본문은 Malgun Gothic 인데 캔버스만 일반 sans-serif 로
+// 떨어졌다 (R13-1). 여기를 고칠 땐 51행 body 규칙과 나란히 놓고 대조할 것.
+const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif";
 
 /* playRace(players, winner[, onDone])
    그리고 움직이는 것까지만 한다. 게임 등록·건너뛰기 버튼·GS.teardown·결과 발표는 아래 startRace 가
@@ -2989,7 +3206,12 @@ function playRace(players, winner, onDone){
     ctx.lineWidth = lead ? 3 : 1.5;
     ctx.strokeStyle = lead ? "#2b2118" : "rgba(255,255,255,.92)";
     ctx.stroke();
-    // 두 자리 번호는 한 글자 크기로 그리면 원을 넘는다 — 10 이상만 줄인다(11명부터의 경로다)
+    /* 두 자리 번호는 한 글자 크기로 그리면 원을 넘는다 — 10 이상만 줄인다(11명부터의 경로다).
+       미측정 (R13-5): 이건 논리 캔버스 px 이라 화면 크기가 아니다. 논리 폭 340 을
+       .race-wrap(max-width min(340px,45vh))에 맞추므로 320×568 화면에서 배율이 0.752 이고,
+       10번째 이후 구슬의 숫자는 CSS 7.5px 로 렌더된다(667px 높이 화면에서 8.8px).
+       크기는 RACE_R(11)에 묶여 있어 단독으로 못 올린다 — 키우려면 raceXY 의 벽 여유를 다시
+       확인해야 한다. 실기기에서 판독 여부를 잰 뒤 결정한다. */
     ctx.font = "800 " + (i >= 9 ? 10 : 12.5) + "px " + RACE_FONT;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff"; ctx.fillText(String(i+1), x, y+0.5);
@@ -3427,7 +3649,7 @@ function peopleListHtml(c, key){
     return `<div class="prow" data-tip="${esc(tip)}">
       <div class="row-between" style="margin-bottom:5px">
         <span class="prow-n">${esc(r.name)}</span>
-        <span class="muted" style="font-size:11.5px;flex:none">${r.a}/${denom}${unit}${r.s?` · ☕${r.s}${unit}`:''} · 누적 ${r.t}</span></div>
+        <span class="muted" style="font-size:var(--fs-sm);flex:none">${r.a}/${denom}${unit}${r.s?` · ☕${r.s}${unit}`:''} · 누적 ${r.t}</span></div>
       <div class="meter"><i style="width:${pct}%"></i></div></div>`;
   }).join("");
 }
@@ -3443,7 +3665,7 @@ function menuTopHtml(c, key){
       <div class="row-between"><span class="hbar-name">${esc(x.name)}</span><span class="hbar-n">${x.n}</span></div>
       <div class="hbar-track"><i style="width:${Math.round(x.n/max*100)}%"></i></div></div>`).join("");
   const more = rest.length
-    ? `<div class="muted" style="font-size:11.5px;padding:6px 2px 0">그 외 ${rest.length}종 ${rest.reduce((s,x)=>s+x.n,0)}잔</div>` : "";
+    ? `<div class="muted" style="font-size:var(--fs-sm);padding:6px 2px 0">그 외 ${rest.length}종 ${rest.reduce((s,x)=>s+x.n,0)}잔</div>` : "";
   return `<div style="height:12px"></div>
     <div class="row-between" style="padding:2px 0 4px"><b style="font-size:13px">🥤 많이 마신 메뉴</b>
       <button class="nav-link" data-mbm="${key}" style="font-size:12px">사람별로 보기</button></div>${rows}${more}`;
@@ -3602,24 +3824,45 @@ async function renderCellDashboard(cellId){
    캐시된 payload 로 다시 그리므로 즉각 반응한다(기간 변경만 서버를 다시 부른다). */
 let dashPayload=null, dashQ="", dashSel=null;
 
+/* 두 번째 마커 블록 — tests/game-logic.test.mjs 가 게임 블록과 함께 떼어내 평가한다.
+   달·해 경계에서 틀리기 쉬운 산수만 여기 둔다. 게임 블록에 넣지 않는 이유는 유일한 호출부
+   (presetRange)가 바로 아래라서다 — 도메인이 다른 함수를 한 블록에 몰면 그 블록이 서랍이 된다.
+   블록 안에서는 DOM 도 전역 상태도 읽지 않는다. 시작 마커는 반드시 한 줄로 유지한다. */
+/* @test-export:start */
+// 기준일이 속한 주의 월요일까지 되돌릴 일수. getUTCDay() 는 일요일이 0 이므로 +6 %7 로
+// 월(1)→0 · 화(2)→1 · … · 일(0)→6 이 된다.
+function weekBackDays(ds){ return (new Date(ds+"T00:00:00Z").getUTCDay()+6)%7; }
+// (이번 달 − 2)월. 1월 → 전년 11월, 2월 → 전년 12월. [연, 월(1-based)] 을 돌려준다.
+function q3Start(y, m){ const mm=m-2; return mm<=0 ? [y-1, mm+12] : [y, mm]; }
+/* @test-export:end */
+
 function shiftDate(ds, n){ const d=new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function dashSpanDays(){ return Math.round((Date.parse(dashTo)-Date.parse(dashFrom))/86400000)+1; }
 
 /* 기간 프리셋 — '며칠치'가 아니라 달력 기준(이번주·이번달·올해…)이다.
    기준일은 todayKey() 라 KST 고정이고, 계산은 'YYYY-MM-DD' 문자열 + UTC 로만 해서 시간대 밀림이 없다.
    아직 안 온 날은 데이터가 없으므로 진행 중 구간(이번주·이번달·올해)의 끝은 오늘로 자른다. */
+/* 라벨 '최근3개월'을 '3개월'로 줄인 건 순전히 폭 때문이다 — 6개를 320px 한 줄에 넣으려면
+   가장 넓은 라벨을 깎아야 한다(R3). 키(q3)와 계산은 그대로이고, 무슨 기간인지는
+   dashPresetsHtml 이 title/aria-label 로 말한다. */
 const DASH_PRESETS=[["이번주","week"],["지난달","lastmon"],["이번달","month"],
-                    ["최근3개월","q3"],["올해","year"],["작년","lastyear"]];
+                    ["3개월","q3"],["올해","year"],["작년","lastyear"]];
 function presetRange(key){
   const t=todayKey(), y=+t.slice(0,4), m=+t.slice(5,7);
   const p=(yy,mm,dd)=>`${yy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
   const lastDay=(yy,mm)=>new Date(Date.UTC(yy,mm,0)).getUTCDate();   // mm 은 1-based — 0일 = 그 달 말일
   switch(key){
-    // 일요일 시작 — 교회 한 주가 주일부터라 달력과 감각이 맞는다
-    case "week":    return [shiftDate(t, -new Date(t+"T00:00:00Z").getUTCDay()), t];
+    /* 월요일 시작 — 사용자 지시로 정한 값이다. 예전 근거("교회 한 주가 주일부터라 달력과
+       감각이 맞는다")는 그 지시로 대체됐다. 끝은 그대로 오늘이다: '이번달'·'올해'가 이미
+       오늘로 자르고 있고, 서버 _dash_range 가 미래 종료일을 오늘로 클램프하므로, 화면엔
+       일요일까지 적어 놓고 서버는 오늘까지만 집계하는 어긋남을 애초에 만들지 않는다. */
+    case "week":    return [shiftDate(t, -weekBackDays(t)), t];
     case "month":   return [p(y,m,1), t];
     case "lastmon":{ const yy=m===1?y-1:y, mm=m===1?12:m-1; return [p(yy,mm,1), p(yy,mm,lastDay(yy,mm))]; }
-    case "q3":      return [shiftDate(t,-89), t];   // 달력 분기가 아니라 오늘 기준 90일 롤링
+    // 달력 3개월 — '이번 달을 포함한 최근 세 달'이고 첫날은 항상 1일이다. 예전엔 오늘 기준
+    // 90일 롤링이라 달 경계와 안 맞아 '지난달'과 겹치는 구간이 애매했다. 최대 92일이라
+    // 서버 _dash_range 의 366일 상한에 걸리지 않는다.
+    case "q3":      { const [qy,qm]=q3Start(y,m); return [p(qy,qm,1), t]; }
     case "year":    return [p(y,1,1), t];
     case "lastyear":return [p(y-1,1,1), p(y-1,12,31)];
   }
@@ -3656,10 +3899,15 @@ function dashDatesHtml(today){
       <input type="date" id="dTo" value="${dashTo}" max="${today}" aria-label="종료일">
     </div>`;
 }
+/* 라벨을 줄인 칩은 그 기간이 무엇인지 따로 말해준다 (R3-9). 접근성 이름은 보이는 라벨을
+   포함해야 하므로(WCAG 2.5.3 Label in Name) 축약형을 앞에 두고 설명을 뒤에 붙인다.
+   title 은 모바일에서 안 뜨지만 데스크톱 호버용으로 함께 둔다. */
+const PRESET_HINT={ q3:"3개월 — 이번 달 포함 최근 3개월", week:"이번주 — 이번 주 월요일부터 오늘까지" };
 function dashPresetsHtml(){
   return `<div class="tabs dash-filter" role="group" aria-label="기간 선택">${DASH_PRESETS.map(([l,k])=>{
     const r=presetRange(k), on=(dashFrom===r[0] && dashTo===r[1]);
-    return `<button class="tab${on?' on':''}" data-preset="${k}" aria-pressed="${on}">${l}</button>`;
+    const hint=PRESET_HINT[k] ? ` title="${esc(PRESET_HINT[k])}" aria-label="${esc(PRESET_HINT[k])}"` : "";
+    return `<button class="tab${on?' on':''}" data-preset="${k}"${hint} aria-pressed="${on}">${l}</button>`;
   }).join("")}</div>`;
 }
 function dashWarnHtml(){
@@ -3721,7 +3969,7 @@ function cellGridHtml(cells){
     || (b.used_days||0)-(a.used_days||0) || a.name.localeCompare(b.name,"ko"));
   const max=Math.max(1,...sorted.map(c=>c.servings_total||0));
   const head=`<div class="row-between" style="padding:2px 2px 6px"><b style="font-size:13px">🏆 많이 활용한 셀</b>
-    <span class="muted" style="font-size:11.5px">누르면 아래 상세가 바뀝니다</span></div>`;
+    <span class="muted" style="font-size:var(--fs-sm)">누르면 아래 상세가 바뀝니다</span></div>`;
   if(!sorted.length) return head+`<div class="card"><p class="muted center" style="margin:0;padding:10px 0">조건에 맞는 셀이 없어요</p></div>`;
   return head+`<div class="cellgrid">${sorted.map((c,i)=>{
     const n=c.servings_total||0;
@@ -3739,7 +3987,7 @@ function dashPeopleHitHtml(people){
     <div class="muted" style="font-size:12px;margin-bottom:6px">🙋 이름이 걸린 사람 ${people.length}명</div>
     <div class="logchips">${people.slice(0,20).map(p=>
       `<span class="logchip" style="font-size:12px">${esc(p.name)} <span class="muted">· ${esc(p.cell)}</span>${p.ct?` <b>☕${p.ct}</b>`:''}</span>`).join("")}</div>
-    ${people.length>20?`<div class="muted" style="font-size:11.5px;padding-top:6px">그 외 ${people.length-20}명</div>`:''}</div>`;
+    ${people.length>20?`<div class="muted" style="font-size:var(--fs-sm);padding-top:6px">그 외 ${people.length-20}명</div>`:''}</div>`;
 }
 // 컨트롤 바 아래 본문 — 검색·셀 선택으로 바뀌는 건 전부 여기 안에 있다
 function dashBodyHtml(list, people, sel){
