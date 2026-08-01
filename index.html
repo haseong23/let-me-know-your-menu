@@ -638,7 +638,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.91";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.92";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -3828,12 +3828,22 @@ const RACE_VIEW_H = 260;         // 캔버스 논리 높이 (폭은 RACE_W = 200
    아래 줌과 함께 29% 로 올렸고, 선두 앞으로 보이는 코스도 156 → 165px 로 오히려 늘었다 —
    줌이 시야를 통째로 넓히기 때문에 앞뒤가 같이 늘어난다. */
 const RACE_CAM = 0.55;
-/* 무리가 퍼지면 시야를 넓힌다. 하한 0.70 은 가독성에서 나온 값이다 — 구슬 지름이 화면에서
-   30.6px → 21.4px, 두 자리 번호가 15.3px → 10.7px 가 된다. 더 빼면(0.62) 번호가 9.5px 라
-   예전에 문제였던 7.5px(R13-5)에 가까워진다. 화면 안 비율은 0.62 에서도 24명 24% 로 크게
-   나아지지 않아, 읽히는 쪽을 골랐다.
-   줌을 그대로 따라가면 프레임마다 값이 떨려서 화면이 울렁인다 — 지수 평활로 천천히 따라간다. */
-const RACE_ZOOM_MIN = 0.70;
+/* 카메라가 무리에 맞춰 확대·축소한다(레퍼런스와 같은 방식). 뭉쳐 있으면 바짝 당겨 구슬이
+   크게 보이고, 퍼지면 물러나 다 담는다 — 화면에 늘 '무리'가 있고, 그 크기가 지금 얼마나
+   붙어 있는지를 그 자체로 말한다.
+   하한 0.52 는 레퍼런스에서 읽어 왔다 — 무리가 퍼지면 구슬이 꽤 작아지도록 물러난다. 그렇게
+   해도 되는 이유는 이름표를 화면 고정 크기로 그리기 때문이다(줌과 무관하게 늘 읽힌다).
+   상한은 '코스 폭이 늘 통째로 보이는 배율'이다. 조금이라도 더 당기면 폭 200 이 화면보다
+   넓어져 가장자리 구슬이 잘린다 — 실제로 1.15 로 뒀더니 출발 직후 오른쪽 끝 구슬이 화면 밖에
+   있었다. 레퍼런스도 어느 장면에서나 양쪽 벽이 함께 보인다. 그래서 이 카메라가 하는 일은
+   사실상 축소뿐이고, 가로는 따라갈 것이 없어진다(늘 가운데 정렬).
+   줌을 그대로 따라가면 프레임마다 값이 떨려 화면이 울렁이므로 지수 평활로 천천히 따라간다. */
+// 캔버스 CSS 배율. .race-wrap 이 max-width:min(340px,45vh) 이므로 논리 200 이 340 으로 늘어난다.
+// 이름표를 그릴지 말지를 '화면에서 몇 px 인가'로 판단해야 해서 이 값이 필요하다.
+const RACE_CSS = 340/200;
+const RACE_MINI_W = 22;          // 왼쪽 미니맵이 차지하는 폭(화면 논리 px). 코스는 그 오른쪽에만 그린다
+const RACE_ZOOM_MIN = 0.52;
+const RACE_ZOOM_MAX = (RACE_W - RACE_MINI_W) / RACE_W;
 const RACE_ZOOM_EASE = 0.05;
 const RACE_CAM_PAD = 20;         // 카메라 여유 — 코스 양 끝에서 선두가 테두리에 걸치지 않게 한다
 const RACE_HUD_MS = 200;         // HUD 갱신 간격
@@ -3999,32 +4009,90 @@ function playRace(players, onDone){
     ctx.fillStyle = "#fff"; ctx.fillText(String(i+1), x, y+0.5);
   }
 
+  /* 구슬 아래 이름표(레퍼런스와 같은 위치). 번호와 아래 범례를 오갈 것 없이 누가 누군지 바로
+     읽힌다. 카메라 변환 '밖에서' 화면 좌표로 그리는 것이 요점이다 — 줌을 따라 같이 줄면 무리가
+     퍼졌을 때(가장 필요할 때) 글자가 먼저 사라진다. 크기를 고정해 두면 카메라가 얼마나 물러나든
+     이름은 늘 읽히고, 덕분에 축소 하한을 0.52 까지 열 수 있었다.
+     인원 기준은 이 파일이 이미 쓰는 것을 그대로 쓴다 — GAME_LABEL_MAX(10)를 넘으면 사다리·
+     돌림판도 이름을 번호로 바꾼다. 그 위로는 이름표끼리 겹쳐 오히려 방해라 번호와 범례에 맡긴다.
+     흰 테두리를 두르는 이유는 코스 벽·장애물 위에 겹쳐도 읽히게 하기 위해서다. */
+  function drawNames(base, z, camX, camY){
+    if(n > GAME_LABEL_MAX) return;
+    ctx.font = "800 9px " + RACE_FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.lineWidth = 3; ctx.lineJoin = "round";
+    for(let k=n-1;k>=0;k--){
+      const i = rank[k];
+      const sy = (ypos[i] - camY)*z;
+      if(sy < -20 || sy > H+8) continue;
+      const nm = shortName(players[i].name, 4);
+      /* 가장자리 구슬의 이름표가 캔버스 밖으로 나가 잘린다. 글자 폭을 재서 안으로 밀어 넣는다 —
+         구슬과 살짝 어긋나 보이지만, 잘려서 못 읽는 것보다 낫다. */
+      const half = ctx.measureText(nm).width/2 + 2;
+      const sx = Math.max(RACE_MINI_W + half, Math.min(W - half,
+                          RACE_MINI_W + (sim.path[base+i*2] - camX)*z));
+      ctx.strokeStyle = "rgba(255,253,249,.95)"; ctx.strokeText(nm, sx, sy + RACE_R*z + 1.5);
+      ctx.fillStyle = gcolor(i, n);              ctx.fillText(nm, sx, sy + RACE_R*z + 1.5);
+    }
+  }
+
   /* ── 한 프레임 ── 물리는 이미 끝나 있다. 여기서는 녹화된 좌표를 읽어 그리기만 한다. */
   const ypos = new Array(n).fill(0);
   const rank = players.map((m,i)=>i);
-  let camZ = 1;                       // 지금 줌. 목표를 향해 천천히 따라간다
+  let camZ = 1, camX = 0;             // 지금 줌·가로 위치. 목표를 향해 천천히 따라간다
   function draw(t){
     const f = Math.max(0, Math.min(sim.frames-1, Math.floor(t*60/1000)));
     const base = f*n*2;
     for(let i=0;i<n;i++) ypos[i] = sim.path[base+i*2+1];
     rank.sort((a,b)=> ypos[b]-ypos[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
-    // 무리 전체(맨 앞~맨 뒤)를 담을 만큼 시야를 넓힌다. 50 은 위아래 여백이다.
+    // 무리 전체(맨 앞~맨 뒤)가 화면에 들어오는 배율. 50 은 위아래 여백이다.
     const spread = ypos[rank[0]] - ypos[rank[n-1]] + 50;
-    const zTarget = Math.max(RACE_ZOOM_MIN, Math.min(1, H/spread));
+    const zTarget = Math.max(RACE_ZOOM_MIN, Math.min(RACE_ZOOM_MAX, H/spread));
     camZ += (zTarget - camZ) * RACE_ZOOM_EASE;
-    const vh = H / camZ;                                     // 지금 화면이 담는 코스 높이
+    /* 세로만 움직인다. 가로는 코스 폭(200)이 늘 통째로 보이도록 줌 상한이 묶어 두므로 따라갈
+       것이 없다 — 조금이라도 더 당기면 폭이 화면보다 넓어져 가장자리 구슬이 잘린다.
+       왼쪽 RACE_MINI_W 는 미니맵 몫으로 비워 둔다. 겹치게 두면 출발 직후처럼 구슬이 폭 전체에
+       흩어져 있을 때 왼쪽 구슬이 미니맵 뒤로 사라진다. */
+    const vh = H / camZ;
     const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, ypos[rank[0]] - vh*RACE_CAM));
-    /* 줌을 걸면 코스(폭 200)가 캔버스보다 좁아져 양옆에 여백이 생긴다. 그 여백을 캔버스와 같은
-       색으로 두면 구슬이 보이지 않는 벽에 튕기는 것처럼 보이므로, 배경을 한 톤 어둡게 깔고
-       코스 폭만 밝게 칠해 '길'이 어디까지인지 눈에 남긴다. */
+    camX = (W - (W - RACE_MINI_W)/camZ) / 2;                 // 코스를 미니맵 오른쪽 공간의 가운데에
+    /* 코스 폭 밖은 한 톤 어둡게 깔고 코스만 밝게 칠한다 — 안 그러면 축소했을 때 구슬이
+       보이지 않는 벽에 튕기는 것처럼 보인다. */
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#f1ebe1"; ctx.fillRect(0, 0, W, H);
-    ctx.setTransform(dpr*camZ, 0, 0, dpr*camZ, dpr*(W/2)*(1-camZ), 0);   // 코스를 가로 가운데에 둔다
+    ctx.setTransform(dpr*camZ, 0, 0, dpr*camZ, dpr*(RACE_MINI_W - camZ*camX), 0);
     ctx.fillStyle = "#fffdf9"; ctx.fillRect(0, 0, W, vh);
     drawCourse(camY, f, vh);
     for(let k=n-1;k>=0;k--){ const i=rank[k]; drawMarble(i, sim.path[base+i*2], ypos[i]-camY, k===0); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawNames(base, camZ, camX, camY);
+    drawMiniMap(base);
     return rank;
+  }
+
+  /* 미니맵 — 코스 전체를 왼쪽에 한 줄로 접어 놓고 구슬을 점으로 찍는다. 카메라가 무리를 물고
+     따라다니는 대신 '지금 코스의 어디쯤인지'를 잃는데, 그걸 여기서 돌려준다. 레퍼런스도 같은
+     자리에 같은 물건을 둔다. 줌과 무관한 화면 좌표로 그리므로 카메라 변환 밖에서 부른다. */
+  function drawMiniMap(base){
+    const mw=RACE_MINI_W-8, mx=4, my=6, mh=H-12;
+    ctx.fillStyle="rgba(255,253,249,.86)";
+    ctx.strokeStyle="#e0d5c4"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.fill(); ctx.stroke();
+    // 지금 화면이 코스의 어디를 보고 있는지
+    const camTop=Math.max(0, Math.min(1, (ypos[rank[0]] - H/camZ*RACE_CAM)/map.total));
+    const camBot=Math.max(0, Math.min(1, (ypos[rank[0]] + H/camZ*(1-RACE_CAM))/map.total));
+    ctx.fillStyle="rgba(111,78,55,.13)";
+    ctx.fillRect(mx, my+camTop*mh, mw, Math.max(2,(camBot-camTop)*mh));
+    ctx.fillStyle="#2b2118";
+    ctx.fillRect(mx, my+mh-1.5, mw, 1.5);                  // 결승선
+    for(let k=n-1;k>=0;k--){
+      const i=rank[k];
+      const px=mx+2+ (sim.path[base+i*2]/W)*(mw-4);
+      const py=my+ Math.max(0,Math.min(1, ypos[i]/map.total))*mh;
+      ctx.beginPath(); ctx.arc(px, py, k===0?2.4:1.8, 0, Math.PI*2);
+      ctx.fillStyle=gcolor(i, n); ctx.fill();
+      if(k===0){ ctx.lineWidth=0.8; ctx.strokeStyle="#2b2118"; ctx.stroke(); }
+    }
   }
 
   /* ── 루프 ──
