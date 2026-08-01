@@ -638,7 +638,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.90";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.91";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -3400,7 +3400,7 @@ function playLadder(roster, winner){
   // 긴장은 선이 2.4초 동안 위에서 아래로 내려오는 데서 나온다.
 
   openGameOv("🪜 사다리타기", `
-    <div class="game-say" id="gvSay" aria-live="polite">한 폰을 다 같이 보세요 — 내려갑니다…</div>
+    <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 이름을 찾아두세요</div>
     <div class="game-stage"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="사다리타기 진행 중">
       ${roster.map((m,i)=>`<text x="${colX(i)}" y="${LABEL_Y}" text-anchor="middle" font-size="${LFS}" font-weight="800" fill="${gcolor(i, n)}"><title>${esc(m.name)}</title>${NUMS ? (i+1) : esc(shortName(m.name,NCH))}</text>`).join("")}
       ${roster.map((m,i)=>`<line x1="${colX(i)}" y1="${Y0}" x2="${colX(i)}" y2="${Y1}" stroke="#e7ddcf" stroke-width="3" stroke-linecap="round"/>`).join("")}
@@ -3412,7 +3412,11 @@ function playLadder(roster, winner){
     </svg></div>
     ${gameLegendHtml(roster, n)}
     <div id="gvWin" role="status"></div>`);
-  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  /* 푸터가 두 단계다 — 구슬 레이스의 출발 게이트와 같은 이유다. 열자마자 선이 내려가면 세로줄
+     위의 자기 이름을 찾기도 전에 여섯 줄이 동시에 움직여, 누구를 보고 있었는지 놓친다.
+     멈춰 있는 동안 내 이름을 찾아 두면 그 뒤로는 한 줄만 눈으로 따라가면 된다. */
+  setGameFoot(`<div class="row-2"><button class="btn btn-brand" id="gvGo">▶ 시작!</button>
+    <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
   // 4800ms — 예전 2400 의 절반 속도다. 2.4초는 선 여섯 줄이 동시에 내려오는 걸 눈으로 좇기엔
@@ -3450,9 +3454,24 @@ function playLadder(roster, winner){
   });
   const place=(g,pt)=> g.setAttribute("transform","translate("+pt.x.toFixed(1)+" "+pt.y.toFixed(1)+")");
   els.forEach((p,i)=> place(marks[i], p.getPointAtLength(0)));
-  void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
-  els.forEach((p,i)=>{ p.style.transition="stroke-dashoffset "+durs[i].toFixed(0)+"ms cubic-bezier(.45,.05,.25,1)";
-                       p.style.strokeDashoffset="0px"; });
+
+  /* [▶ 시작!] 을 누른 뒤에 굴린다. 여기서 리플로우를 한 번 내는 것이 여전히 요점이다 —
+     시작값과 끝값이 같은 스타일 재계산에 묶이면 보간할 구간이 없어 선이 완성된 채로 나타난다. */
+  let started=false;
+  const startRun=()=>{
+    if(started) return;
+    started=true;
+    const say=document.getElementById("gvSay"); if(say) say.textContent="한 폰을 다 같이 보세요 — 내려갑니다…";
+    setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    bind("gvCancel",()=>closeGame());
+    void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
+    els.forEach((p,i)=>{ p.style.transition="stroke-dashoffset "+durs[i].toFixed(0)+"ms cubic-bezier(.45,.05,.25,1)";
+                         p.style.strokeDashoffset="0px"; });
+    mraf=requestAnimationFrame(follow);
+    // 선이 다 내려오면 곧바로 발표한다. 상자는 이미 다 보이므로 열어 보일 것이 없다 (R4-5).
+    // 120ms 는 마지막 선의 끝점이 상자에 닿은 걸 눈이 확인할 여유다.
+    gtimer(()=>showGameResult(winner), LAST+120);
+  };
   /* 표식은 애니메이션의 '현재 값'을 읽어서 따라간다 — 같은 이징을 두 군데 적어 두면 언젠가
      어긋나므로, 진짜 값 하나(strokeDashoffset)를 출처로 삼는다. lessMotion 이면 전역 규칙이
      전환을 꺼서 첫 프레임에 이미 0 이라 표식도 곧장 끝점에 선다. */
@@ -3473,11 +3492,8 @@ function playLadder(roster, winner){
      ① 선이 다 내려오면(off<=0.5) 더 예약하지 않는다 ② [한 판 더]나 다른 게임이 오버레이
      마크업을 갈아치우면 isConnected 가 false 가 된다. GS.teardown 을 가로채는 방식은
      손가락 룰렛이 이미 쓰고 있어서, 여기서 또 감싸면 두 게임이 서로의 정리를 덮어쓴다. */
-  mraf=requestAnimationFrame(follow);
-
-  // 선이 다 내려오면 곧바로 발표한다. 상자는 이미 다 보이므로 열어 보일 것이 없다 (R4-5).
-  // 120ms 는 마지막 선의 끝점이 상자에 닿은 걸 눈이 확인할 여유다.
-  gtimer(()=>showGameResult(winner), LAST+120);
+  // 배선은 follow 를 선언한 뒤에 건다 — startRun 이 그것을 부르므로 순서를 눈에 보이게 둔다.
+  bind("gvGo", startRun);
 }
 
 /* ---------- 🎡 돌림판 ---------- */
@@ -3519,7 +3535,14 @@ function playWheel(roster, winner){
         ${sectors}${labels}<circle cx="0" cy="0" r="13" fill="#fff" stroke="#e7ddcf" stroke-width="2"/></svg></div></div>
     ${gameLegendHtml(roster, n)}
     <div id="gvWin" role="status"></div>`);
-  setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+  /* [⏹ 그만 돌리기] — 기다리기 싫을 때 회전을 끊는다. 이름을 '여기서 멈추기'로 하지 않은 이유가
+     있다. 당첨자는 판을 돌리기 전에 이미 정해져 있고(확률⬇️·제외·평등이 적용된 가중 추첨),
+     판은 그 자리를 향해 갈 뿐이다. '여기서'라고 쓰면 누르는 순간의 각도가 결과를 정한다는 뜻이
+     되어 사실과 다르다. 이 버튼이 줄이는 건 결과가 아니라 기다리는 시간이다.
+     누른 각도로 결과를 정하려면 확률 조정을 포기해야 하는데(각도가 곧 추첨이 되므로),
+     돌림판은 '🎯 확률 조정 가능' 무리에 있는 게임이라 그쪽을 지켰다. */
+  setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvStop">⏹ 그만 돌리기</button>
+    <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
   const slow=!lessMotion(), DUR= slow?4400:220;
@@ -3561,6 +3584,47 @@ function playWheel(roster, winner){
     if(slow) gtimer(swap, 350); else swap();
   }
   gtimer(()=>showGameResult(winner), DUR);
+
+  /* 끊기. 지금 보이는 각도에서 이어서 0.9초 만에 같은 자리로 데려간다.
+     CSS transition 을 중간에 짧게 갈아 끼우면 브라우저는 '현재 계산된 값'이 아니라 원래
+     끝값에서 새로 보간해서 판이 뒤로 튄다. 그래서 두 단계로 한다 — ① 지금 화면에 그려진 각도를
+     행렬에서 읽어 transition 없이 그대로 박고 ② 거기서 한 바퀴를 더 돌아 목표 각도로 간다.
+     한 바퀴를 더 얹는 이유는 각도가 360 으로 접혀 있어서, 그냥 목표를 주면 몇 도쯤 뒤로
+     되감기는 그림이 나오기 때문이다. 최종 각도는 360 의 배수만 다르므로 핀 아래 조각은 같다.
+     결과 시각도 다시 잡는다 — 기존 4.4초짜리 예약을 그대로 두면 판이 멈춘 뒤 한참 기다린다. */
+  const canRead = typeof DOMMatrixReadOnly === "function";
+  // lessMotion 이면 판이 돌지 않고 220ms 뒤 결과가 뜬다 — 끊을 것이 없으니 버튼째 뺀다.
+  // 버튼만 지우면 .row-2 에 하나만 남아 폭이 벌어지므로 푸터를 다시 그린다.
+  if(!slow){
+    setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    bind("gvCancel",()=>closeGame());
+  }
+  else bind("gvStop", ()=>{
+    if(!rot.isConnected) return;
+    clearGameTimers();                                   // 4.4초짜리 발표 예약을 걷어낸다
+    const say=document.getElementById("gvSay"); if(say) say.textContent="멈춥니다…";
+    setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    bind("gvCancel",()=>closeGame());
+    const STOP=900;
+    if(canRead){
+      const m=new DOMMatrixReadOnly(getComputedStyle(rot).transform);
+      const now=Math.atan2(m.b, m.a)*180/Math.PI;        // -180~180, 바퀴 수는 사라진다
+      const goal=now + ((spin - now) % 360 + 360) % 360 + 360;
+      rot.style.transition="none"; rot.style.transform="rotate("+now.toFixed(2)+"deg)";
+      if(labelsAnimate) labs.forEach(el=>{ el.style.transition="none"; el.style.transform="rotate("+(-now).toFixed(2)+"deg)"; });
+      void $gv().offsetHeight;
+      const E="transform "+STOP+"ms cubic-bezier(.16,.72,.14,1)";
+      rot.style.transition=E; rot.style.transform="rotate("+goal.toFixed(2)+"deg)";
+      if(labelsAnimate) labs.forEach(el=>{ el.style.transition=E; el.style.transform="rotate("+(-goal).toFixed(2)+"deg)"; });
+      else labs.forEach(el=> el.setAttribute("transform","rotate("+el.dataset.rot+")"));
+    }else{
+      // DOMMatrix 를 못 읽는 브라우저 — 각도를 이어 붙일 수 없으니 그냥 끝 각도로 보낸다.
+      rot.style.transition="none"; rot.style.transform="rotate("+spin.toFixed(2)+"deg)";
+      if(labelsAnimate) labs.forEach(el=>{ el.style.transition="none"; el.style.transform="rotate("+labelEnd.toFixed(2)+"deg)"; });
+      else labs.forEach(el=> el.setAttribute("transform","rotate("+el.dataset.rot+")"));
+    }
+    gtimer(()=>showGameResult(winner), canRead ? STOP+120 : 120);
+  });
 }
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
@@ -3759,7 +3823,18 @@ function playFinger(){
 /* 논리 치수. 캔버스 좌표는 전부 이 값들로 쓰고 devicePixelRatio 는 setTransform 한 줄로만 다룬다 —
    그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
 const RACE_VIEW_H = 260;         // 캔버스 논리 높이 (폭은 RACE_W = 200)
-const RACE_CAM = 0.40;           // 선두를 화면 위에서 이 비율 지점에 둔다
+/* 선두를 화면 위에서 이 비율 지점에 둔다. 0.40 이었는데 0.55 로 내렸다 — 선두 뒤쪽이 더 보인다.
+   무리가 화면 밖에 있다는 게 이 게임의 오래된 문제였다(24명 판에서 구슬의 18% 만 화면 안).
+   아래 줌과 함께 29% 로 올렸고, 선두 앞으로 보이는 코스도 156 → 165px 로 오히려 늘었다 —
+   줌이 시야를 통째로 넓히기 때문에 앞뒤가 같이 늘어난다. */
+const RACE_CAM = 0.55;
+/* 무리가 퍼지면 시야를 넓힌다. 하한 0.70 은 가독성에서 나온 값이다 — 구슬 지름이 화면에서
+   30.6px → 21.4px, 두 자리 번호가 15.3px → 10.7px 가 된다. 더 빼면(0.62) 번호가 9.5px 라
+   예전에 문제였던 7.5px(R13-5)에 가까워진다. 화면 안 비율은 0.62 에서도 24명 24% 로 크게
+   나아지지 않아, 읽히는 쪽을 골랐다.
+   줌을 그대로 따라가면 프레임마다 값이 떨려서 화면이 울렁인다 — 지수 평활로 천천히 따라간다. */
+const RACE_ZOOM_MIN = 0.70;
+const RACE_ZOOM_EASE = 0.05;
 const RACE_CAM_PAD = 20;         // 카메라 여유 — 코스 양 끝에서 선두가 테두리에 걸치지 않게 한다
 const RACE_HUD_MS = 200;         // HUD 갱신 간격
 const RACE_DPR_MAX = 3;
@@ -3862,12 +3937,12 @@ function playRace(players, onDone){
      새로 만들지 않는다). */
   const stamp = new Int32Array(map.bodies.length).fill(-1);
   let stampNo = 0;
-  function drawCourse(camY, f){
+  function drawCourse(camY, f, vh){
     const tt = f*RACE_SUB*RACE_DT;
     stampNo++;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     const c0 = Math.max(0, Math.floor(camY/RACE_CELL));
-    const c1 = Math.min(map.cells-1, Math.floor((camY+H)/RACE_CELL));
+    const c1 = Math.min(map.cells-1, Math.floor((camY+vh)/RACE_CELL));
     for(let c=c0;c<=c1;c++){
       const list = map.grid[c];
       for(let k=0;k<list.length;k++){
@@ -3900,7 +3975,7 @@ function playRace(players, onDone){
     }
     // 결승선 — 체커 두 줄. 1위가 도착하는 순간 화면에 무엇이 걸렸는지 보여야 한다
     const fy = map.finishY - camY;
-    if(fy > -24 && fy < H+24){
+    if(fy > -24 && fy < vh+24){
       const cell = 10;
       for(let row=0;row<2;row++) for(let x=0;x<W;x+=cell){
         ctx.fillStyle = ((x/cell + row) % 2) ? "#2b2118" : "#ffffff";
@@ -3927,15 +4002,28 @@ function playRace(players, onDone){
   /* ── 한 프레임 ── 물리는 이미 끝나 있다. 여기서는 녹화된 좌표를 읽어 그리기만 한다. */
   const ypos = new Array(n).fill(0);
   const rank = players.map((m,i)=>i);
+  let camZ = 1;                       // 지금 줌. 목표를 향해 천천히 따라간다
   function draw(t){
     const f = Math.max(0, Math.min(sim.frames-1, Math.floor(t*60/1000)));
     const base = f*n*2;
     for(let i=0;i<n;i++) ypos[i] = sim.path[base+i*2+1];
     rank.sort((a,b)=> ypos[b]-ypos[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
-    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - H + RACE_CAM_PAD, ypos[rank[0]] - H*RACE_CAM));
-    ctx.clearRect(0, 0, W, H);
-    drawCourse(camY, f);
+    // 무리 전체(맨 앞~맨 뒤)를 담을 만큼 시야를 넓힌다. 50 은 위아래 여백이다.
+    const spread = ypos[rank[0]] - ypos[rank[n-1]] + 50;
+    const zTarget = Math.max(RACE_ZOOM_MIN, Math.min(1, H/spread));
+    camZ += (zTarget - camZ) * RACE_ZOOM_EASE;
+    const vh = H / camZ;                                     // 지금 화면이 담는 코스 높이
+    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, ypos[rank[0]] - vh*RACE_CAM));
+    /* 줌을 걸면 코스(폭 200)가 캔버스보다 좁아져 양옆에 여백이 생긴다. 그 여백을 캔버스와 같은
+       색으로 두면 구슬이 보이지 않는 벽에 튕기는 것처럼 보이므로, 배경을 한 톤 어둡게 깔고
+       코스 폭만 밝게 칠해 '길'이 어디까지인지 눈에 남긴다. */
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#f1ebe1"; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(dpr*camZ, 0, 0, dpr*camZ, dpr*(W/2)*(1-camZ), 0);   // 코스를 가로 가운데에 둔다
+    ctx.fillStyle = "#fffdf9"; ctx.fillRect(0, 0, W, vh);
+    drawCourse(camY, f, vh);
     for(let k=n-1;k>=0;k--){ const i=rank[k]; drawMarble(i, sim.path[base+i*2], ypos[i]-camY, k===0); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return rank;
   }
 
