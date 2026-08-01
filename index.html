@@ -168,7 +168,7 @@
      margin-left:auto 가 없으면 가운데 블록 바로 뒤에 붙어 행마다 좌우로 흔들린다. */
   .sameas { flex:none; margin-left:auto; }
   /* 게임 시트의 사람별 당첨 확률. 칩으로 흘려 담아 24명도 몇 줄로 접힌다(범례와 같은 처방).
-     .low 는 [확률 낮추기]가 걸린 분 — 숫자만으로는 목록에서 한 명을 찾아내야 한다. */
+     .low 는 [확률⬇️]가 걸린 분 — 숫자만으로는 목록에서 한 명을 찾아내야 한다. */
   .gpr { display:flex; flex-wrap:wrap; gap:4px 6px; margin-top:8px; }
   .gpr-it { display:inline-flex; align-items:baseline; gap:5px; background:var(--bg); border:1px solid var(--line);
     border-radius:8px; padding:3px 8px; font-size:var(--fs-sm); line-height:1.4; max-width:100%; min-width:0; }
@@ -176,25 +176,29 @@
   .gpr-it i { font-style:normal; font-weight:800; color:var(--brand); font-variant-numeric:tabular-nums; flex:none; }
   .gpr-it.low { border-color:var(--accent); background:#fdf4e6; }
   .gpr-it.low i { color:var(--accent-ink); }
-  /* 확률 낮추기 강도 슬라이더. range 입력은 이 파일에서 여기만 쓴다 — 손잡이·트랙을 다시 그리지
-     않고 기본 모양을 쓴다(다시 그리면 기기별 키보드·보이스오버 조작을 직접 떠맡게 된다).
-     accent-color 한 줄이면 브랜드 색은 입힐 수 있다. */
-  /* 왼쪽 세로선으로 위 칩([확률 낮추기])에 딸린 설정임을 보인다 — 안 그러면 칩 세 개와
-     슬라이더가 같은 층위의 컨트롤 넷으로 읽혀서, 슬라이더가 어느 칩의 값인지 알 수 없다. */
-  .gsl { margin-top:10px; padding-left:11px; border-left:3px solid var(--brand-soft); }
-  .gsl-l { display:block; font-size:var(--fs-sm); color:var(--sub); font-weight:700; margin-bottom:2px; }
-  .gsl-l b { color:var(--brand); font-variant-numeric:tabular-nums; }
+  /* 정책 칩 아래 결과 한 줄. 세 정책이 같은 자리·같은 단위(절대 %)로 결론만 말한다 —
+     설명 문장·슬라이더 라벨·결과 칩으로 나뉘어 같은 값을 네 번 적던 것을 여기로 합쳤다.
+     min-height 로 자리를 미리 잡아 둔다: 칩을 바꿀 때 줄 수가 달라져도 아래 슬라이더가
+     위아래로 튀지 않아야 방금 누른 칩에서 눈이 안 떨어진다. */
+  .gpo { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 9px; margin-top:9px;
+         min-height:22px; font-size:var(--fs-sm); }
+  /* 가운뎃점으로 두 값을 끊는다. 간격만으로는 "한사랑R 10.0% 다른 분 30.0%" 가 한 문장으로
+     붙어 읽힌다. 앞 값의 ::after 로 다는 게 요점이다 — 뒤 값의 ::before 로 달면 이름이 길어
+     줄이 바뀔 때 점이 다음 줄 맨 앞에 홀로 떨어진다. */
+  .gpo-t.sep::after { content:"·"; color:var(--line); font-weight:800; margin-left:9px; }
+  .gpo-t { color:var(--ink); font-weight:700; }
+  .gpo-t b { font-weight:800; color:var(--brand); font-variant-numeric:tabular-nums; }
+  .gpo-t.low, .gpo-t.low b { color:var(--accent-ink); }
+  .gpo-s { color:var(--sub); font-weight:600; }
+  /* 강도 슬라이더. range 입력은 이 파일에서 여기만 쓴다 — 손잡이·트랙을 다시 그리지 않고 기본
+     모양을 쓴다(다시 그리면 기기별 키보드·보이스오버 조작을 직접 떠맡게 된다).
+     accent-color 한 줄이면 브랜드 색은 입힐 수 있다.
+     왼쪽 세로선으로 위 칩([확률⬇️])에 딸린 설정임을 보인다 — 안 그러면 칩 세 개와 슬라이더가
+     같은 층위의 컨트롤 넷으로 읽혀서, 슬라이더가 어느 칩의 값인지 알 수 없다. */
+  .gsl { margin-top:2px; padding-left:11px; border-left:3px solid var(--brand-soft); }
   /* 44px — 손잡이 자체는 작지만 입력의 히트 영역은 이 높이 전체다(터치 최소 규격) */
   .gsl input[type=range] { width:100%; accent-color:var(--brand); min-height:44px; }
   .gsl-e { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--sub); margin-top:-2px; }
-  /* 조절한 결과를 조절기 바로 아래 둔다. 왼쪽이 낮춰진 분, 오른쪽이 나머지 한 분 기준이다. */
-  .gsl-r { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:var(--fs-sm); }
-  .gsl-r > span { display:inline-flex; align-items:baseline; gap:5px; border-radius:8px; padding:4px 9px;
-    background:var(--bg); border:1px solid var(--line); min-width:0; }
-  .gsl-r b { font-variant-numeric:tabular-nums; }
-  .gsl-r-a { border-color:var(--accent) !important; background:#fdf4e6 !important; color:var(--accent-ink); }
-  .gsl-r-a b { color:var(--accent-ink); }
-  .gsl-r-b b { color:var(--brand); }
   /* 참가자 고르기 시트 — 일괄 버튼 줄과 고정 푸터의 요약 */
   .rst-pre { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
   .rst-sum { margin-bottom:8px; font-size:var(--fs-base); font-weight:700; color:var(--ink); }
@@ -2001,7 +2005,7 @@ function ladderRungs(n, LEV, rnd){
 
    확률 정책과의 관계 — 이 게임은 승자를 미리 뽑지 않는다. 물리가 정하고, 이름은 시뮬레이션이
    끝난 뒤 구슬에 붙는다. 구슬의 반지름·질량·반발이 모두 같고 출발 x 도 각자 독립 난수라
-   구슬 번호에는 아무 의미가 없다 — 즉 이 게임은 언제나 '평등'이다. [확률 낮추기]를 걸 자리가
+   구슬 번호에는 아무 의미가 없다 — 즉 이 게임은 언제나 '평등'이다. [확률⬇️]를 걸 자리가
    없고(손가락 룰렛과 같은 이유), [제외]는 gamePlayers() 가 명단에서 이미 빼주므로 지켜진다.
 
    난수는 예외 없이 인자(rnd)로 받는다. 블록 안에서 Math.random 을 부르면 같은 시드로 두 번
@@ -2439,7 +2443,7 @@ const GS_NONE = new Set();
 function gsOn(){  return GS ? GS.on  : GS_NONE; }
 function gsOff(){ return GS ? GS.off : GS_NONE; }
 function gsPolicy(){ return GS ? GS.policy : "soft"; }          // 기본 soft — 명단을 줄이지 않는다
-/* [확률 낮추기]의 강도. 예전엔 1/3 고정이었는데, "얼마나 낮출지"는 그날 사람들이 정할 문제라
+/* [확률⬇️]의 강도. 예전엔 1/3 고정이었는데, "얼마나 낮출지"는 그날 사람들이 정할 문제라
    슬라이더로 열었다. 상한을 0.9 로 둔 이유: 1.0 이면 평등과 같아져 [평등] 칩과 뜻이 겹친다.
    하한 0.1 도 마찬가지로 [제외](0)와 구분되는 자리까지만 내려간다. */
 const GS_SOFT_MIN = 0.1, GS_SOFT_MAX = 0.9;
@@ -2688,7 +2692,7 @@ function openGameSheet(){
 // 기준 안내 한 줄이 필요한 이유: 무응답인 분이 왜 안 보이는지 여기서 말하지 않으면 [바꾸기]를
 // 열어봐야 알 수 있다 (R2-6). 예전의 '오늘 이미 섬긴 분은 기본으로 빠져 있어요'는 이제 사실이
 // 아니라서 2.1 에서 지웠다 — 오늘 섬긴 분 제외는 수동 버튼으로만 남는다.
-/* 사람별 당첨 확률을 미리 보여준다 (사용자 요청). 이름만 나열하면 [확률 낮추기]가 실제로
+/* 사람별 당첨 확률을 미리 보여준다 (사용자 요청). 이름만 나열하면 [확률⬇️]가 실제로
    얼마나 낮추는지 알 수 없다 — 1/3 이라는 말보다 "7.7%" 라는 숫자가 바로 읽힌다.
    출처는 gameWeights() 하나다. 화면이 따로 계산하면 언젠가 추첨과 어긋난다.
    낮춰진 분은 색으로도 갈라 둔다 — 숫자만으로는 목록에서 한 명을 찾아내야 한다. */
@@ -2719,27 +2723,29 @@ function gamePlayerCardHtml(){
    방에서는 끝까지 안 뜨는 자리라, 깜빡였다 사라지는 쪽이 아무것도 없는 쪽보다 나쁘다 (R6-12).
    응답이 오면 syncPolicyBlock() 이 이 블록만 채운다 — 시트를 다시 그리지 않으므로 스크롤이 그대로다(R7-6). */
 const GS_POLICIES = [
-  { k:"soft", label:"확률 낮추기" },   // 기본값 (R6-3)
+  { k:"soft", label:"확률⬇️" },        // 기본값 (R6-3)
   { k:"skip", label:"제외" },
   { k:"even", label:"평등" }
 ];
 
-// 칩 이름만으로는 '얼마나' 낮추는지 알 수 없다 — 1/3 이라는 실제 크기를 글로 적어 준다 (R6-4, R6-5).
-// [제외]는 참가자 수까지 바꾸므로 그 사실을 미리 말한다(누르고 나서 숫자가 줄면 사고처럼 보인다).
-function gamePolicyHint(p){
-  if(p==="skip") return "이번 판에는 아예 안 넣어요. 참가자 수도 한 분 줄어요.";
-  if(p==="even") return "다른 분들과 똑같은 확률로 걸려요.";
-  return "다른 분 한 분의 "+Math.round(gsSoftW()*100)+"% 확률로 걸려요. 아예 안 걸리는 건 아니에요.";
+/* 칩 아래 한 줄. 세 정책 모두 '이 판에서 실제로 어떻게 되는지'를 같은 자리·같은 단위로 말한다.
+   예전에는 여기에 설명 문장이 오고, 그 아래 슬라이더가 자기 라벨("다른 분의 33%")을 또 갖고,
+   그 아래 결과 칩 두 개가 "10.0% / 30.0%"를 또 적었다. 같은 설정을 두 단위(상대 %·절대 %)로
+   네 번 말한 셈이라 어느 숫자를 봐야 하는지가 오히려 흐려졌다. 절대 %로 통일한다 —
+   위 참가자 카드가 쓰는 단위와 같아야 두 카드가 한 화면에서 읽힌다.
+   조절기 바로 위에 두는 것도 중요하다. 슬라이더를 움직이는 손과 바뀌는 숫자가 붙어 있어야 한다. */
+function gamePolicyOutcomeHtml(){
+  const p=gsPolicy();
+  if(p==="skip") return `<span class="gpo-t">이번 판에서 빠져요</span><span class="gpo-s">참가자 ${gamePlayers().length}명</span>`;
+  const pair=gameOddsPair();
+  // 그분이 명단에 없으면 보여줄 값이 없다 — 아래쪽 '지금은 영향 없음' 줄이 사정을 말해 준다.
+  if(!pair) return `<span class="gpo-s">지금은 명단에 없어 적용되지 않아요</span>`;
+  if(p==="even") return `<span class="gpo-t">모두 <b>${pair.other.toFixed(1)}%</b>로 똑같이</span>`;
+  return `<span class="gpo-t low sep">${esc(pair.name)} <b>${pair.low.toFixed(1)}%</b></span>`
+       + `<span class="gpo-t">다른 분 <b>${pair.other.toFixed(1)}%</b></span>`;
 }
 
-/* 강도 슬라이더. [확률 낮추기]일 때만 나온다 — 다른 두 정책에는 조절할 값이 없다.
-   숫자를 '다른 분 대비 %'로 말한다. 절대 당첨 확률(예: 7.7%)은 인원에 따라 변해서 슬라이더를
-   움직여도 얼마나 센지 감이 안 오고, 그 값은 어차피 위 참가자 카드가 사람별로 보여준다.
-   input[type=range] 는 이 파일에서 처음 쓰는 컨트롤이라 기본 스타일을 그대로 둔다 — 굳이 다시
-   그리면 기기별 접근성 동작(키보드 화살표·보이스오버 조작)을 직접 떠맡게 된다. */
-/* 슬라이더를 움직였을 때 '실제로 얼마가 되는지' 두 숫자. 컨트롤 바로 아래에 둔다 —
-   위쪽 참가자 카드에도 사람별 %가 있지만, 스크롤 위치에 따라 화면 밖일 수 있어서
-   조작하는 손과 결과가 떨어진다. 조절기 옆에 결과가 없으면 몇 번을 움직여도 감이 안 온다. */
+/* 위 한 줄이 쓰는 두 숫자 — 낮춰진 분과 나머지 한 분의 실제 당첨 확률. */
 function gameOddsPair(){
   const players=gamePlayers(), last=gsLastHost();
   const i=players.findIndex(m=>m.id===last);
@@ -2748,22 +2754,20 @@ function gameOddsPair(){
   if(!(sum>0)) return null;
   return { name:players[i].name, low:w[i]/sum*100, other:1/sum*100 };
 }
+/* 강도 슬라이더. [확률⬇️]일 때만 나온다 — 다른 두 정책에는 조절할 값이 없다.
+   라벨을 떼어냈다. 값은 바로 위 결과 줄이 절대 %로 말하고 있어서, 여기에 상대 %를 또 적으면
+   같은 설정을 두 단위로 말하게 된다(그래서 어느 쪽을 봐야 하는지가 흐려졌다).
+   양 끝 글자는 칩 이름과 같은 말로 맞춘다 — 오른쪽 끝이 [평등]과 같은 뜻임이 바로 읽혀야 한다.
+   input[type=range] 의 기본 모양은 그대로 둔다 — 다시 그리면 기기별 접근성 동작(키보드
+   화살표·보이스오버 조작)을 직접 떠맡게 된다. 화면에 안 보이는 값은 aria-valuetext 가 말한다. */
 function gameSoftSliderHtml(){
   if(gsPolicy() !== "soft") return "";
   const v = Math.round(gsSoftW()*100);
-  const pair = gameOddsPair();
   return `<div class="gsl" id="gSoftWrap">
-      <label class="gsl-l" for="gSoftW">얼마나 덜 걸리게 할까요? <b id="gSoftV">다른 분의 ${v}%</b></label>
       <input type="range" id="gSoftW" min="${Math.round(GS_SOFT_MIN*100)}" max="${Math.round(GS_SOFT_MAX*100)}" step="5" value="${v}"
-             aria-label="직전에 섬긴 분의 상대 확률" aria-valuetext="다른 분의 ${v}퍼센트">
-      <div class="gsl-e"><span>거의 안 걸림</span><span>평등에 가까움</span></div>
-      <div class="gsl-r" id="gSoftR">${gameSoftResultHtml(pair)}</div>
+             aria-label="직전에 섬긴 분을 얼마나 덜 걸리게 할지" aria-valuetext="다른 분의 ${v}퍼센트">
+      <div class="gsl-e"><span>덜 걸리게</span><span>평등에 가깝게</span></div>
     </div>`;
-}
-function gameSoftResultHtml(pair){
-  if(!pair) return "";
-  return `<span class="gsl-r-a">${esc(pair.name)} <b>${pair.low.toFixed(1)}%</b></span>`
-       + `<span class="gsl-r-b">다른 분 <b>${pair.other.toFixed(1)}%</b></span>`;
 }
 
 // 단일선택 칩은 파일에 이미 쓰는 패턴이 있다(주문 옵션 그룹) — .chips + role="radiogroup" +
@@ -2786,7 +2790,9 @@ function gamePolicyCardHtml(){
       <b id="gPolicyName" style="font-size:14px">직전에 섬긴 분: ${esc(hon(m.name))}</b>
       <div class="chips" id="gPolicyChips" role="radiogroup" aria-labelledby="gPolicyName">${
         GS_POLICIES.map(o=>`<div class="chip ${o.k===p?"sel":""}" role="radio" tabindex="0" aria-checked="${o.k===p}" data-p="${o.k}">${o.label}</div>`).join("")}</div>
-      <div class="muted" id="gPolicyHint" style="margin-top:8px;font-size:12px">${gamePolicyHint(p)}</div>
+      <!-- aria-live 를 두지 않는다. 슬라이더를 끄는 동안 매 input 마다 다시 읽혀 말이 겹친다 —
+           값 변화는 슬라이더의 aria-valuetext 가, 칩 변화는 radio 상태가 이미 알려 준다. -->
+      <div class="gpo" id="gPolicyOut">${gamePolicyOutcomeHtml()}</div>
       <div id="gSoftBlock">${gameSoftSliderHtml()}</div>
       ${inRoster?"":`<div class="muted" style="margin-top:4px;font-size:12px">지금은 이분이 명단에서 빠져 있어 이 설정이 결과를 바꾸지 않아요. [바꾸기]로 다시 넣으면 적용돼요.</div>`}
     </div>`;
@@ -2801,9 +2807,9 @@ function gameShortReason(){
   const players = gamePlayers().length;
   // ① 정책이 줄인 경우를 먼저 본다. 명단에는 두 분이 보이는데 못 돌리는 유일한 경우라
   //    [바꾸기]로 보내면 헛걸음한다. 이 배너 위에 정책 카드가 그대로 남아 있으므로
-  //    [확률 낮추기] 칩을 누르는 것만으로 바로 풀린다 — 그래서 문구가 그쪽을 먼저 가리킨다.
+  //    [확률⬇️] 칩을 누르는 것만으로 바로 풀린다 — 그래서 문구가 그쪽을 먼저 가리킨다.
   if(players < roster) return { why:"직전에 섬긴 분을 [제외]로 둬서 한 분만 남았어요",
-                                how:"정책을 [확률 낮추기]로 돌리거나 참가자를 늘려주세요" };
+                                how:"정책을 [확률⬇️]로 돌리거나 참가자를 늘려주세요" };
   // ② 다 켜도 두 분이 안 되는 경우. 토글로는 안 풀리니 주문을 기다리는 쪽을 먼저 말한다.
   if(ordered < 2) return { why: ordered ? "지금까지 메뉴를 고른 분이 한 분뿐이에요" : "아직 주문이 모이지 않았어요",
                            how:"조금 기다리거나, 아직 안 고른 분을 직접 넣어도 돼요" };
@@ -2881,8 +2887,8 @@ function patchPolicyChips(){
   const p=gsPolicy();                  // 화면은 GS 를 읽는다 — 지역 변수를 따로 들면 두 값이 갈라진다
   box.querySelectorAll(".chip").forEach(c=>{ const on=c.dataset.p===p;
     c.classList.toggle("sel", on); c.setAttribute("aria-checked", on?"true":"false"); });
-  const hint=document.getElementById("gPolicyHint");
-  if(hint) hint.textContent=gamePolicyHint(p);
+  const out=document.getElementById("gPolicyOut");
+  if(out) out.innerHTML=gamePolicyOutcomeHtml();
   // 슬라이더는 soft 일 때만 있다 — 블록째 갈아 끼운다. 칩과 달리 포커스를 잃어도 되는 이유는
   // 사용자가 방금 누른 것이 칩이지 슬라이더가 아니기 때문이다.
   const sb=document.getElementById("gSoftBlock");
@@ -2893,19 +2899,19 @@ function patchPolicyChips(){
   if(odds) odds.innerHTML=gameOddsHtml();
 }
 
-/* 슬라이더를 끄는 동안 % 두 곳(슬라이더 옆 값 · 참가자 카드의 사람별 확률)이 같이 움직인다.
+/* 슬라이더를 끄는 동안 % 두 곳(칩 아래 결과 줄 · 참가자 카드의 사람별 확률)이 같이 움직인다.
    input 이벤트라 손을 떼기 전에도 따라온다 — 값을 확정한 뒤에야 바뀌면 얼마나 센지 알 수 없다.
-   정책 카드 전체를 다시 그리지 않는 이유: 그리는 순간 잡고 있던 슬라이더 손잡이가 사라진다. */
+   정책 카드 전체를 다시 그리지 않는 이유: 그리는 순간 잡고 있던 슬라이더 손잡이가 사라진다.
+   슬라이더 자체에는 이제 눈에 보이는 값이 없다 — 그 자리를 결과 줄이 맡으므로 여기서는
+   aria-valuetext 만 손으로 맞춰 준다(화면 밖 사용자에게는 상대 %가 더 또렷하다). */
 function bindSoftSlider(){
   const el=document.getElementById("gSoftW");
   if(!el) return;
   el.oninput=()=>{
     const v=Math.max(GS_SOFT_MIN*100, Math.min(GS_SOFT_MAX*100, +el.value||33));
     if(GS) GS.softW=v/100;
-    const lab=document.getElementById("gSoftV"); if(lab) lab.textContent="다른 분의 "+Math.round(v)+"%";
     el.setAttribute("aria-valuetext","다른 분의 "+Math.round(v)+"퍼센트");
-    const res=document.getElementById("gSoftR"); if(res) res.innerHTML=gameSoftResultHtml(gameOddsPair());
-    const hint=document.getElementById("gPolicyHint"); if(hint) hint.textContent=gamePolicyHint("soft");
+    const out=document.getElementById("gPolicyOut"); if(out) out.innerHTML=gamePolicyOutcomeHtml();
     const odds=document.getElementById("gOdds"); if(odds) odds.innerHTML=gameOddsHtml();
   };
 }
@@ -3147,7 +3153,7 @@ function startGame(kind){
   // 명단도 여기서 읽은 players 를 그대로 넘긴다. [한 판 더]가 이 지점을 다시 지나므로 그때의
   // gamePlayers() 로 새로 뽑히고, playRace 는 명단을 어디에도 캐시하지 않는다 (R19-15).
   // 구슬 레이스만 예외다 — 승자를 미리 뽑지 않는다. 물리가 정하고 이름은 그 뒤에 붙으며,
-  // 구슬이 서로 구별되지 않으므로 결과는 균등하다. [확률 낮추기]를 걸 자리가 없고(손가락 룰렛과
+  // 구슬이 서로 구별되지 않으므로 결과는 균등하다. [확률⬇️]를 걸 자리가 없고(손가락 룰렛과
   // 같은 이유) [제외]는 gamePlayers() 가 이미 반영했다.
   else if(kind==="race") startRace(players);
   // 손가락 룰렛은 예외다 (R6-10). 당첨되는 건 화면에 올라온 물리적 손가락이고 그게 누구인지는
@@ -3537,7 +3543,7 @@ function playWheel(roster, winner){
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
 function playFinger(){
-  // 확률 정책 안내 (R6-10, R6-11). [확률 낮추기]가 켜져 있어도 이 게임에서는 아무 일도 하지 않는다 —
+  // 확률 정책 안내 (R6-10, R6-11). [확률⬇️]가 켜져 있어도 이 게임에서는 아무 일도 하지 않는다 —
   // 당첨은 화면에 올라온 물리적 손가락에서 결정되고 그게 누구인지는 사후에 사람이 지목하니 가중치를
   // 얹을 지점이 없다. 그래서 결과가 아니라 시작 화면에 적는다. 결과에 적으면 "왜 직전에 섬긴 분이
   // 또 걸렸지"를 이미 겪은 뒤라 늦다. 잘못된 상태가 아니라 정상 동작이므로 경고가 아닌 설명으로 쓴다.
