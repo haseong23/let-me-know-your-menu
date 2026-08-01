@@ -127,6 +127,13 @@
   .chip:active { transform: scale(.94); }
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
   .label { font-size: var(--fs-md); font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
+  /* 구역 구분선 — '내 주문'과 '현황'을 한 화면에 합친 뒤(R12) 둘이 이어 붙어 보이던 걸 끊는다.
+     .label 보다 한 단계 위의 구분이라 선을 함께 그린다. 제목을 선 가운데 얹어 "여기서부터
+     다른 이야기"를 한 번에 읽히게 한다. 글자는 짧게 유지할 것 — 좌우 선이 flex:1 이라
+     제목이 길어지면 선이 사라진다. */
+  .sec-div { display:flex; align-items:center; gap:10px; margin:26px 0 12px;
+    font-size:var(--fs-md); font-weight:700; color:var(--sub); white-space:nowrap; }
+  .sec-div::before, .sec-div::after { content:""; flex:1 1 0; min-width:12px; height:1px; background:var(--line); }
   /* 16px 하한의 근거는 :root 의 --fs-input 옆에 적어 뒀다 (R13-12) */
   input[type=text], input[type=search], textarea { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: var(--fs-input); font-family: inherit; background: #fff; color: var(--ink); -webkit-appearance: none; appearance: none; }
   /* select 도 body 폰트를 물려받게 한다 (R13-2). 위 규칙이 input/textarea 만 덮고 있어서
@@ -374,6 +381,11 @@
   .game-body { flex:1 1 auto; min-height:0; position:relative; display:flex; flex-direction:column; align-items:center;
     justify-content:flex-start; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:10px 16px; }
   .game-body::before, .game-body::after { content:""; flex:none; margin:auto; }
+  /* 손가락 룰렛만은 흐름 내용을 위로 붙인다. .fp-mid 는 body 의 50% 에 절대 배치되는데,
+     이 게임의 흐름 내용은 안내 한 줄뿐이라 위 auto 마진이 그걸 딱 50% 로 데려가 두 글자
+     덩어리가 정확히 겹쳤다. 안내를 위에 고정하면 가운데는 카운트다운 몫으로 비워진다.
+     당첨자를 지목해 teardown 이 돌면 이 클래스를 떼서 결과 블록은 다시 가운데로 온다. */
+  .game-body.fp-live::before, .game-body.fp-live::after { margin:0; }
   .game-foot { flex:none; padding:8px 16px calc(12px + env(safe-area-inset-bottom)); }
   .game-foot > * + * { margin-top:8px; }
   .game-say { position:relative; z-index:1; font-size:var(--fs-lg); font-weight:700; text-align:center; color:var(--sub); margin:0 0 10px; pointer-events:none; }
@@ -1208,8 +1220,10 @@ function renderOpen(){
       <div class="card banner" style="padding:18px"><div class="emoji">🎉</div>
         <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요 ☕`}</h2>
         ${myOrder?'':'<p>메뉴를 고르거나, 안 드실 땐 알려주세요</p>'}</div>
-      ${tabs}${myStatus}${changeLink}${gridHtml}${gameHtml}${gameWhyHtml}
-      <div class="label">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}지금 현황</div>
+      ${tabs}
+      <div class="sec-div">☕ 내 주문</div>
+      ${myStatus}${changeLink}${gridHtml}${gameHtml}${gameWhyHtml}
+      <div class="sec-div">👀 ${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}현황</div>
       ${dashStatsHtml()}
       <div class="label">다른 분들 · [나도] 누르면 같은 걸로</div>
       ${dashPeopleHtml()}`;
@@ -2725,7 +2739,9 @@ function playLadder(roster, winner){
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
-  const DUR = lessMotion() ? 10 : 2400;
+  // 4800ms — 예전 2400 의 절반 속도다. 2.4초는 선 여섯 줄이 동시에 내려오는 걸 눈으로 좇기엔
+  // 빨라서 "누가 어디로 갔는지"가 안 보였다. 돌림판(4.4초)과도 대역이 맞는다.
+  const DUR = lessMotion() ? 10 : 4800;
   // 선이 위에서 아래로 그려지는 애니메이션. 두 가지를 지켜야 실제로 움직인다:
   //   ① 길이에 단위를 붙인다 — CSS 의 stroke-dashoffset 은 <length> 라 단위 없는 숫자는 0 으로 떨어진다.
   //   ② 시작값을 브라우저가 한 번 반영한 뒤에 끝값을 준다 — 안 그러면 두 값이 같은 스타일 재계산에
@@ -2852,8 +2868,11 @@ function playFinger(){
   // 않는 이유: 여기서 아는 건 '내가 덮어쓴다'는 사실뿐이고, 원래 값은 읽어서만 알 수 있다.
   const prevBody={ touchAction: body.style.touchAction, overflowY: body.style.overflowY };
   body.style.touchAction="none"; body.style.overflowY="hidden";
+  // 안내 한 줄을 위에 붙여 .fp-mid(50% 절대배치)와 겹치지 않게 한다 — 자세한 건 .fp-live 주석.
+  body.classList.add("fp-live");
   // 고정된 값을 다시 쓰기만 하므로 몇 번 불러도 결과가 같다 — teardown 이 두 번 들어와도 안전하다.
-  const restoreBody=()=>{ body.style.touchAction=prevBody.touchAction; body.style.overflowY=prevBody.overflowY; };
+  const restoreBody=()=>{ body.style.touchAction=prevBody.touchAction; body.style.overflowY=prevBody.overflowY;
+    body.classList.remove("fp-live"); };
   const pts=new Map(); let seq=0, cdT=null, settleT=null, picked=false;
   // 손가락 수가 바뀌면 곧바로 3부터 세지 않고, SETTLE 동안 '변화가 없음'을 먼저 기다린다 (R15-3, R15-4).
   // 예전에는 두 번째 손가락이 닿는 순간 카운트가 시작돼 세 번째 사람이 올릴 틈이 없었다.
