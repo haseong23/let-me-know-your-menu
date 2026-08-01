@@ -108,13 +108,12 @@
      실패(--red)가 아니라 '다른 갈래'라서 주의 계열(--accent)을 쓰고, 글자는 흰 배경 대비
      2.92:1 인 --accent 대신 --accent-ink(4.9:1)로 둔다. 주문 버튼(--brand)과도 색이 갈려
      '메뉴 고르기'와 헷갈리지 않는다. */
-  /* '안 마실게요' 행동 버튼. 채움을 쓰지 않는 것이 핵심이다 —
-     .menu-tile.sel(고른 메뉴)이 이미 '연한 채움 + 색 테두리'로 선택을 말하고 있어서, 아직 안 고른
-     버튼이 같은 모양이면 이미 고른 것처럼 보인다(실사용 제보). 그래서 신호를 두 채널로 가른다:
-       테두리만  = 고를 수 있는 것 (지금 이 버튼)
-       연한 채움 = 고른 것        (.menu-tile.sel)
-       꽉 찬 채움 = 정해진 것      (아래 .state-skip)
-     흰 카드 위 --accent-ink 는 4.9:1 로 AA 를 넘고, 테두리 --accent 는 비텍스트 3:1 을 넘는다. */
+  /* '안 마실게요' 행동 버튼. 채움을 쓰지 않는 것이 핵심이다 — 이 앱의 신호는 두 채널이다:
+       테두리만   = 아직 안 고른 것 (이 버튼)
+       꽉 찬 채움 = 고른 것·정해진 것 (.chip.sel · .menu-tile.sel · .state-skip)
+     예전엔 이 버튼도 연한 채움이라 '이미 고른 것'처럼 보였다(실사용 제보).
+     흰 카드 위 --accent-ink 는 4.9:1 로 AA 를 넘고, 테두리 --accent 는 비텍스트 3:1 을 넘는다.
+     색상도 갈라 둔다 — 고르는 쪽은 --brand(갈색), 안 마시는 쪽은 --accent(주황). */
   .btn-skip { background:var(--card); color:var(--accent-ink); border:1.5px solid var(--accent); font-weight:800; }
   /* 안 마시기로 '정해진' 상태. 위 두 채널과 겹치지 않게 꽉 채운다 — 흰 글자라 되돌릴 수 없는
      확정처럼 보이지만, 바로 아래 메뉴 그리드가 그대로 열려 있어 언제든 바꿀 수 있다. */
@@ -147,7 +146,14 @@
   .host-name { color: var(--brand); font-weight: 800; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .menu-tile { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; font-weight: 700; font-size: var(--fs-base); position: relative; transition: .12s; }
-  .menu-tile.sel { border-color: var(--brand); background: var(--brand-soft); }
+  /* 고른 타일은 꽉 채운다. 예전엔 연한 채움(--brand-soft)이라 '눌러볼 수 있는 것'과 구분이
+     약했다 — 이 앱에서 고른 상태는 .chip.sel 이 이미 꽉 찬 --brand 로 말하고 있어서, 타일만
+     연한 채움을 쓰면 같은 뜻을 두 가지 세기로 말하는 셈이 된다.
+     흰 글자 대비 7.4:1 로 AA 를 넉넉히 넘는다. 구조(타일 크기·배치·체크 위치)는 그대로 두고
+     색만 바꾼다 — 선택 때문에 레이아웃이 흔들리면 그리드 전체가 출렁인다. */
+  .menu-tile.sel { border-color: var(--brand); background: var(--brand); color:#fff; }
+  .menu-tile.sel .ck { color:#fff; }
+  .menu-tile.sel .cnt { color:#e7d9c6; }   /* --accent-ink 는 이 배경에서 안 읽힌다 */
   .menu-tile .em { display:block; font-size: 22px; margin-bottom: 4px; }
   .menu-tile .cnt { display:block; font-size: var(--fs-xs); color: var(--accent-ink); margin-top: 3px; font-weight: 700; }
   .menu-tile .ck { position: absolute; top: 6px; right: 9px; color: var(--brand); font-weight: 900; opacity: 0; } .menu-tile.sel .ck { opacity: 1; }
@@ -628,7 +634,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.87";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.88";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1323,12 +1329,20 @@ function renderOpen(){
      취소되면 '참가자 2명 + 주문 0건'이 성립하므로, 그 방어는 실제로 쓰는 지점인
      commitGameWinner 로 옮겼다 (R16-5). 화면 조건으로 막으면 시트가 열려 있는 동안 주문이
      사라지는 경우를 놓친다. */
-  const canGame = gameEligible() && (SESSION.hostId===ME || !SESSION.hostId);
-  // 라벨은 실제 노출 조건을 그대로 말해야 한다 — 예전엔 '내가 호스트일 때만' 뜨면서
-  // "누가 섬길지 아직 안 정했다면"이라고 적혀 있었다 (R16-1).
+  /* 진입점을 전원에게 연다. 예전에는 '내가 호스트이거나 호스트가 없을 때'만 보였는데, 그러면
+     게임 이야기를 들은 일반 참가자가 버튼을 찾다가 [제가 섬길게요]를 눌러 섬김을 열어버린다 —
+     게임을 보려고 섬김을 여는 건 정확히 반대 방향이다.
+     대신 결과를 서버에 쓸 수 있는 사람만 진짜다. 나머지는 연습(dry-run): 똑같이 돌려보고
+     결과까지 보지만 [확정하기]가 없다. 그 판정은 gameCanCommit() 한 곳에서만 나온다. */
+  const canGame = gameEligible();
   const amHostNow = SESSION.hostId===ME;
-  const gameLabel = amHostNow ? "섬길 사람을 다시 정하려면" : "누가 섬길지 아직 안 정했다면";
-  const gameBtnText = amHostNow ? "🎲 어떤 분이 섬겨주실지 게임으로 정하기" : "🎲 게임으로 섬길 사람 정하기";
+  const canCommit = gameCanCommit();
+  const gameLabel = !canCommit ? "게임이 궁금하면 (연습)"
+                  : amHostNow  ? "섬길 사람을 다시 정하려면"
+                               : "누가 섬길지 아직 안 정했다면";
+  const gameBtnText = !canCommit ? "🎲 게임 연습으로 돌려보기"
+                    : amHostNow  ? "🎲 어떤 분이 섬겨주실지 게임으로 정하기"
+                                 : "🎲 게임으로 섬길 사람 정하기";
   // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
   // 자리는 로스터 '위'다 (R12-11). 아래에 두면 버튼이 ~1,200px 지점으로 밀려, 예전에 탭 문제로
   // 나타났던 G9("기본 탭에 없어서 아무도 못 봤다")가 스크롤 깊이 문제로 되돌아온다.
@@ -1388,7 +1402,13 @@ function renderOpen(){
   const grid=document.getElementById("menuGrid");
   if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
   // 안 마실게요 버튼은 두 자리(그리드 아래 / 주문 후 버튼줄)에 나타난다 — 상호배타지만 클래스로 한 번에 배선
-  view().querySelectorAll(".skip-btn").forEach(b=> b.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }));
+  /* 한 번 묻는다. 되돌릴 수 있는 선택이지만(아래 메뉴 그리드가 그대로 열려 있다) 이 버튼은
+     메뉴 타일 바로 아래에 전폭으로 있어서 타일을 누르려다 스치는 자리다. 실수로 눌리면
+     '주문함'에서 '안 마심'으로 상태가 통째로 바뀌고, 섬기는 분 화면의 잔 수까지 줄어든다. */
+  view().querySelectorAll(".skip-btn").forEach(b=> b.onclick=async()=>{
+    if(!(await askConfirm("오늘은 음료를 안 드시는 거죠?\n마음이 바뀌면 아래에서 메뉴를 고르면 돼요.",{ok:"네, 안 마실게요"}))) return;
+    guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
+  });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
@@ -1757,10 +1777,15 @@ function dashboardHtml(){   // 마감 화면 전용 — 안쪽 탭 그대로
 }
 function wireDashboard(){
   const t=document.getElementById("dashTabs"); if(t) t.querySelectorAll(".tab").forEach(el=> el.onclick=()=>{ dashTab=el.dataset.t; rerenderDash(); });
-  const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요");
+  const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요", cp);
   const nd=document.getElementById("nudge"); if(nd) nd.onclick=()=>{ const names=MEMBERS.filter(m=>!ORDERS[m.id]).map(m=>m.name).join(", ");
     const h=memberById(SESSION.hostId); const hostClause=h?`${hon(h.name)}이 `:"";   // host가 구성원에서 빠져도 안전
-    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${hostClause}오늘 음료로 섬기십니다. 링크에서 골라주세요!`,"안내 문구 복사됨"); };
+    /* 링크를 같이 붙인다 — "링크에서 골라주세요"라고 적어 놓고 링크를 안 주면 받는 사람이
+       대화방을 거슬러 올라가 찾아야 한다. 안내를 붙여넣는 곳이 대개 단톡방이라 그 한 줄이 곧
+       진입점이다. CELL 이 없는 경로(직접 링크 없이 들어온 경우)는 줄을 아예 빼서 빈 URL 을
+       남기지 않는다. */
+    const link=CELL?`\n${location.origin}${location.pathname}?cell=${CELL.id}`:"";
+    copyText(`☕ 아직 메뉴 안 고르신 분: ${names}\n${hostClause}오늘 음료로 섬기십니다. 링크에서 골라주세요!${link}`,"안내 문구 복사됨", nd); };
 }
 function rerenderDash(){ if(SESSION.state==="closed") renderClosed(); else render(); }
 function countDrinks(){ return MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink").length; }
@@ -2321,6 +2346,10 @@ function gamePlayers(){ return playersFrom(gameRoster(), gsPolicy(), gsLastHost(
 // 렌더 도중 canGame 이 부르므로 GS 없이도 답이 나와야 한다 — 위 널 안전 리더들이 그 경로를 받친다.
 // 기본값 규칙과 같은 출처를 쓰므로, 음료 주문자가 2명 미만이면 진입점이 뜨지 않는다 (R2-8).
 function gameEligible(){ return gamePlayers().length >= 2; }
+/* 결과를 서버에 쓸 수 있는가. 진입점 노출(전원)과 확정 권한(호스트 또는 호스트 없음)을 가르는
+   단 하나의 판정이다. 화면과 실행 지점이 같은 함수를 봐야 '보이는데 안 되는' 어긋남이 없다.
+   호스트가 남이면 그 사람의 결정을 가로챌 수 없다 — 대신 연습으로는 돌려볼 수 있다. */
+function gameCanCommit(){ return SESSION.hostId===ME || !SESSION.hostId; }
 /* 게임이 도는 동안 추첨 대상이 바뀌었는지 알아보는 서명 (R17-1).
    id 만 모아 정렬한다 — MEMBERS 는 이름순이라 누가 개명하면 배열 순서가 바뀌는데, 그건 명단이
    바뀐 게 아니다. 정렬하면 순서가 id 에만 매이므로 개명은 서명을 흔들지 않고, 사람이 들어오거나
@@ -3014,7 +3043,12 @@ function showGameResult(w){
      same(당첨자가 이미 호스트)인 경우는 막지 않는다. 그 버튼은 [확인]이라 서버에 쓰는 것이 없고
      '그대로 섬깁니다'도 여전히 사실이다 — 막으면 현상 유지를 받아들일 길만 사라진다. */
   const blocked = gone && !same;
-  setGameFoot(`${blocked?"":`<button class="btn btn-brand" id="gvOk">${okLabel}</button>`}
+  /* 연습(dry-run)이면 확정 버튼 자체를 안 만든다. 비활성 버튼으로 두지 않는 이유는 위 blocked 와
+     같다 — 못 누르는 버튼은 '내가 뭘 잘못했나'를 묻게 만든다. 대신 왜 없는지를 한 줄로 적는다.
+     결과·이름·[한 판 더]는 그대로다: 연습이라고 게임을 반쪽으로 만들지는 않는다. */
+  const dry = !gameCanCommit();
+  const dryNote = dry ? `<div class="game-hint" style="margin-bottom:6px">연습으로 돌려본 판이에요 — 확정은 섬기기로 하신 분이 합니다</div>` : "";
+  setGameFoot(`${dryNote}${(blocked||dry)?"":`<button class="btn btn-brand" id="gvOk">${okLabel}</button>`}
     <div class="row-2"><button class="btn btn-soft" id="gvAgain">🎲 한 판 더</button>
       <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvOk", async()=>{
@@ -3063,6 +3097,13 @@ async function commitGameWinner(w){
        읽는 자리를 guardWrite 안으로 옮긴 것도 같은 이유다 — 지금은 이 앞에 await 가 없어 값이
        같지만, 나중에 확인창 같은 await 가 앞에 끼면 밖에서 읽은 값이 곧 낡은 값이 된다. */
     const seq=SESSION.seq, prevHost=SESSION.hostId, cafeId=SESSION.cafeId||activeCafeId();
+    /* 권한을 쓰기 직전에 한 번 더 본다. 화면은 연습이면 [확정하기]를 아예 안 만들지만, 결과가
+       떠 있는 동안 폴링이 호스트를 갈아끼울 수 있다 — 눌렀을 땐 내 권한이었는데 쓰기 직전엔
+       남의 섬김인 경우가 그것이다. 그때 그대로 쓰면 남의 결정을 가로챈다. */
+    if(prevHost && prevHost!==ME){
+      toast("그 사이 다른 분이 섬기기로 하셨어요 — 이 결과는 확정할 수 없어요");
+      return;
+    }
     if(prevHost && !Object.keys(ORDERS).length){
       toast("아직 주문이 없어서 지금 넘기면 이 섬김이 사라져요 — 주문이 모인 뒤에 확정해주세요");
       return;   // 오버레이는 그대로 둔다 — [한 판 더]나 닫기를 사용자가 고르게 한다
@@ -3766,8 +3807,23 @@ function openSettings(){
 }
 
 /* ---------- 클립보드 ---------- */
-function copyText(text,msg){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(()=>toast(msg)).catch(()=>fb(text,msg)); else fb(text,msg);
-  function fb(t,m){ try{ const ta=document.createElement("textarea"); ta.value=t; ta.style.cssText="position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); const ok=document.execCommand("copy"); document.body.removeChild(ta); if(ok){ toast(m); return; } }catch(e){}
+/* copyText(text, msg[, btn])
+   btn 을 주면 토스트 대신 그 버튼의 글자를 잠깐 바꾼다. 안드로이드 13 이상은 클립보드에 쓸 때
+   시스템이 "복사했습니다" 알림을 스스로 띄우는데, 거기에 우리 토스트가 겹쳐 두 겹으로 떴다.
+   시스템 알림이 뜨는지 알아낼 API 는 없으므로 겹치는 자리(토스트)를 피하는 쪽으로 바꾼다 —
+   누른 버튼 자리에서 확인이 나면 시스템 알림과 겹치지도 않고, 시스템 알림이 없는 iOS·데스크톱
+   에서도 피드백이 그대로 남는다. btn 없이 부르는 옛 호출부는 예전처럼 토스트다. */
+function copyDone(msg, btn){
+  if(!btn){ toast(msg); return; }
+  if(btn.dataset.busy) return;              // 연타로 원래 글자를 잃지 않게
+  btn.dataset.busy="1";
+  const was=btn.textContent;
+  btn.textContent="✅ 복사했어요";
+  setTimeout(()=>{ btn.textContent=was; delete btn.dataset.busy; }, 1600);
+}
+function copyText(text,msg,btn){ const ok=()=>copyDone(msg,btn);
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok).catch(()=>fb(text,msg)); else fb(text,msg);
+  function fb(t,m){ try{ const ta=document.createElement("textarea"); ta.value=t; ta.style.cssText="position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); const done=document.execCommand("copy"); document.body.removeChild(ta); if(done){ copyDone(m,btn); return; } }catch(e){}
     // 카톡 등 인앱 브라우저 폴백: 길게 눌러 복사
     try{ prompt("복사가 안 되면 아래를 길게 눌러 복사하세요", t); }catch(e){ toast("복사 실패"); } } }
 
