@@ -108,7 +108,19 @@
      실패(--red)가 아니라 '다른 갈래'라서 주의 계열(--accent)을 쓰고, 글자는 흰 배경 대비
      2.92:1 인 --accent 대신 --accent-ink(4.9:1)로 둔다. 주문 버튼(--brand)과도 색이 갈려
      '메뉴 고르기'와 헷갈리지 않는다. */
-  .btn-skip { background:#fdf4e6; color:var(--accent-ink); border:1.5px solid var(--accent); font-weight:800; }
+  /* '안 마실게요' 행동 버튼. 채움을 쓰지 않는 것이 핵심이다 —
+     .menu-tile.sel(고른 메뉴)이 이미 '연한 채움 + 색 테두리'로 선택을 말하고 있어서, 아직 안 고른
+     버튼이 같은 모양이면 이미 고른 것처럼 보인다(실사용 제보). 그래서 신호를 두 채널로 가른다:
+       테두리만  = 고를 수 있는 것 (지금 이 버튼)
+       연한 채움 = 고른 것        (.menu-tile.sel)
+       꽉 찬 채움 = 정해진 것      (아래 .state-skip)
+     흰 카드 위 --accent-ink 는 4.9:1 로 AA 를 넘고, 테두리 --accent 는 비텍스트 3:1 을 넘는다. */
+  .btn-skip { background:var(--card); color:var(--accent-ink); border:1.5px solid var(--accent); font-weight:800; }
+  /* 안 마시기로 '정해진' 상태. 위 두 채널과 겹치지 않게 꽉 채운다 — 흰 글자라 되돌릴 수 없는
+     확정처럼 보이지만, 바로 아래 메뉴 그리드가 그대로 열려 있어 언제든 바꿀 수 있다. */
+  .state-skip { background:var(--accent-ink); color:#fff; border:none; display:flex; align-items:center;
+    justify-content:center; gap:9px; padding:16px 14px; font-size:var(--fs-lg); font-weight:800; }
+  .state-skip .sk-ck { font-size:20px; line-height:1; }
   .btn-sm { width: auto; padding: 9px 14px; font-size: var(--fs-base); border-radius: 10px; min-height: 44px; }
   .banner { text-align: center; padding: 26px 18px; } .banner .emoji { font-size: 44px; }
   /* 열린 섬김 머리말 — 높이를 고정한다.
@@ -616,7 +628,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.85";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.86";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1199,7 +1211,7 @@ function renderOpen(){
   const host=memberById(SESSION.hostId), myOrder=ORDERS[ME];
   let myStatus="";
   if(myOrder && myOrder.type==="skip"){
-    myStatus=`<div class="card center"><b>감사하지만, 안 마실게요</b> 🙅</div>`;
+    myStatus=`<div class="card state-skip"><span class="sk-ck">✓</span><span>안 마시기로 하셨어요</span></div>`;
   } else if(myOrder){
     const d=orderDisplay(myOrder);
     myStatus=`<div class="card row-between"><div><div class="muted">내 주문</div>
@@ -1297,7 +1309,12 @@ function renderOpen(){
       ${dashPeopleHtml()}`;
   } else {
     view().innerHTML=`
-      <div class="muted" style="margin:0 2px 10px">${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}섬기는 분: <b>${host?esc(hon(host.name)):"아직 없어요"}</b></div>
+      <!-- 합친 화면과 '똑같은' 머리말을 쓴다. 예전엔 여기만 muted 한 줄이라 카드 높이가 달랐고,
+           탭을 오갈 때마다 탭 줄이 위아래로 움직였다(실사용 제보). 높이를 맞추는 게 아니라
+           같은 컴포넌트를 쓰는 쪽을 골랐다 — 값을 맞춰 두면 한쪽만 고칠 때 다시 어긋난다. -->
+      <div class="card open-hero"><div class="emoji">${host?"🎉":"☕"}</div>
+        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요`}</h2>
+        <p>${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}카페에 그대로 보여주세요</p></div>
       ${tabs}${dashCafeHtml()}`;
   }
   view().querySelectorAll("#openTabs .tab").forEach(el=> el.onclick=()=>setOpenTab(el.dataset.t));
@@ -1556,8 +1573,13 @@ function openFullMenuSheet(curId, carryNote){
       <div style="height:14px"></div>
     </div>
     <div class="sheet-foot">
-      <button class="btn btn-soft" id="freeInput">목록에 없어요 — 직접 입력</button>
-      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="mClose">닫기</button>
+      <!-- 좌우로 나란히 둔다. 세로로 쌓으면 버튼 하나 + 간격만큼(≈60px) 목록이 짧아지는데,
+           이 시트는 목록을 훑는 것이 본론이라 그 60px 이 아깝다. 라벨을 줄인 건 그 대가다 —
+           반쪽 폭이 320px 에서 ≈130px 이라 '목록에 없어요 — 직접 입력'은 두 줄로 접힌다. -->
+      <div class="row-2">
+        <button class="btn btn-soft" id="freeInput">✍️ 직접 입력</button>
+        <button class="btn btn-ghost btn-close" id="mClose">닫기</button>
+      </div>
     </div>`);
   const mq=document.getElementById("mq"), results=document.getElementById("mResults"), empty=document.getElementById("mEmpty");
   // 오타 허용 검색: 직접입력과 같은 matchesName 기준 — "아메리카노"를 "아메리카노"로 오타쳐도 목록에서 바로 찾힘
@@ -2239,6 +2261,9 @@ function gameToggle(id, on){
 }
 // 전원 참가 (R2-10): 안 마시는 분을 뺀 전원을 '명시적 참가'로 — 나중에 주문이 들어와도 흔들리지 않는다
 function gameAllOn(){ GS.off.clear(); GS.on = new Set(MEMBERS.filter(m=>!gameIsSkip(m)).map(m=>m.id)); }
+// 전부 해제 — 손으로 몇 명만 고르고 싶을 때의 출발점이다. 참가자가 0명이 되지만 그 상태로
+// 게임을 시작할 수는 없고(startGame 이 2명 미만을 막는다), 시트 푸터가 '참가 0명'을 바로 말한다.
+function gameAllOff(){ GS.on.clear(); GS.off = new Set(MEMBERS.map(m=>m.id)); }
 // 오늘 섬긴 분 빼기 (R2-9): 그분들만 끄고 나머지 명단은 그대로 둔다
 function gameDropServed(){ gameServedIds().forEach(id=>gameToggle(id,false)); }
 
@@ -2777,9 +2802,10 @@ function openRosterSheet(){
   openSheet(`
     <h3>참가자 고르기</h3>
     <div class="rst-pre">
-      <button class="btn btn-sm btn-soft" id="gDefault">메뉴 고른 분만</button>
-      <button class="btn btn-sm btn-soft" id="gAll">전원</button>
-      <button class="btn btn-sm btn-soft" id="gServed">오늘 섬긴 분 빼기</button></div>
+      <button class="btn btn-sm btn-soft" id="gAll">전원 참가</button>
+      <button class="btn btn-sm btn-soft" id="gDefault">음료 고른 분</button>
+      <button class="btn btn-sm btn-soft" id="gDropLast">직전 섬긴 분 빼기</button>
+      <button class="btn btn-sm btn-soft" id="gNone">전부 해제</button></div>
     <div class="sheet-scroll">
       <div class="card" id="gRosterList" style="padding:6px 14px;margin-bottom:4px">${MEMBERS.map(m=>rosterRowHtml(m,snap)).join("")}</div>
     </div>
@@ -2802,11 +2828,16 @@ function openRosterSheet(){
     syncRosterCount();              // 상단 카운트만 — 컨테이너를 다시 만들지 않으니 scrollTop 이 그대로다 (R7-1, R7-3)
     sw.focus();                     // iOS 사파리는 버튼을 눌러도 포커스를 주지 않는다 — 여기서 못 박는다 (R7-2)
   });
-  // 기본값 복귀 — 켠 것과 끈 것을 모두 지우면 '메뉴를 고른 분'이라는 기본 규칙만 남는다.
-  bind("gDefault",()=>{ GS.on.clear(); GS.off.clear(); syncRosterAll(); });
-  bind("gAll",    ()=>{ gameAllOn();      syncRosterAll(); });   // R2-10
-  bind("gServed", ()=>{ gameDropServed(); syncRosterAll(); });   // R2-9 — 오늘 섬긴 분만 꺼지고 나머지 명단은 그대로다
-  bind("gDone",   backToGameSheet);
+  /* 일괄 버튼 넷. 셋은 '이렇게 채워라'이고 하나(전부 해제)는 '비우고 직접 고르겠다'다.
+     [음료 고른 분]은 켠 것과 끈 것을 모두 지워 기본 규칙만 남기는 것이라 되돌아갈 자리가 된다.
+     [직전 섬긴 분 빼기]는 그 한 분만 끈다 — 확률 정책의 [제외]와 뜻이 겹쳐 보이지만 다른 일이다.
+     정책은 '명단에는 두되 추첨에서만 빼는' 것이고 이건 명단에서 아예 빼는 것이라, 참가자 수가
+     실제로 한 명 줄고 그 행의 스위치가 꺼진 모습으로 남는다. */
+  bind("gAll",     ()=>{ gameAllOn();      syncRosterAll(); });   // R2-10
+  bind("gDefault", ()=>{ GS.on.clear(); GS.off.clear(); syncRosterAll(); });
+  bind("gDropLast",()=>{ const id=gsLastHost(); if(id) gameToggle(id,false); syncRosterAll(); });
+  bind("gNone",    ()=>{ gameAllOff();     syncRosterAll(); });
+  bind("gDone",    backToGameSheet);
 }
 
 /* ---------- 실행 ---------- */
@@ -3276,8 +3307,22 @@ function playFinger(){
     if(need===pts.size || okAt===pts.size) return null;  // 같거나, 이 손가락 수로 이미 승인받았다
     return need;
   };
+  /* [이대로 시작]이 안 눌리던 이유 (실사용 제보).
+     여러 손가락이 올라간 상태에서 그중 하나만 움직이거나 떨어져도 refresh() 가 돌고, 그때마다
+     이 블록을 innerHTML 로 다시 그려서 버튼 노드가 통째로 갈렸다. click 은 같은 노드에서
+     pointerdown 과 pointerup 이 이어져야 나는데, 그 사이에 노드가 사라지니 click 이 영영 안 났다.
+     두 겹으로 막는다 —
+       ① 내용이 같으면 다시 그리지 않는다(askSig). 노드가 살아 있으면 click 이 정상적으로 난다.
+       ② 그래도 갈릴 수 있으니 pointerdown 에서 바로 승인한다. 손을 뗄 때까지 기다리지 않으므로
+          중간에 노드가 갈려도 이미 승인이 끝나 있다. 드래그로 빠져나가 취소할 수 없게 되지만,
+          손가락이 널린 화면에서는 '눌렀는데 안 되는 것'이 훨씬 나쁘다. */
+  let askSig=null;
+  const approve=()=>{ okAt=pts.size; refresh(); };
   function askMismatch(need){
     stop();
+    const sig=pts.size+"/"+need;
+    if(askSig===sig) return;                 // 같은 안내가 이미 떠 있다 — 버튼 노드를 살려 둔다
+    askSig=sig;
     const why = pts.size < need
       ? "아직 안 올린 분이 있어요?"
       : "한 분이 두 개 올렸거나, 참가자가 아닌 분이 올렸을 수 있어요";
@@ -3286,35 +3331,38 @@ function playFinger(){
       <div class="fp-why">${why}</div>
       <button type="button" class="fp-go" id="fpGo">이대로 시작</button></div>`;
     const go=document.getElementById("fpGo"); if(!go) return;
-    // 이 버튼의 pointerdown 은 body 까지 올려보내지 않는다 — 올라가면 onDown 이 점을 하나 만들고
+    // pointerdown 을 body 까지 올려보내지 않는다 — 올라가면 onDown 이 점을 하나 만들고
     // setPointerCapture 까지 걸어 '버튼을 눌렀는데 손가락이 하나 늘었다'가 된다 (R5-4).
-    // stopPropagation 만 하고 preventDefault 는 하지 않는다 — 터치에서 click 은 pointerdown 의
-    // 호환 이벤트라, 여기서 기본 동작을 막으면 버튼이 아예 안 눌리는 기기가 생긴다.
-    go.addEventListener("pointerdown",e=>{ e.stopPropagation(); });
-    go.onclick=()=>{ okAt=pts.size; refresh(); };
+    // preventDefault 는 하지 않는다 — 터치에서 click 은 pointerdown 의 호환 이벤트라,
+    // 기본 동작을 막으면 마우스·키보드 경로가 함께 죽는다.
+    go.addEventListener("pointerdown",e=>{ e.stopPropagation(); approve(); });
+    go.onclick=approve;                      // 마우스·키보드 경로. 이미 승인됐으면 같은 값을 다시 쓸 뿐이다
   }
+  // .fp-mid 를 다른 곳에서 쓸 때는 서명을 지운다 — 안 지우면 안내가 사라진 뒤에도 '같은 내용'으로
+  // 판정되어 다시 그려야 할 때 안 그려진다.
+  const midSet=html=>{ askSig=null; mid.innerHTML=html; };
   function countdown(){
     settleT=null;                      // 이미 발화한 타이머 — 남겨두면 stop() 이 죽은 id 를 지운다
     if(picked || pts.size<2){ refresh(); return; }   // 타이머와 포인터 사이의 틈을 세기 직전에 한 번 더 확인
     const bad=mismatch(); if(bad!==null){ askMismatch(bad); return; }        // ②
-    let k=3; mid.innerHTML=`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`; gvibe(12);
+    let k=3; midSet(`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`); gvibe(12);
     cdT=setInterval(()=>{
       const late=mismatch(); if(late!==null){ stop(); askMismatch(late); return; }   // ③
       k--;
       if(k<=0){ stop(); choose(); }
-      else { mid.innerHTML=`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`; gvibe(12); } }, 800);
+      else { midSet(`<div class="fp-plate"><div class="fp-cnt">${k}</div></div>`); gvibe(12); } }, 800);
   }
   // 손가락이 늘 때(onDown)와 줄 때(onUp) 모두 여기로 온다. 어느 쪽이든 stop() 으로 진행 중인 카운트다운을
   // 버리고 처음부터 다시 기다리므로, 카운트다운 중에 2명 미만으로 떨어지면 '두 개 이상' 안내로 돌아간다.
   function refresh(){
     if(picked) return; stop();
-    if(pts.size<2){ mid.innerHTML=`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 두 개 이상 올려주세요</div></div>`; return; }
+    if(pts.size<2){ midSet(`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 두 개 이상 올려주세요</div></div>`); return; }
     const bad=mismatch(); if(bad!==null){ askMismatch(bad); return; }        // ①
-    mid.innerHTML=`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 다 올리셨으면 곧 시작해요</div></div>`;
+    midSet(`<div class="fp-plate"><div class="fp-why">손가락 ${pts.size}개 — 다 올리셨으면 곧 시작해요</div></div>`);
     settleT=setTimeout(countdown, SETTLE);
   }
   function choose(){
-    picked=true; mid.innerHTML="";
+    picked=true; midSet("");
     const win=pickOne([...pts.keys()]);
     pts.forEach((p,id)=>{ if(id===win){ p.el.classList.add("win"); p.el.style.width="98px"; p.el.style.height="98px"; }
                           else p.el.classList.add("lose"); });
@@ -3435,7 +3483,7 @@ function playRace(players, onDone){
 
   openGameOv("🏁 구슬 레이스", `
     <div class="game-say" id="gvSay" aria-live="polite">출발!</div>
-    <div class="game-hint" style="margin-bottom:8px">시스템도 모르는 100% 랜덤이에요</div>
+    <div class="game-hint" style="margin-bottom:8px">부딪히고 튕기며 내려가요 — 결과는 아무도 몰라요</div>
     <div class="race-wrap">
       <canvas id="raceCv" role="img" aria-label="구슬 레이스 진행 중"></canvas>
       <div class="race-hud" id="raceHud">
