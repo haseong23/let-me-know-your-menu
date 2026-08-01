@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.96";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.97";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2271,7 +2271,23 @@ function rpathGate(B, y, rnd){
    판마다 초반이 격렬하고 후반이 조용하기도 하고 그 반대이기도 했다 — 설계된 곡선이 없었다.
    코스 진행률에 맞춰 이 순서에서 뽑으면 매 판 같은 기승전결이 나온다. 인접한 한 칸까지
    흔들어(±1) 판마다 같은 그림이 되지는 않게 한다. */
-const RACE_OBS = [robSlope, robPyramid, robSeesaw, robSpinner, robDiagBumper, robPinball];
+/* 버블 — 구슬이 닿는 순간 사라진다. 지금까지의 장애물은 전부 판이 끝날 때까지 그대로여서,
+   앞선 구슬이 뒤 구슬의 조건을 바꾸는 상호작용이 하나도 없었다. 버블은 "1등이 뚫어 놓은 자리로
+   2등이 더 빨리 온다"를 만든다 — 뒤가 따라붙는 장치이자, 코스가 판 중에 변하는 유일한 자리다.
+   두 줄을 촘촘히(간격 4) 깔아 그냥은 못 지나가게 한다. 지름 18 이 지나려면 반드시 하나는
+   터뜨려야 하고, 터진 자리는 그대로 길이 된다.
+   막힐 걱정은 없다 — 닿기만 하면 사라지므로 눌려 있을수록 빨리 열린다. */
+function robBubble(B, y, h, rnd){
+  /* 한 줄만 깐다. 두 줄로 했더니 앞줄을 뚫고도 뒷줄에 다시 막혀서, 무리가 오래 갇힌 판이
+     생겨 최장 소요가 31.5초까지 늘었다(테스트가 잡았다). 한 줄이면 뚫는 순간 바로 길이 된다. */
+  const r=15, gap=4, dx=2*r+gap;
+  const yy=y+h*0.46;
+  for(let x=26; x<=RACE_W-26; x+=dx){
+    const bb=rpeg(x, yy, r); bb.pop=1; bb.e=0.35; B.push(bb);
+  }
+}
+
+const RACE_OBS = [robSlope, robPyramid, robSeesaw, robBubble, robSpinner, robDiagBumper, robPinball];
 
 /* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
    만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
@@ -2369,15 +2385,19 @@ function raceMapBuild(rnd, soft){
   B.push(rcap(RACE_W+8, y+20, RACE_W/2+NECK, y+120, 4));
   B.push(rcap(RACE_W/2-NECK, y+120, RACE_W/2-NECK, y+120+CHAN, 4));
   B.push(rcap(RACE_W/2+NECK, y+120, RACE_W/2+NECK, y+120+CHAN, 4));
-  { const VHL=13, VDY=34, VW=7.7;
-    let k=0;
-    for(let vy=y+120+22; vy<y+120+CHAN-10; vy+=VDY, k++){
-      const left = k%2===0;
-      B.push(rbar(RACE_W/2+(left?-NECK:NECK), vy, VHL, 4, (left?1:-1)*VW, rnd()*6.283));
-    } }
-  // 축을 좌우 중 한쪽 바깥에 둔다. 매 판 뒤집어 어느 한쪽이 구조적으로 유리해지지 않게 한다.
-  const gx = rnd()<0.5 ? -70 : RACE_W+70;
-  B.push(rbar(gx, y+46, 340, 6, (rnd()<0.5?1:-1)*(0.9+rnd()*0.6), rnd()*6.283, 0));
+  /* 작은 날개 사다리를 걷어내고 '큰 날'이 훑게 한다 (실사용 제보 — 작은 것 여럿보다 큰 하나가
+     쓸고 지나가는 그림을 원한다). 축을 코스에서 멀리 뺄수록 코스를 지나는 구간이 완만한 호가
+     되어, 같은 각속도로도 천천히 쓸어 담는 느낌이 난다. 축 ±150 은 예전(±70)의 두 배 거리이고,
+     팔 500 이면 코스 먼 쪽 끝(축에서 350)까지 덮는다.
+     두 개를 쓴다 — 깔때기 입구 하나, 통로 한가운데 하나. 축을 서로 반대쪽 밖에 두어 두 날이
+     같은 방향으로만 쓸지 않게 한다. */
+  const GAX=150, GARM=500;
+  const gs = rnd()<0.5 ? -1 : 1;                 // 축을 어느 쪽 밖에 둘지. 매 판 뒤집는다
+  B.push(rbar(gs<0 ? -GAX : RACE_W+GAX, y+46, GARM, 6, (rnd()<0.5?1:-1)*(0.85+rnd()*0.45), rnd()*6.283, 0));
+  /* 통로 쪽 날은 입구 쪽보다 빠르게 돈다(1.5~2.1). 같은 속도로 뒀더니 통로를 막고 있는 시간이
+     길어, 2명 판에서 두 구슬이 그 앞에 오래 갇혀 최장 소요가 46초까지 갔다. 사람이 많으면
+     서로 밀어 비집고 나가지만 둘뿐이면 밀 힘이 없다 — 그래서 날이 스스로 빨리 비켜 줘야 한다. */
+  B.push(rbar(gs<0 ? RACE_W+GAX : -GAX, y+120+CHAN*0.5, GARM, 6, (rnd()<0.5?1:-1)*(1.5+rnd()*0.6), rnd()*6.283, 0));
   const neckY=y+20;                              // 결승 깔때기 벽이 시작되는 자리
   const finishY=y+120+CHAN+34;
   y=finishY+46;
@@ -2471,7 +2491,13 @@ function raceSimulate(map, n, rnd){
         const c=Math.floor(py[i]/RACE_CELL);
         if(c<0||c>=cells) continue;
         const list=grid[c];
-        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, px, py, vx, vy, rang, rav);
+        for(let k=0;k<list.length;k++){
+          const b=B[list[k]];
+          if(b.dead!=null) continue;                       // 이미 터진 버블 — 없는 셈 친다
+          const touched=raceHit(b, i, px, py, vx, vy, rang, rav);
+          // 버블은 닿는 순간 사라진다. 터진 프레임을 적어 두면 재생 쪽이 그때부터 안 그린다.
+          if(touched && b.pop) b.dead=f;
+        }
       }
       /* 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
          매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
@@ -2555,7 +2581,7 @@ function raceHit(b, i, px, py, vx, vy, rang, rav){
   const qx=x1+t*dx, qy=y1+t*dy;
   let nx=px[i]-qx, ny=py[i]-qy;
   const rr=RACE_R+b.rad, d2=nx*nx+ny*ny;
-  if(d2>=rr*rr) return;
+  if(d2>=rr*rr) return false;   // 닿지 않음. 돌려주는 값은 버블을 터뜨릴지 판정하는 데 쓰인다
   let d=Math.sqrt(d2);
   if(d<1e-9){ nx=0; ny=-1; d=1e-9; } else { nx/=d; ny/=d; }
   /* 위치는 구슬만 민다. 회전체는 축이 고정이라 평행이동할 수 없다. */
@@ -2563,12 +2589,12 @@ function raceHit(b, i, px, py, vx, vy, rang, rav){
   if(b.ri>=0){ sxv=-w*(qy-b.cy); syv=w*(qx-b.cx); }
   const rvx=vx[i]-sxv, rvy=vy[i]-syv;
   const vn=rvx*nx+rvy*ny;
-  if(vn>=0) return;
+  if(vn>=0) return true;        // 겹쳤지만 멀어지는 중 — 접촉은 접촉이다
   const e=b.e||RACE_E_WALL;
   if(!b.invI){                       // 무한 질량 — 벽·정적 지형·등속 회전체
     vx[i]=rvx-(1+e)*vn*nx+sxv;
     vy[i]=rvy-(1+e)*vn*ny+syv;
-    return;
+    return true;
   }
   /* 자유 회전체. 충격량을 구슬과 로터가 나눠 갖는다 — 이것이 '밀어붙이는 벽'과 '맞으면 돌아가는
      날개'를 가르는 전부다. rn 은 접촉점 지렛대(r × n)이고, 분모의 rn²·invI 가 로터 몫이다.
@@ -2577,6 +2603,7 @@ function raceHit(b, i, px, py, vx, vy, rang, rav){
   const j=-(1+e)*vn/(1 + rn*rn*b.invI);
   vx[i]+=j*nx; vy[i]+=j*ny;
   rav[b.ri]=w + rn*j*b.invI;
+  return true;
 }
 
 // 시드 PRNG — 코스와 출발 배치가 판마다 달라진다. 시드 하나로 완전히 재현된다.
@@ -4147,6 +4174,8 @@ function playRace(players, onDone){
         if(stamp[bi] === stampNo) continue;
         stamp[bi] = stampNo;
         const b = map.bodies[bi];
+        // 터진 버블은 그 프레임부터 그리지 않는다. dead 는 시뮬레이션이 적어 둔 프레임 번호다.
+        if(b.dead!=null && f>=b.dead) continue;
         ctx.lineWidth = 2*b.rad;
         if(b.ri>=0){
           /* 회전체 각도는 시뮬이 프레임마다 적어 둔 표에서 읽는다. 자유 회전체는 충돌로 각속도가
@@ -4227,6 +4256,27 @@ function playRace(players, onDone){
   const ypos = new Array(n).fill(0);
   const rank = players.map((m,i)=>i);
   let camZ = 1;                       // 지금 줌. 목표를 향해 천천히 따라간다
+  /* 중계 대상. 1등만 뽑는 게임이지만 뒷 순위가 어떤 상황인지도 보여줘야 재미가 산다.
+     선두가 혼자 멀리 달아나 있으면(2등과 LONE 이상) 카메라는 '가장 붙어 있는 다툼'으로 옮겨
+     가고, 결승 깔때기에 들어서면 무조건 선두로 돌아온다 — 마지막은 1등 이야기라서다.
+     자주 바꾸면 어지러우므로 한 번 고른 대상은 HOLD 프레임 동안 유지한다. */
+  const CAM_LONE=240, CAM_TIGHT=70, CAM_HOLD=110;
+  let camTgt=-1, camHold=0;
+  function relayY(lead){
+    if(lead >= map.neckY){ camTgt=-1; camHold=0; return lead; }
+    if(camHold>0 && camTgt>=0){ camHold--; return (ypos[rank[camTgt]]+ypos[rank[camTgt+1]])*0.5; }
+    camTgt=-1;
+    if(n>=3 && ypos[rank[0]]-ypos[rank[1]] > CAM_LONE){
+      let best=-1, bg=CAM_TIGHT;
+      for(let k=1;k<Math.min(n-1,8);k++){
+        const g=ypos[rank[k]]-ypos[rank[k+1]];
+        if(g<bg){ bg=g; best=k; }
+      }
+      if(best>=0){ camTgt=best; camHold=CAM_HOLD;
+        return (ypos[rank[best]]+ypos[rank[best+1]])*0.5; }
+    }
+    return lead;
+  }
   function draw(t){
     const f = Math.max(0, Math.min(sim.frames-1, Math.floor(t*60/1000)));
     const base = f*n*2;
@@ -4247,7 +4297,8 @@ function playRace(players, onDone){
     }
     camZ += (zTarget - camZ) * zEase;
     const vh = H / camZ;                                     // 지금 화면이 담는 코스 높이
-    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, lead - vh*RACE_CAM));
+    const focus = relayY(lead);                              // 선두일 수도, 뒤쪽 다툼일 수도 있다
+    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, focus - vh*RACE_CAM));
     /* 줌을 걸면 코스(폭 200)가 캔버스보다 좁아져 양옆에 여백이 생긴다. 그 여백을 캔버스와 같은
        색으로 두면 구슬이 보이지 않는 벽에 튕기는 것처럼 보이므로, 배경을 한 톤 어둡게 깔고
        코스 폭만 밝게 칠해 '길'이 어디까지인지 눈에 남긴다. */
@@ -4269,11 +4320,35 @@ function playRace(players, onDone){
   /* 미니맵 — 코스 전체를 왼쪽에 한 줄로 접어 놓고 구슬을 점으로 찍는다. 카메라가 무리를 물고
      따라다니는 대신 '지금 코스의 어디쯤인지'를 잃는데, 그걸 여기서 돌려준다. 레퍼런스도 같은
      자리에 같은 물건을 둔다. 줌과 무관한 화면 좌표로 그리므로 카메라 변환 밖에서 부른다. */
+  /* 지형은 판마다 고정이라 한 번만 그려 두고 매 프레임 붙인다. 매번 96개를 다시 그리면 미니맵
+     하나 때문에 프레임 예산을 쓰게 된다. 회전체는 축만 점으로 찍는다 — 미니맵 배율에서 날개는
+     선 하나보다 얇아 그려 봐야 안 보이고, 축 위치가 '여기 도는 게 있다'를 말해 준다. */
+  let miniBg=null;
+  function buildMiniBg(mw, mh){
+    const c=document.createElement("canvas");
+    c.width=Math.round(mw*dpr); c.height=Math.round(mh*dpr);
+    const g=c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+    const sx=mw/W, sy=mh/map.total;
+    g.lineCap="round";
+    for(const b of map.bodies){
+      if(b.ri>=0 || b.sp || b.invI){                 // 회전체 — 축만
+        g.fillStyle="rgba(122,106,82,.55)";
+        g.beginPath(); g.arc(b.cx*sx, b.cy*sy, 1.4, 0, Math.PI*2); g.fill();
+        continue;
+      }
+      g.strokeStyle = b.pop ? "rgba(201,138,58,.55)" : "rgba(160,138,106,.42)";
+      g.lineWidth = Math.max(0.6, b.rad*sx*0.8);
+      g.beginPath(); g.moveTo(b.x1*sx, b.y1*sy); g.lineTo(b.x2*sx, b.y2*sy); g.stroke();
+    }
+    return c;
+  }
   function drawMiniMap(base){
     const mw=RACE_MINI_W-8, mx=4, my=6, mh=H-12;
     ctx.fillStyle="rgba(255,253,249,.86)";
     ctx.strokeStyle="#e0d5c4"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.fill(); ctx.stroke();
+    if(!miniBg) miniBg=buildMiniBg(mw, mh);
+    ctx.drawImage(miniBg, mx, my, mw, mh);
     // 지금 화면이 코스의 어디를 보고 있는지
     const camTop=Math.max(0, Math.min(1, (ypos[rank[0]] - H/camZ*RACE_CAM)/map.total));
     const camBot=Math.max(0, Math.min(1, (ypos[rank[0]] + H/camZ*(1-RACE_CAM))/map.total));
@@ -4312,10 +4387,24 @@ function playRace(players, onDone){
     },
     canvas: cv
   };
+  /* 접전 슬로모션. 결승이 코앞이고 바로 뒤에 붙은 구슬이 있을 때만 재생 속도를 늦춘다.
+     물리는 이미 다 끝나 녹화돼 있으므로 시간축만 늦추면 된다 — 시뮬레이션을 건드리지 않으니
+     결과도 도착 순서도 바뀌지 않는다. 이게 녹화-재생 구조의 덤이다.
+     경쟁자가 없으면 늦추지 않는다. 혼자 들어오는 장면을 늘리면 지루해질 뿐이다.
+     하한 0.4 는 '느려졌다'가 읽히면서도 답답하지 않은 선이다(0.2 는 마지막 구간이 3초 넘게
+     늘어져 전체 길이 예산을 밀어낸다). */
+  const SLOW_D=300, SLOW_NEAR=95, SLOW_MIN=0.4;
+  function timeScale(){
+    if(!ypos.length || n<2) return 1;
+    const lead=ypos[rank[0]], rest=map.finishY-lead;
+    if(rest > SLOW_D || rest < 0) return 1;
+    if(lead - ypos[rank[1]] > SLOW_NEAR) return 1;      // 뒤가 멀면 그냥 간다
+    return Math.max(SLOW_MIN, rest/SLOW_D);
+  }
   function frame(now){
     ctl.raf = 0;
     if(!cv.isConnected){ ctl.stop(); return; }   // 오버레이가 닫힌 뒤 이미 예약돼 있던 프레임 방어
-    const dt = Math.min(64, now - last);
+    const dt = Math.min(64, now - last) * timeScale();
     last = now; t += dt;
     if(t >= END){ ctl.finish(); return; }
     drawHud(t, draw(t), false);

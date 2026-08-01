@@ -706,12 +706,15 @@ test("raceMapBuild — 원형 장애물의 표면 간격이 구슬 지름보다 
      또는 못과 못 사이가 구슬 지름보다 좁으면 구슬이 둘에 동시에 닿아 그 조합이 성립한다 —
      못밭이 edge=18 로 겪었고, 탄성 못밭도 벽 여유 14 로 좁혔더니 60판이 전부 완주에 실패했다.
      "표면 간격 > 지름" 한 줄이 두 사고를 다 막는다. 그 한 줄을 여기서 지킨다.
-     선분(길·기둥)은 뺀다 — 벽 너머까지 뻗어 나가도록 일부러 그렇게 둔 것들이다. */
+     선분(길·기둥)은 뺀다 — 벽 너머까지 뻗어 나가도록 일부러 그렇게 둔 것들이다.
+     버블(pop)도 뺀다. 그건 일부러 지름보다 좁게 깔아 '반드시 하나는 터뜨려야 지난다'를 만든
+     장애물이고, 닿는 순간 사라지므로 정적 쐐기의 전제(접촉이 유지된다)가 성립하지 않는다.
+     대신 '닿으면 정말 사라지는가'는 아래 별도 테스트가 지킨다. */
   const D = 2 * RACE_R;
   let seen = 0;
   for (let s = 1; s <= 40; s++) {
     const map = raceRun(s * 7919, 8).map;
-    const pegs = map.bodies.filter((b) => !b.sp && b.x1 === b.x2 && b.y1 === b.y2 && b.rad > 0);
+    const pegs = map.bodies.filter((b) => !b.sp && !b.pop && b.x1 === b.x2 && b.y1 === b.y2 && b.rad > 0);
     seen += pegs.length;
     for (const p of pegs) {
       // 벽에 파묻힌 것은 애초에 닿을 수 없어 안전하다. 어중간하게 떨어져 있는 것만 위험하다.
@@ -910,4 +913,27 @@ test("wheelSpin — 5바퀴 이상 돌고 jitter 가 조각 안에 머문다", (
       assert.ok(lo > 360 * 4, `n=${n} wi=${wi}: 회전량 ${lo} 가 5바퀴에 못 미친다`);
     }
   }
+});
+
+test("버블 — 닿으면 사라지고, 사라진 뒤에는 다시 막지 않는다", () => {
+  /* 버블은 지름보다 좁게 깔려 있어서 '터진다'가 보장되지 않으면 그냥 막힌 벽이다.
+     그래서 두 가지를 본다 — ① 버블이 있는 판에서 실제로 터진 것이 있는가
+     ② 터진 프레임(dead)이 기록되는가. ②가 없으면 재생 쪽이 사라진 버블을 계속 그린다. */
+  let sawMap = 0, sawPop = 0;
+  for (let s = 1; s <= 60; s++) {
+    const { map, sim } = raceRun(s * 7919, 8);
+    const bubbles = map.bodies.filter((b) => b.pop);
+    if (!bubbles.length) continue;
+    sawMap++;
+    if (!sim.ok) continue;
+    const dead = bubbles.filter((b) => b.dead != null);
+    if (dead.length) sawPop++;
+    for (const b of dead) {
+      assert.ok(Number.isInteger(b.dead) && b.dead >= 0 && b.dead < sim.frames,
+        `터진 프레임 ${b.dead} 이 0~${sim.frames} 밖이다`);
+    }
+  }
+  assert.ok(sawMap >= 5, `버블이 들어간 판이 ${sawMap} 개뿐이다 — 추첨에서 거의 안 뽑히고 있다`);
+  assert.ok(sawPop >= sawMap * 0.8,
+    `버블이 있는 ${sawMap} 판 중 ${sawPop} 판에서만 터졌다 — 나머지는 그냥 벽으로 서 있었다는 뜻이다`);
 });
