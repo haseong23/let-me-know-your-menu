@@ -634,7 +634,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.88";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.89";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1980,7 +1980,10 @@ const RACE_E_WALL = 0.34;    // 벽·장애물 반발
 const RACE_E_BALL = 0.18;    // 구슬끼리 반발
 const RACE_MAXF = 4200;      // 70초. 이 안에 1등이 안 나오면 그 시드는 버린다
 const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하나가 훑을 물체를 이 단위로 줄인다
-const RACE_SEG_MIX = ["s","s","s","s","z","z","z","f","f","f"];   // 1자 4 · 지그재그 3 · 깔때기 3
+/* 1자 5 · 지그재그 3 · 깔때기 2. 깔때기를 셋에서 둘로 줄였다 — 한 줄로 세워 통과시키는 구간이라
+   들어간 순서가 거의 그대로 나온다(실사용 제보: "깔때기에서는 순위 역전이 안 일어난다").
+   그 자리를 1자길로 돌리면 장애물이 하나 더 들어가고, 순위를 흔드는 건 장애물이다. */
+const RACE_SEG_MIX = ["s","s","s","s","s","z","z","z","f","f"];
 
 /* 캡슐 하나로 못·벽·경사·기둥을 전부 표현한다 — 원-선분 거리 계산 하나면 넷이 다 풀린다.
    회전 막대(바람개비)는 sp!==0 이고 매 스텝 끝점을 다시 잡는다. y0/y1b 는 격자에 넣을 때 쓰는
@@ -1991,6 +1994,13 @@ function rpeg(x,y,rad){ return rcap(x,y,x,y,rad); }
 function rbar(cx,cy,hl,rad,sp,ph){
   const b={x1:cx-hl,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,ph,e:0};
   b.y0=cy-hl-rad; b.y1b=cy+hl+rad; return b;
+}
+/* 힘장 — 충돌체가 아니라 '그 안에 있으면 힘을 받는' 영역이다. 위로 미는 장치(에어샤워·분수)를
+   만들려고 들였다. 캡슐로는 위로 미는 걸 표현할 수 없다 — 캡슐은 닿았을 때 튕겨낼 뿐이라
+   구슬이 거슬러 올라가는 구간을 만들 수 없고, 깔때기·지그재그만으로는 순위가 잘 안 바뀐다.
+   out 이 있으면 가로 힘을 그 x 에서 '바깥으로' 준다(부호가 항상 정해지므로 결정론이 유지된다). */
+function rfield(x0,y0,x1,y1,fy,fx,out){
+  return { fl:1, fx0:x0, fx1:x1, fy, fx:fx||0, out:(out===undefined?null:out), y0, y1b:y1, sp:0, e:0, rad:0 };
 }
 
 /* ══ 길 세 가지 ══ 좌우 바깥벽은 시뮬레이터가 직접 잡으므로 여기서는 안쪽 지형만 놓는다. */
@@ -2068,7 +2078,21 @@ function robBumpers(B, y, h, rnd){
   for(let k=0;k<P.length;k++){ const b=rpeg(P[k][0], y+h*P[k][1], r); b.e=0.78; B.push(b); }
 }
 
-const RACE_OBS = [robPins, robWheel, robIsland, robBumpers];
+/* 에어샤워 — 위로 부는 바람. 세기를 중력보다 '약하게'(0.72G) 잡는 것이 요점이다. 순 가속이
+   아래로 남아 있어 아무도 멈추지 않으면서 낙하 속도만 크게 죽는다. 여기서 구슬이 뭉치고,
+   뭉친 채로 서로 밀면서 순위가 뒤집힌다. 깔때기가 못 만들던 장면이 이것이다. */
+function robBlow(B, y, h, rnd){
+  B.push(rfield(6, y+h*0.16, RACE_W-6, y+h*0.84, -RACE_G*0.72, 0));
+}
+/* 분수 — 가운데에서 위로 쏘아 올린다. 중력보다 세서(2.2G) 구슬이 실제로 거슬러 올라간다.
+   좌우로 밀어 내보내는 힘을 함께 주지 않으면 제트 한가운데서 영원히 오르내린다 — 그래서
+   중심에서 바깥 방향으로 0.55G 를 같이 건다. 폭이 68 이라 양옆으로 빠져나갈 자리가 넉넉하다. */
+function robFountain(B, y, h, rnd){
+  const cx=RACE_W/2, w=34;
+  B.push(rfield(cx-w, y+h*0.28, cx+w, y+h*0.88, -RACE_G*2.2, RACE_G*0.55, cx));
+}
+
+const RACE_OBS = [robPins, robWheel, robIsland, robBumpers, robBlow, robFountain];
 
 /* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
    만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
@@ -2082,7 +2106,7 @@ function raceMapBuild(rnd){
   /* 구성 비율을 고정하고 순서만 섞는다. 매 구간을 독립으로 뽑았더니 어떤 판은 1자길만 나와
      4.5초, 어떤 판은 깔때기가 몰려 20초가 됐다 — 같은 게임이라고 보기 어려운 편차다.
      비율을 묶으면 길이가 모이고, 다양성은 '어떤 장애물이 어느 순서로 오느냐'가 맡는다. */
-  const mix=RACE_SEG_MIX.slice();
+  const mix=RACE_SEG_MIX.slice();   // 아래 셔플은 순서만 바꾼다
   for(let i=mix.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=mix[i]; mix[i]=mix[j]; mix[j]=t; }
   for(let s=0;s<mix.length;s++){
     if(mix[s]==="s"){
@@ -2135,7 +2159,17 @@ function raceSimulate(map, n, rnd){
         const c=Math.floor(py[i]/RACE_CELL);
         if(c<0||c>=cells) continue;
         const list=grid[c];
-        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, tt, px, py, vx, vy);
+        for(let k=0;k<list.length;k++){
+          const b=B[list[k]];
+          if(b.fl){
+            // 힘장 — 범위 안이면 가속만 더한다. 위치를 밀지 않으므로 터널링과 무관하다.
+            if(px[i]>b.fx0 && px[i]<b.fx1 && py[i]>b.y0 && py[i]<b.y1b){
+              vy[i]+=b.fy*RACE_DT;
+              if(b.out!==null) vx[i]+=(px[i]<b.out?-1:1)*b.fx*RACE_DT;
+              else if(b.fx)    vx[i]+=b.fx*RACE_DT;
+            }
+          } else raceHit(b, i, tt, px, py, vx, vy);
+        }
       }
       // 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
       // 매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
@@ -3600,7 +3634,7 @@ function playRace(players, onDone){
   const W = RACE_W, H = RACE_VIEW_H;
 
   openGameOv("🏁 구슬 레이스", `
-    <div class="game-say" id="gvSay" aria-live="polite">출발!</div>
+    <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 번호를 찾아두세요</div>
     <div class="game-hint" style="margin-bottom:8px">부딪히고 튕기며 내려가요 — 결과는 아무도 몰라요</div>
     <div class="race-wrap">
       <canvas id="raceCv" role="img" aria-label="구슬 레이스 진행 중"></canvas>
@@ -3624,7 +3658,7 @@ function playRace(players, onDone){
      여기서 막지 않으면 아래 전부가 null 을 읽는다. */
   if(!built){
     document.getElementById("gvSay").textContent = "코스를 못 만들었어요 — 다른 게임으로 돌려주세요";
-    return { raf:0, done:true, stop(){}, finish(){}, canvas:cv, winner:players[0] };
+    return { raf:0, done:true, started:true, stop(){}, finish(){}, start(){}, canvas:cv, winner:players[0] };
   }
   const map = built.map, sim = built.sim, END = sim.frames*1000/60;
   const winner = players[sim.winner];   // 구슬 번호에 의미가 없으므로 이 대응이 곧 균등 추첨이다
@@ -3671,6 +3705,7 @@ function playRace(players, onDone){
         if(stamp[bi] === stampNo) continue;
         stamp[bi] = stampNo;
         const b = map.bodies[bi];
+        if(b.fl){ drawField(b, camY, tt); continue; }   // 힘장은 선이 아니라 띠로 그린다
         let x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2;
         if(b.sp){ const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
           x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa; }
@@ -3695,6 +3730,25 @@ function playRace(players, onDone){
         ctx.fillRect(x, fy + row*cell, cell, cell);
       }
     }
+  }
+
+  /* 힘장(에어샤워·분수)을 눈에 보이게 그린다. 안 그리면 구슬이 이유 없이 떠오르는 것처럼 보인다 —
+     물리를 진짜로 돌리는 값어치가 '왜 저렇게 됐는지 보인다'에 있으므로 원인을 화면에 남긴다.
+     위로 흐르는 갈매기 표시가 시간에 따라 올라가서 방향과 '지금 작동 중'을 함께 말한다.
+     분수(중력보다 센 것)는 띠도 표시도 진하게 — 세기 차이가 곧 결과 차이라서 미리 알아볼 수 있어야 한다. */
+  function drawField(b, camY, tt){
+    const y0=b.y0-camY, y1=b.y1b-camY;
+    if(y1 < -12 || y0 > H+12) return;
+    const strong = b.fy < -RACE_G;
+    ctx.fillStyle = strong ? "rgba(158,136,104,.22)" : "rgba(158,136,104,.13)";
+    ctx.fillRect(b.fx0, y0, b.fx1-b.fx0, y1-y0);
+    const step=26, ph=(tt*72)%step, cx=(b.fx0+b.fx1)/2, w=Math.min(15,(b.fx1-b.fx0)/4);
+    ctx.strokeStyle = strong ? "#8a7350" : "#a5917a";
+    ctx.lineWidth=2; ctx.beginPath();
+    for(let yy=y1-ph; yy>y0; yy-=step){
+      ctx.moveTo(cx-w, yy+7); ctx.lineTo(cx, yy); ctx.lineTo(cx+w, yy+7);
+    }
+    ctx.stroke();
   }
 
   // 구슬 = gcolor(i, n) 색 원 + 흰 번호. 선두만 어두운 테두리로 강조한다 —
@@ -3735,6 +3789,7 @@ function playRace(players, onDone){
   const ctl = {
     raf: 0,
     done: false,
+    started: false,
     winner: winner,
     stop(){ if(ctl.raf) cancelAnimationFrame(ctl.raf); ctl.raf = 0; ctl.done = true; },
     finish(){
@@ -3757,8 +3812,19 @@ function playRace(players, onDone){
     ctl.raf = requestAnimationFrame(frame);
   }
   drawHud(0, draw(0), true);          // 첫 프레임은 즉시 — rAF 를 기다리면 빈 캔버스가 한 번 보인다
-  if(lessMotion()) gtimer(()=>ctl.finish(), 10);   // 연출을 건너뛰고 결과로 간다
-  else ctl.raf = requestAnimationFrame(frame);
+  /* 바로 굴리지 않는다. 출발선에 멈춰 있는 동안 "내가 몇 번인지" 찾을 시간이 생긴다 —
+     그 확인 없이 시작하면 20명이 뒤엉킨 화면에서 자기 구슬을 끝까지 못 찾는다.
+     시작 버튼은 startRace 가 푸터에 건다. 여기서는 시작하는 방법만 내어 준다.
+     last 를 시작 순간에 다시 잡는 게 중요하다 — 멈춰 있던 시간이 레이스 시각에 섞이면
+     첫 프레임에 구슬이 화면 절반을 순간이동한다(dt 상한 64ms 가 있어도 여러 프레임 튄다). */
+  ctl.start = ()=>{
+    if(ctl.done || ctl.started) return;
+    ctl.started = true;
+    const say=document.getElementById("gvSay"); if(say) say.textContent="출발!";
+    if(lessMotion()){ gtimer(()=>ctl.finish(), 10); return; }   // 연출을 건너뛰고 결과로 간다
+    last = performance.now();
+    ctl.raf = requestAnimationFrame(frame);
+  };
   return ctl;
 }
 
@@ -3786,9 +3852,17 @@ function startRace(players){
   // [건너뛰기]는 취소가 아니라 결과를 앞당기는 것이다 (R19-7). ctl.finish() 가 rAF 를 취소하고
   // 결승선 통과 상태를 마지막으로 그린 뒤 onDone(=showGameResult) 을 부르므로, 여기서
   // cancelAnimationFrame 을 따로 부를 것이 없다 — 취소 지점이 두 곳으로 갈리지 않는다.
-  setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvSkip">⏭ 건너뛰기</button>
+  /* 푸터가 두 단계다. 출발 전에는 [▶ 출발]만 있고, 누른 뒤에야 [⏭ 건너뛰기]로 바뀐다 —
+     아직 시작도 안 한 판에 건너뛰기를 내어 주면 그게 무엇을 건너뛰는지 알 수 없다. */
+  const runFoot = ()=>{
+    setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvSkip">⏭ 건너뛰기</button>
+      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
+    bind("gvSkip", ()=>ctl.finish());
+    bind("gvCancel",()=>closeGame());
+  };
+  setGameFoot(`<div class="row-2"><button class="btn btn-brand" id="gvGo">▶ 출발!</button>
     <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
-  bind("gvSkip", ()=>ctl.finish());
+  bind("gvGo", ()=>{ ctl.start(); runFoot(); });
   // playRace 가 붙인 푸터를 갈아치웠으므로 [그만두기]도 새 노드에 다시 배선한다
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 }
