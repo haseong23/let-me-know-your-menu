@@ -23,6 +23,7 @@ const REQUIRED = [
   "gcolor",
   "gameFits",
   "ladderGeometry",
+  "ladderRungs",
   "GS_SOFT_W",
   "GAME_MAX",
   "wheelSpin",
@@ -103,7 +104,7 @@ function loadGameLogic(source = HTML, names = REQUIRED) {
 // 모듈 스코프에서 한 번만 로드한다. 테스트마다 index.html 을 다시 파싱할 이유가 없고,
 // 1.3 이 아래에 test() 를 덧붙일 때 그대로 쓸 수 있게 한다.
 export const gameLogic = loadGameLogic();
-export const { pickWeighted, rosterFrom, playersFrom, gcolor, gameFits, ladderGeometry, GS_SOFT_W, GAME_MAX } =
+export const { pickWeighted, rosterFrom, playersFrom, gcolor, gameFits, ladderGeometry, ladderRungs, GS_SOFT_W, GAME_MAX } =
   gameLogic;
 
 test("마커 블록에서 기대 심볼이 모두 나온다", () => {
@@ -506,6 +507,57 @@ test("경계값 — 사다리 16/17/18, 돌림판 24/25 (R10-6)", () => {
   assert.ok(gameFits("finger", 999), "손가락 룰렛은 인원 상한이 없다");
 });
 
+// ---------- ladderRungs (가로줄 놓기) ----------
+// 이 함수의 계약은 두 줄이다 — 인접 금지, 그리고 모든 세로줄에 가로선이 최소 하나.
+// 후자가 이번에 들어온 규칙이고, "거의 항상"이 아니라 "반드시"여야 해서 판수를 넉넉히 잡는다.
+const LADDER_NS = Array.from({ length: 15 }, (_, k) => k + 2); // 2..16
+function eachLadder(fn) {
+  for (const n of LADDER_NS) {
+    const LEV = ladderGeometry(n).LEV;
+    for (let t = 0; t < 200; t++) {
+      const rows = ladderRungs(n, LEV, Math.random);
+      assert.ok(rows, `n=${n}: ladderRungs 가 자리를 못 찾았다(null)`);
+      assert.equal(rows.length, LEV, `n=${n}: 층 수가 ${rows.length} 다`);
+      fn(rows, n, LEV);
+    }
+  }
+}
+
+test("ladderRungs — 가로선이 하나도 안 닿는 세로줄이 없다", () => {
+  // 안 닿는 줄에 선 사람은 처음부터 끝까지 직진이라 게임을 구경만 한다. 그 판이 하나도 없어야 한다.
+  eachLadder((rows, n) => {
+    for (let c = 0; c < n; c++) {
+      const touched = rows.some((row) => row.includes(c) || row.includes(c - 1));
+      assert.ok(touched, `n=${n}: 세로줄 ${c} 에 닿는 가로선이 없다 — ${JSON.stringify(rows)}`);
+    }
+  });
+});
+
+test("ladderRungs — 같은 층에서 이웃 간격이 겹치지 않는다 (인접 금지)", () => {
+  // 겹치면 경로가 갈라지지 않는다. 커버리지를 먼저 까는 새 순서가 이 규칙을 깨지 않았는지 본다.
+  eachLadder((rows, n) => {
+    for (const row of rows) {
+      for (const g of row) {
+        assert.ok(g >= 0 && g < n - 1, `n=${n}: 간격 ${g} 이 범위 밖이다`);
+        assert.ok(!row.includes(g - 1) && !row.includes(g + 1),
+          `n=${n}: 한 층에 ${g} 와 이웃이 함께 있다 — ${JSON.stringify(row)}`);
+      }
+      assert.equal(new Set(row).size, row.length, `한 층에 같은 간격이 두 번 있다: ${JSON.stringify(row)}`);
+    }
+  });
+});
+
+test("ladderRungs — 층 수 공식이 playLadder 와 한 곳에서 나온다", () => {
+  // 공식을 두 곳에 적으면 한쪽만 고쳐도 아무도 못 알아챈다. playLadder 가 ladderGeometry 를
+  // 통해 LEV 를 읽고 있는지 소스로 확인한다 — 값 비교로는 '두 번 적힌 같은 값'을 못 잡는다.
+  assert.match(HTML, /const LEV=ladderGeometry\(n\)\.LEV/,
+    "playLadder 가 LEV 를 ladderGeometry 에서 안 읽고 있다 — 공식이 두 곳에 적혔다");
+  for (const n of LADDER_NS) {
+    const LEV = ladderGeometry(n).LEV;
+    assert.ok(LEV >= 6 && LEV <= 14, `n=${n}: LEV=${LEV} 가 6~14 밖이다`);
+  }
+});
+
 test("경계값 — skip 정책 적용 후 참가자가 1명이 될 수 있다 (R6-14)", () => {
   // 순수 함수는 막지 않는다. 2명 미만이면 시작하지 않는 판단은 호출부(5.1)의 몫이라,
   // 여기서는 '1명이 된다'는 사실만 고정해 둔다. 이 값이 호출부 방어의 입력이다.
@@ -544,7 +596,7 @@ const RACE_N_MAX = 24;
 // rnd 하나를 맵과 시뮬레이션이 이어서 쓰므로 순서가 바뀌면 결과가 달라진다.
 function raceRun(seed, n) {
   const rnd = raceRnd(seed >>> 0);
-  const map = raceMapBuild(rnd);
+  const map = raceMapBuild(rnd, n <= 2);   // 2인 판을 약하게 만드는 것까지 앱과 같게 흉내 낸다
   return { map, sim: raceSimulate(map, n, rnd) };
 }
 
@@ -628,8 +680,59 @@ test("raceSimulate — 승자가 구슬 번호에 쏠리지 않는다 (이 대�
   });
 });
 
+test("raceSimulate — 역동성이 문턱을 넘는다 (leadChanges 는 깜빡임에 약하다)", () => {
+  /* leadChanges 는 선두가 프레임 단위로 깜빡이기만 해도 오른다. 실제로 몇 명이 선두를 잡아
+     봤는지(distinctLeaders)와 순위가 얼마나 갈렸는지(rankChurn)를 함께 본다.
+     rankChurn 은 인원과 시간에 선형이라 그대로는 단일 문턱을 못 잡는다 — 구슬 하나가 1초에
+     몇 칸 움직였는지로 정규화한다. n=2 는 순위가 두 칸뿐이라 이 검사에서 뺀다. */
+  for (const n of [8, 16]) {
+    const dist = [], rate = [];
+    for (let s = 1; s <= 40; s++) {
+      const { sim } = raceRun(s * 7919, n);
+      assert.ok(sim.ok, `seed=${s} n=${n}: 정체`);
+      dist.push(sim.distinctLeaders);
+      rate.push(sim.rankChurn / (n * sim.frames / 60));
+    }
+    const ok = dist.filter((x) => x >= 4).length;
+    assert.ok(ok >= dist.length * 0.7,
+      `n=${n}: 선두를 4명 이상이 잡은 판이 ${ok}/${dist.length} 뿐이다 — 줄만 서서 내려온다`);
+    const m = rate.slice().sort((a, b) => a - b)[Math.floor(rate.length / 2)];
+    assert.ok(m >= 1.0, `n=${n}: 순위 변동률 중앙값이 ${m.toFixed(2)} 다 — 순위가 안 갈린다`);
+  }
+});
+
+test("raceMapBuild — 원형 장애물의 표면 간격이 구슬 지름보다 넓다 (정적 쐐기 금지)", () => {
+  /* 마찰이 0 이라 정체는 '접촉 법선들이 중력을 정적으로 떠받치는가'로만 결정된다. 못과 벽,
+     또는 못과 못 사이가 구슬 지름보다 좁으면 구슬이 둘에 동시에 닿아 그 조합이 성립한다 —
+     못밭이 edge=18 로 겪었고, 탄성 못밭도 벽 여유 14 로 좁혔더니 60판이 전부 완주에 실패했다.
+     "표면 간격 > 지름" 한 줄이 두 사고를 다 막는다. 그 한 줄을 여기서 지킨다.
+     선분(길·기둥)은 뺀다 — 벽 너머까지 뻗어 나가도록 일부러 그렇게 둔 것들이다. */
+  const D = 2 * RACE_R;
+  let seen = 0;
+  for (let s = 1; s <= 40; s++) {
+    const map = raceRun(s * 7919, 8).map;
+    const pegs = map.bodies.filter((b) => !b.sp && b.x1 === b.x2 && b.y1 === b.y2 && b.rad > 0);
+    seen += pegs.length;
+    for (const p of pegs) {
+      // 벽에 파묻힌 것은 애초에 닿을 수 없어 안전하다. 어중간하게 떨어져 있는 것만 위험하다.
+      const L = p.x1 - p.rad, R = RACE_W - (p.x1 + p.rad);
+      assert.ok(L <= 0 || L > D, `seed=${s}: 왼벽 통로가 ${L.toFixed(1)} 이다 (지름 ${D})`);
+      assert.ok(R <= 0 || R > D, `seed=${s}: 오른벽 통로가 ${R.toFixed(1)} 이다 (지름 ${D})`);
+    }
+    for (let i = 0; i < pegs.length; i++) for (let j = i + 1; j < pegs.length; j++) {
+      const a = pegs[i], b = pegs[j];
+      const dx = a.x1 - b.x1, dy = a.y1 - b.y1;
+      const gap = Math.sqrt(dx * dx + dy * dy) - a.rad - b.rad;
+      assert.ok(gap > D, `seed=${s}: 못 두 개의 표면 간격이 ${gap.toFixed(1)} 이다 (지름 ${D})`);
+    }
+  }
+  // 한 판에 원형이 하나도 없는 코스는 있을 수 있다(1자길 다섯 칸이 전부 큰 날·기둥으로 뽑힌 판).
+  // 40판을 통틀어 하나도 없으면 그건 필터가 잘못된 것이다.
+  assert.ok(seen > 0, "40판을 통틀어 원형 장애물이 하나도 안 잡혔다 — 필터가 잘못됐다");
+});
+
 test("raceMapBuild — 코스 길이는 고정이고 구성만 섞인다", () => {
-  // 길 구성 비율(1자 4 · 지그재그 3 · 깔때기 3)을 고정했으므로 총 길이는 판마다 같아야 한다.
+  // 길 구성 비율(1자 5 · 지그재그 3 · 깔때기 2)을 고정했으므로 총 길이는 판마다 같아야 한다.
   // 그게 이 설계의 요점이다 — 판마다 게임 시간이 들쭉날쭉하지 않게 만드는 장치다.
   const totals = [], shapes = [];
   for (let s = 1; s <= 30; s++) {
@@ -638,7 +741,7 @@ test("raceMapBuild — 코스 길이는 고정이고 구성만 섞인다", () =>
     shapes.push(m.bodies.length);
   }
   assert.equal(new Set(totals).size, 1, `코스 길이가 ${new Set(totals).size} 가지다 — 비율 고정이 깨졌다`);
-  // 구성은 섞여야 한다. 장애물마다 물체 수가 달라서(못밭 수십 · 바람개비 2 · 기둥 1 · 범퍼 5)
+  // 구성은 섞여야 한다. 장애물마다 물체 수가 달라서(못밭 수십 · 큰 날 1 · 기둥 1 · 범퍼 5 · 탄성 못밭 11)
   // 물체 수가 한 가지로 고정돼 있으면 매 판 같은 코스를 그리고 있다는 뜻이다.
   assert.ok(new Set(shapes).size >= 3, `물체 수가 ${new Set(shapes).size} 가지뿐이다 — 구성이 안 섞이고 있다`);
 });

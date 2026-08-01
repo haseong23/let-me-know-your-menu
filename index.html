@@ -634,7 +634,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.89";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.90";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1946,10 +1946,46 @@ function wheelSpin(n, wi, rnd){
   return { a, mid, spin, labelStart:0, labelEnd:-spin };
 }
 
-// 사다리 치수. 인원 상한(16)이 실제 한계와 맞는지 이 값으로 역검증한다
+// 사다리 치수. 인원 상한(16)이 실제 한계와 맞는지 이 값으로 역검증한다.
+// LEV(층 수)도 치수의 일부라 여기서 함께 돌려준다 — playLadder 와 테스트가 같은 공식을 두 번
+// 적으면 한쪽만 고쳐도 아무도 못 알아챈다.
 function ladderGeometry(n){
   const W=340, PAD=24, GAP=(W-2*PAD)/(n-1);
-  return { GAP, BOX_W: Math.min(30, GAP*0.82), NCH: n<=7?4 : n<=9?3 : 2, NFS: n<=7?11 : n<=9?10 : 8.5 };
+  return { GAP, BOX_W: Math.min(30, GAP*0.82), NCH: n<=7?4 : n<=9?3 : 2, NFS: n<=7?11 : n<=9?10 : 8.5,
+           LEV: Math.min(14, Math.max(6, n*2)) };
+}
+
+/* 가로줄을 놓는다. 규칙 둘이 있다.
+     ① 인접 금지 — 같은 높이에서 이웃끼리 겹치면 경로가 갈라지지 않는다.
+     ② 세로줄마다 가로선이 최소 하나는 닿는다 — 하나도 안 닿는 줄에 선 사람은 처음부터 끝까지
+        직진이라 게임을 구경만 한다(실사용 제보).
+
+   ②를 확률로 굴린 뒤 걸러내지 않고 먼저 깔아 두는 것이 요점이다. 걸러내는 방식은 n=2·LEV=6 에서
+   실패율이 2.8% 라 예순 번쯤 다시 뽑으면 사실상 통과하지만, 그건 "거의 항상"이지 "반드시"가
+   아니다. 순서도 요점이다 — 확률로 먼저 채우면 인접 금지에 막혀 ①이 놓을 자리가 사라진다.
+
+   난수를 인자로 받는 이유는 두 규칙이 실제로 지켜지는지 결정론적으로 검증하기 위해서다. */
+function ladderRungs(n, LEV, rnd){
+  const R = rnd || Math.random;
+  const rows = Array.from({length:LEV}, ()=>[]);
+  const has = (row,g)=> row.indexOf(g) >= 0;
+  const canPut = (row,g)=> g>=0 && g<n-1 && !has(row,g) && !has(row,g-1) && !has(row,g+1);
+  const touched = (c)=> rows.some(row=> has(row,c) || has(row,c-1));
+  for(let c=0;c<n;c++){
+    if(touched(c)) continue;
+    // 세로줄 c 에 닿는 가로선은 왼쪽 간격(c-1) 아니면 오른쪽 간격(c) 이다. 양 끝 줄은 한쪽뿐.
+    const gaps = c===0 ? [0] : c===n-1 ? [c-1] : [c-1, c];
+    const cand = [];
+    for(let l=0;l<LEV;l++) for(let k=0;k<gaps.length;k++) if(canPut(rows[l], gaps[k])) cand.push([l, gaps[k]]);
+    // 이론상만 있는 경우다(그 줄의 양쪽 간격이 전 층에서 비었는데 그 '이웃' 간격이 전 층을 채운 상태).
+    // 여기서 조용히 포기하지 않고 호출부가 다시 뽑게 한다 — 보장이 무너지는 유일한 통로를 막는다.
+    if(!cand.length) return null;
+    const pick = cand[Math.floor(R()*cand.length)];
+    rows[pick[0]].push(pick[1]);
+  }
+  for(let l=0;l<LEV;l++) for(let g=0;g<n-1;g++) if(canPut(rows[l],g) && R()<0.45) rows[l].push(g);
+  for(let l=0;l<LEV;l++) rows[l].sort((a,b)=>a-b);   // trace 는 순서를 안 보지만 읽기 위해 정렬한다
+  return rows;
 }
 
 /* ─────────── 🏁 구슬 레이스 (물리) ───────────
@@ -1959,7 +1995,7 @@ function ladderGeometry(n){
 
    구성 원칙:
      · 길은 세 가지다 — 1자길 · 지그재그길 · 깔때기길.
-     · 속도를 흩는 일은 길이 아니라 장애물이 한다 — 못 · 바람개비 · 가운데 물길 · 범퍼.
+     · 속도를 흩는 일은 길이 아니라 장애물이 한다 — 못밭 · 큰 날 · 가운데 물길 · 범퍼 · 탄성 못밭.
      · 마찰은 없다. 에너지를 잃는 경로는 벽·장애물과의 반발과 구슬끼리의 반발뿐이고 나머지는
        중력이 준다. 그래서 RACE_TFRIC 이 없다(접선 방향을 아예 건드리지 않는다).
 
@@ -1986,21 +2022,18 @@ const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하
 const RACE_SEG_MIX = ["s","s","s","s","s","z","z","z","f","f"];
 
 /* 캡슐 하나로 못·벽·경사·기둥을 전부 표현한다 — 원-선분 거리 계산 하나면 넷이 다 풀린다.
-   회전 막대(바람개비)는 sp!==0 이고 매 스텝 끝점을 다시 잡는다. y0/y1b 는 격자에 넣을 때 쓰는
+   회전 막대(큰 날)는 sp!==0 이고 매 스텝 끝점을 다시 잡는다. y0/y1b 는 격자에 넣을 때 쓰는
    세로 범위이고, 회전 막대는 어느 각도로도 돌 수 있으니 반지름 전체를 범위로 잡는다. */
 function rcap(x1,y1,x2,y2,rad){ return {x1,y1,x2,y2,rad,sp:0,cx:0,cy:0,hl:0,ph:0,e:0,
   y0:Math.min(y1,y2)-rad, y1b:Math.max(y1,y2)+rad}; }
 function rpeg(x,y,rad){ return rcap(x,y,x,y,rad); }
-function rbar(cx,cy,hl,rad,sp,ph){
-  const b={x1:cx-hl,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,ph,e:0};
-  b.y0=cy-hl-rad; b.y1b=cy+hl+rad; return b;
-}
-/* 힘장 — 충돌체가 아니라 '그 안에 있으면 힘을 받는' 영역이다. 위로 미는 장치(에어샤워·분수)를
-   만들려고 들였다. 캡슐로는 위로 미는 걸 표현할 수 없다 — 캡슐은 닿았을 때 튕겨낼 뿐이라
-   구슬이 거슬러 올라가는 구간을 만들 수 없고, 깔때기·지그재그만으로는 순위가 잘 안 바뀐다.
-   out 이 있으면 가로 힘을 그 x 에서 '바깥으로' 준다(부호가 항상 정해지므로 결정론이 유지된다). */
-function rfield(x0,y0,x1,y1,fy,fx,out){
-  return { fl:1, fx0:x0, fx1:x1, fy, fx:fx||0, out:(out===undefined?null:out), y0, y1b:y1, sp:0, e:0, rad:0 };
+// hl 은 축 오른쪽 팔, hl0 은 왼쪽 팔이다. hl0 을 안 주면 예전처럼 대칭이라 기존 호출부가 그대로 산다.
+// 팔을 따로 두는 이유는 robVane 주석에 있다 — 대칭 막대는 돌고 있는 게 안 보인다.
+function rbar(cx,cy,hl,rad,sp,ph,hl0){
+  const h0=(hl0===undefined?hl:hl0);
+  const b={x1:cx-h0,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,hl0:h0,ph,e:0};
+  const m=Math.max(hl,h0);
+  b.y0=cy-m-rad; b.y1b=cy+m+rad; return b;
 }
 
 /* ══ 길 세 가지 ══ 좌우 바깥벽은 시뮬레이터가 직접 잡으므로 여기서는 안쪽 지형만 놓는다. */
@@ -2028,7 +2061,7 @@ function rpathFunnel(B, y, rnd){
   return 300;
 }
 
-/* ══ 장애물 네 가지 ══ 1자길 안에만 들어간다.
+/* ══ 장애물 다섯 가지 ══ 1자길 안에만 들어간다.
    지그재그·깔때기 위에 겹쳐 봤더니 이빨의 아랫면과 기둥의 옆면이 만나 주머니가 생겨서, 계측한
    60판 중 54판이 그 자리에서 멈췄다. 벽이 이미 방향을 트는 길에 또 방향을 트는 물체를 두면 둘
    사이에 닫힌 구석이 반드시 나온다. 그래서 역할을 나눈다 — 지그재그·깔때기는 '벽으로',
@@ -2047,21 +2080,29 @@ function robPins(B, y, h, rnd){
   }
 }
 
-/* 바람개비 — 막대 둘을 90° 어긋나게 같은 중심에 걸어 네 날로 만든다. 접촉점의 표면 속도가
-   구슬에 그대로 실려서, 올라가는 날에 맞으면 붙잡히고 내려가는 날에 맞으면 튕겨 나간다.
+/* 큰 날 — 축 하나에 걸린 비대칭 외날이다. 접촉점의 표면 속도가 구슬에 그대로 실려서, 올라가는
+   날에 맞으면 붙잡히고 내려가는 날에 맞으면 던져진다.
 
-   두 막대의 길이를 다르게(74 / 50) 준 이유가 핵심이다. 처음엔 둘 다 56 으로 똑같이 만들었는데,
-   그러면 네 날이 전부 같아서 90° 돌 때마다 완전히 같은 그림이 된다. 1.4 rad/s 로는 1.1초마다
-   원래 모양으로 돌아오고 바람개비가 화면에 머무는 시간이 1~1.5초뿐이라, 실제로는 돌고 있는데
-   눈에는 멈춰 보였다(실사용 제보). 길이를 갈라 놓으면 대칭이 깨져 어느 순간에도 방향이 읽힌다.
-   속도도 2.4~3.8 rad/s 로 올렸다 — 지나가는 그 짧은 사이에 반 바퀴는 돌아야 '돈다'고 읽힌다.
-   긴 날이 74 라 끝이 x=26~174 까지 닿는다. 양옆에 26 씩 남아 지름 18 인 구슬이 지나갈 수는
-   있지만, 예전 56(양옆 44)처럼 그냥 흘러내리지는 못하고 날을 스치게 된다. */
-function robWheel(B, y, h, rnd){
-  const cy=y+h*0.5, r=5;
-  const sp=(rnd()<0.5?1:-1)*(2.4+rnd()*1.4), ph=rnd()*6.283;
-  B.push(rbar(RACE_W/2, cy, 74, r, sp, ph));
-  B.push(rbar(RACE_W/2, cy, 50, r, sp, ph+1.5708));
+   팔 길이를 88 / 42 로 가르는 것이 이 물건의 전부다. 대칭 막대 하나는 180° 마다 같은 그림이라
+   "실제로는 돌고 있는데 눈에는 멈춰 보인다"는 예전 제보가 그대로 재발한다(예전 십자 막대가 네
+   날을 다 같은 길이로 뒀다가 겪은 일이다). 갈라 놓으면 회귀 주기가 π 가 아니라 2π(≈2.1초)라,
+   이 구간에 머무는 1~1.5초 안에 같은 그림이 두 번 나오지 않는다.
+
+   긴 팔 끝 표면이 x=6/194 다 — 지름 18 인 구슬은 양옆으로 못 빠져나간다. 즉 이건 관문이고,
+   긴 팔이 향한 쪽이 닫히는 동안 짧은 팔 쪽(벽까지 52)만 열린다.
+
+   끼임 걱정은 계측으로 털었다(6구간 반복 60판: 완주 실패 0, 최장 정체 1.72초 — 예전 십자 2.02초
+   보다 짧다). 마찰이 0 이라 정체는 '접촉 법선들이 중력을 정적으로 떠받치는가'로만 결정되는데,
+   회전체는 그 조건이 회전당 0.2~0.3초만 존재하고, 접촉점 표면속도가 팔에 수직이라 끼인 구슬을
+   위아래로 쓸어낸다. 그래서 벽 쪽에 경사 캡슐을 덧대면 안 된다 — 정적 경사면과 회전 팔 사이에는
+   진짜 정적 쐐기가 생긴다(바로 아래 장애물 배치 규칙과 같은 이야기다).
+
+   각속도 3.4 초과는 최장 정체가 2.15초로 늘고, 2.2 미만은 체류 중 반 바퀴를 못 채운다.
+   축은 가운데 고정이다 — 좌우로 흔들면 긴 팔을 82 이하로 줄여야 해서 크기를 포기하게 된다. */
+function robVane(B, y, h, rnd, arm){
+  const cy=y+h*0.5, r=6;
+  const sp=(rnd()<0.5?1:-1)*(2.2+rnd()*1.2), ph=rnd()*6.283;
+  B.push(rbar(RACE_W/2, cy, (arm||88), r, sp, ph, 42));
 }
 
 // 가운데 물길 — 굵은 기둥이 흐름을 좌우로 가른다. 끝이 반원이라 얹힌 구슬은 굴러 떨어지고,
@@ -2078,26 +2119,57 @@ function robBumpers(B, y, h, rnd){
   for(let k=0;k<P.length;k++){ const b=rpeg(P[k][0], y+h*P[k][1], r); b.e=0.78; B.push(b); }
 }
 
-/* 에어샤워 — 위로 부는 바람. 세기를 중력보다 '약하게'(0.72G) 잡는 것이 요점이다. 순 가속이
-   아래로 남아 있어 아무도 멈추지 않으면서 낙하 속도만 크게 죽는다. 여기서 구슬이 뭉치고,
-   뭉친 채로 서로 밀면서 순위가 뒤집힌다. 깔때기가 못 만들던 장면이 이것이다. */
-function robBlow(B, y, h, rnd){
-  B.push(rfield(6, y+h*0.16, RACE_W-6, y+h*0.84, -RACE_G*0.72, 0));
-}
-/* 분수 — 가운데에서 위로 쏘아 올린다. 중력보다 세서(2.2G) 구슬이 실제로 거슬러 올라간다.
-   좌우로 밀어 내보내는 힘을 함께 주지 않으면 제트 한가운데서 영원히 오르내린다 — 그래서
-   중심에서 바깥 방향으로 0.55G 를 같이 건다. 폭이 68 이라 양옆으로 빠져나갈 자리가 넉넉하다. */
-function robFountain(B, y, h, rnd){
-  const cx=RACE_W/2, w=34;
-  B.push(rfield(cx-w, y+h*0.28, cx+w, y+h*0.88, -RACE_G*2.2, RACE_G*0.55, cx));
+/* 탄성 못밭 — 크고 · 많고 · 세게 튀는 집단. 위로 되돌아가는 장면을 이 하나가 맡는다.
+
+   위로 되돌아가려면 충돌 법선이 위를 향해야 하고, 그러려면 구슬이 못의 '꼭대기'에 떨어져야 한다.
+   3-2-3-2 엇배열(플린코)이 그걸 강제한다 — 윗줄 틈으로 빠진 구슬이 아랫줄 못 꼭대기로 유도된다.
+   e=0.88 이면 첫 반동이 686px/s 라 168px, 구슬 아홉 개 높이를 거슬러 오른다.
+
+   배치는 규칙 하나가 지배한다 — 모든 표면 간격이 구슬 지름(2*RACE_R = 18)보다 넓어야 한다.
+   마찰이 0 이라 순수 기하로 유도된다. 못과 벽이 그보다 좁으면 벽에 붙은 구슬이 못에 동시에 닿아
+   정적 쐐기가 생기고(위 못밭의 edge=18 사고와 같은 것), 못과 못이 그보다 좁으면 둘에 동시에 닿아
+   V 주머니가 된다. 계측이 그대로 확인해 준다 — 벽 여유를 14 로 좁히면 60판이 전부 완주에
+   실패했고, 못 간극 16 은 40판 중 5판이 갇혔다. 여기 값은 둘 다 20 이라 두 접촉이 애초에 동시에
+   성립하지 않는다.
+
+   e 상한이 0.90 인 이유 — 마찰이 없어 수직 반복 튐의 정착 시간이 2ev/g/(1-e) 이고 e=0.96 이면
+   32초다. 못이 '원'이라 두 번째 튐부터 어깨로 흘러 실제로는 3초 안에 끝나지만(계측 3.07초),
+   접촉면이 평평하면 그 탈출로가 사라진다 — 길이 56 짜리 수평 캡슐로 같은 걸 만들어 봤더니 한
+   구슬이 44.5초를 튀었다. 그래서 여기는 원 말고 쓰지 않는다.
+
+   범퍼와는 네 축에서 동시에 갈린다 — 개수 11 대 5 · 반지름 20 대 16 · 반발 0.88 대 0.78 ·
+   플린코 대 흩어놓기. 범퍼의 0.78 은 그대로 둔다(0.90 으로 올리면 최장 정체가 2.22→3.85초).
+   반지름을 더 키우면 간격 규칙에 걸려 한 줄에 두 개밖에 못 들어가고, 그렇게 만든 r=26 후보는
+   현행 범퍼보다도 약했다(구간당 +0.24초). 20 이 '크게'와 '많이'가 만나는 지점이다. */
+function robBounce(B, y, h, rnd, rows){
+  const r=20, e=0.88, s=60, dy=68, nrow=(rows||4);
+  const y0=y+h*0.5-(nrow-1)*dy/2;
+  for(let j=0;j<nrow;j++){
+    const yy=y0+j*dy;
+    const xs=(j%2===0) ? [RACE_W/2-s, RACE_W/2, RACE_W/2+s]    // 40 · 100 · 160
+                       : [RACE_W/2-s/2, RACE_W/2+s/2];         // 70 · 130
+    for(let k=0;k<xs.length;k++){ const b=rpeg(xs[k], yy, r); b.e=e; B.push(b); }
+  }
 }
 
-const RACE_OBS = [robPins, robWheel, robIsland, robBumpers, robBlow, robFountain];
+/* 에어샤워(위로 부는 바람)와 분수를 힘장으로 만들어 뒀다가 걷어냈다. 계측에서 둘 다 무력했다 —
+   같은 장애물만 여섯 번 반복한 코스에서 구간당 추가 시간이 에어샤워 +0.003초 · 분수 +0.012초였다
+   (못밭 +0.48 · 범퍼 +0.39 · 탄성 못밭 +0.70 과 비교하면 측정 한계다). 이유가 분명하다 — 구슬은
+   코스 대부분을 RACE_VMAX 클램프에 붙어 내려오므로 중력보다 약한 상승풍은 "더 빨라지지 않게"
+   할 뿐 아무 일도 안 한다. 분수는 바깥으로 미는 힘 때문에 0.09초 만에 제트를 벗어난다.
+   힘장이라는 개념 자체(rfield · 시뮬의 fl 분기 · drawField)를 여기서 함께 지웠다. */
+const RACE_OBS = [robPins, robVane, robIsland, robBumpers, robBounce];
 
 /* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
    만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
-   돌림판에서 라벨 기울기가 답이었던 것과 같은 종류의 누출이다. */
-function raceMapBuild(rnd){
+   돌림판에서 라벨 기울기가 답이었던 것과 같은 종류의 누출이다.
+
+   soft 는 2인 판에서만 켠다. 두 구슬뿐이면 서로 미는 압력이 없어 구조적으로 늘어져서, 새 장애물
+   그대로는 200판 중 2.5% 가 상한 23초를 넘었다(최대 25.5초). 완화는 세기 둘로만 한정한다 —
+   탄성 못밭을 한 줄 줄이고 큰 날의 긴 팔을 78 로 낮춘다. 기하 규칙도 구성 비율도 코스 길이도
+   건드리지 않으므로 '같은 게임'이 유지되고, 2인 판은 두 구슬이 같은 코스를 보므로 공정성과도
+   무관하다. rnd 소비 횟수가 안 변하는 것도 중요하다 — 변하면 같은 시드가 다른 코스를 만든다. */
+function raceMapBuild(rnd, soft){
   const B=[];
   let y=0;
   B.push(rcap(-8, y+50, RACE_W/2-17, y+250, 4));
@@ -2112,7 +2184,8 @@ function raceMapBuild(rnd){
     if(mix[s]==="s"){
       const ob=RACE_OBS[Math.floor(rnd()*RACE_OBS.length)];
       const h=rpathStraight(B, y, rnd);
-      ob(B, y, h, rnd); y+=h;
+      // 다섯째 인자는 세기다 — robVane 은 긴 팔, robBounce 는 줄 수. 나머지 셋은 안 읽는다.
+      ob(B, y, h, rnd, soft ? (ob===robVane ? 78 : 2) : undefined); y+=h;
     } else if(mix[s]==="z") y+=rpathZig(B, y, rnd);
     else                    y+=rpathFunnel(B, y, rnd);
   }
@@ -2145,6 +2218,12 @@ function raceSimulate(map, n, rnd){
   const idx=new Int32Array(n); for(let i=0;i<n;i++) idx[i]=i;
   const B=map.bodies, grid=map.grid, cells=map.cells;
   let frames=0, winner=-1, leadPrev=-1, leadChanges=0;
+  /* 역동성 지표 둘. leadChanges 는 선두가 프레임 단위로 깜빡이기만 해도 오르고(히스테리시스를
+     걸어 재보면 25~30% 가 그 깜빡임이다), 더 큰 문제는 24명 판에서 leadChanges 가 16 인데 선두를
+     잡아 본 구슬은 일곱뿐이라는 것이다 — 나머지 열일곱은 한 번도 맨 앞에 못 나왔다. 체감에
+     직결되는 건 후자라 둘을 따로 센다. leadChanges 는 지표로 남기고 채택 문턱은 아래가 맡는다. */
+  const ledSeen=new Uint8Array(n); let distinctLeaders=0;
+  const rankPrev=new Int32Array(n).fill(-1); let rankChurn=0;
 
   for(let f=0; f<RACE_MAXF && winner<0; f++){
     for(let s=0; s<RACE_SUB; s++){
@@ -2159,17 +2238,7 @@ function raceSimulate(map, n, rnd){
         const c=Math.floor(py[i]/RACE_CELL);
         if(c<0||c>=cells) continue;
         const list=grid[c];
-        for(let k=0;k<list.length;k++){
-          const b=B[list[k]];
-          if(b.fl){
-            // 힘장 — 범위 안이면 가속만 더한다. 위치를 밀지 않으므로 터널링과 무관하다.
-            if(px[i]>b.fx0 && px[i]<b.fx1 && py[i]>b.y0 && py[i]<b.y1b){
-              vy[i]+=b.fy*RACE_DT;
-              if(b.out!==null) vx[i]+=(px[i]<b.out?-1:1)*b.fx*RACE_DT;
-              else if(b.fx)    vx[i]+=b.fx*RACE_DT;
-            }
-          } else raceHit(b, i, tt, px, py, vx, vy);
-        }
+        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, tt, px, py, vx, vy);
       }
       // 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
       // 매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
@@ -2210,9 +2279,22 @@ function raceSimulate(map, n, rnd){
     for(let i=1;i<n;i++) if(py[i]>py[lead]) lead=i;
     if(leadPrev>=0&&lead!==leadPrev) leadChanges++;
     leadPrev=lead;
+    if(!ledSeen[lead]){ ledSeen[lead]=1; distinctLeaders++; }
+    /* 순위 변동 총량. idx 는 바로 위 구슬끼리 패스가 py 오름차순으로 정렬해 놓았고 그 뒤 벽
+       클램프는 x 만 건드리므로, 여기서 다시 정렬할 것이 없다 — 순위표가 이미 손에 있다.
+       여섯 프레임(10Hz)마다 재는 이유는 매 프레임 재면 1px 차이로 붙어 가는 두 구슬이 서로
+       자리를 바꾸는 떨림이 총량을 지배해서, leadChanges 와 똑같은 약점을 갖게 되기 때문이다. */
+    if(f%6===0){
+      for(let a=0;a<n;a++){
+        const i=idx[n-1-a];                       // a=0 이 선두
+        if(rankPrev[i]>=0) rankChurn+=Math.abs(a-rankPrev[i]);
+        rankPrev[i]=a;
+      }
+    }
     if(py[lead]>=map.finishY) winner=lead;
   }
-  return { ok:winner>=0, winner, frames, leadChanges, path:path.subarray(0, frames*n*2), n };
+  return { ok:winner>=0, winner, frames, leadChanges, distinctLeaders, rankChurn,
+           path:path.subarray(0, frames*n*2), n };
 }
 
 /* 구슬 i 와 캡슐 하나. 위치를 밀어내고 법선 반사 + 반발계수만 적용한다 — 접선은 손대지 않으므로
@@ -2222,7 +2304,7 @@ function raceHit(b, i, tt, px, py, vx, vy){
   let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2, sxv=0, syv=0;
   if(b.sp){
     const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
-    x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa;
+    x1=b.cx-b.hl0*ca; y1=b.cy-b.hl0*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa;
   }
   const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
   let t = L2>0 ? ((px[i]-x1)*dx+(py[i]-y1)*dy)/L2 : 0;
@@ -3179,7 +3261,7 @@ async function commitGameWinner(w){
 /* ---------- 🪜 사다리타기 ---------- */
 function playLadder(roster, winner){
   const n=roster.length, W=340, PAD=24, LABEL_Y=15, Y0=28, RUN=300;
-  const LEV=Math.min(14, Math.max(6, n*2)), STEP=RUN/LEV, Y1=Y0+RUN, BOX_Y=Y1+9, BOX_H=26, H=BOX_Y+BOX_H+6;
+  const LEV=ladderGeometry(n).LEV, STEP=RUN/LEV, Y1=Y0+RUN, BOX_Y=Y1+9, BOX_H=26, H=BOX_Y+BOX_H+6;
   const colX=i=> PAD + i*(W-2*PAD)/(n-1);
   // 세로줄 간격보다 이름이 넓으면 위쪽 이름이 서로 겹쳐 못 읽는다 → 인원에 맞춰 글자수·크기를 줄인다.
   // 짧게 잘려도 전체 이름은 결과 발표와 <title> 에 그대로 나온다.
@@ -3206,22 +3288,25 @@ function playLadder(roster, winner){
   // 내린다 — BFS=14 에서 BOX_Y+18.0 으로 기존 값과 같다.
   const BTY = BOX_Y + BOX_H/2 + BFS*0.36;
   const rowY=l=> Y0 + (l+0.5)*STEP;
-  // 가로줄: 같은 높이에서 이웃끼리 겹치면 경로가 갈라지지 않는다 → 인접 금지.
-  // 가로줄이 너무 적거나, 아무도 자리를 안 바꾸는(제자리) 사다리는 그림이 밋밋해서 다시 만든다.
+  // 가로줄 놓기(인접 금지 · 모든 세로줄에 최소 하나)는 ladderRungs 가 한다.
+  // 여기서 더 보는 것은 하나뿐이다 — 아무도 자리를 안 바꾸는(제자리) 사다리는 그림이 밋밋해서
+  // 다시 만든다. "가로줄 총수 ≥ n" 은 뺐다. 커버리지 보장이 그보다 강한 조건이라 겹친다.
   const trace=(rungs,start)=>{ let col=start; const pts=[[colX(col),Y0-6]];
     for(let l=0;l<LEV;l++){ const row=rungs[l];
       const to = row.indexOf(col)>=0 ? col+1 : (row.indexOf(col-1)>=0 ? col-1 : null);
       if(to!==null){ pts.push([colX(col),rowY(l)]); pts.push([colX(to),rowY(l)]); col=to; } }
     pts.push([colX(col),BOX_Y-2]); return {pts,end:col}; };
-  let rungs=[], paths=[];
+  let rungs=null, paths=[];
   for(let t=0;t<60;t++){
-    rungs=[]; let total=0;
-    for(let l=0;l<LEV;l++){ const row=[];
-      for(let i=0;i<n-1;i++){ if(row.indexOf(i-1)>=0) continue; if(Math.random()<0.45){ row.push(i); total++; } }
-      rungs.push(row); }
+    const r=ladderRungs(n, LEV, Math.random);
+    if(!r) continue;
+    rungs=r;
     paths=roster.map((m,i)=>trace(rungs,i));
-    if(total>=n && paths.some((p,i)=>p.end!==i)) break;
+    if(paths.some((p,i)=>p.end!==i)) break;
   }
+  // ladderRungs 가 예순 번 내리 포기할 자리는 사실상 없지만(커버리지 단계에서 놓을 자리가 없어지는
+  // 조합이 성립하지 않는다), 없다고 단정하면 아래 전부가 null 을 읽는다. 밋밋한 사다리가 낫다.
+  if(!rungs){ rungs=Array.from({length:LEV},()=>[]); paths=roster.map((m,i)=>trace(rungs,i)); }
   const wi=roster.indexOf(winner), goal=paths[wi].end;   // ☕ 는 당첨자가 도착하는 칸에 놓는다
   // 같은 가로줄을 두 사람이 지날 때 색이 덮이지 않도록 사람마다 아주 조금 어긋나게 그린다
   const dOf=(pts,i)=>{ const off=(i-(n-1)/2)*0.8;
@@ -3600,12 +3685,17 @@ const RACE_HUD_MS = 200;         // HUD 갱신 간격
 const RACE_DPR_MAX = 3;
 // 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body(51행) 스택과 같은 순서다.
 const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif";
-/* 시드 재시도. 무엇을 보고 다시 뽑는지가 중요하다 — 승자는 보지 않는다. 소요 시간과 역전 횟수만
+/* 시드 재시도. 무엇을 보고 다시 뽑는지가 중요하다 — 승자는 보지 않는다. 소요 시간과 역동성만
    본다. 승자를 보고 다시 뽑으면 그게 거부 표집이고, 그러면 게임 앞에 설명할 수 없는 대기가 붙는다.
-   한 판 계산이 24명에서 최대 27ms 라 몇 번 돌려도 사용자는 못 느낀다.
-   n=2 는 역전이 구조적으로 드물어 문턱을 낮춘다(계측: 중앙값 2회). */
+   한 판 계산이 24명에서 최대 27ms 라 몇 번 돌려도 사용자는 못 느낀다. */
 const RACE_TRIES = 6;
 const RACE_MIN_S = 13, RACE_MAX_S = 23;
+/* 문턱은 leadChanges 가 아니라 '선두를 잡아 본 구슬 수'로 잡는다. 예전 문턱(역전 3회)은 계측해
+   보니 아무것도 안 걸렀다 — 여섯 명 판에서도 하위 10% 가 4회라 첫 판이 거의 그대로 통과했다.
+   즉 역동성을 고른 적이 없다. n 이 작을수록 구조적 상한이 낮아서 단을 나눈다(넷을 요구하면
+   4인 판 통과율이 41% 로 떨어진다). 실측 통과율은 2인 91% · 8인 82% · 24인 96% 이고,
+   가장 나쁜 4인 판도 여섯 번이면 98% 다. 못 넘어도 fallback 이 산다. */
+const raceNeedLeaders = n => Math.min(n, n<=2 ? 2 : n<=5 ? 3 : 4);
 
 /* 판 하나를 만든다. 승자를 미리 뽑지 않는다 — 물리가 정한다.
    문턱을 못 넘어도 완주한 판이 있으면 그걸 쓴다. 못 돌리는 것보다 조금 밋밋한 판이 낫다. */
@@ -3613,12 +3703,12 @@ function raceBuild(n){
   let fallback = null;
   for(let t=0; t<RACE_TRIES; t++){
     const rnd = raceRnd((Math.random()*0xffffffff)>>>0);
-    const map = raceMapBuild(rnd);
+    const map = raceMapBuild(rnd, n<=2);
     const sim = raceSimulate(map, n, rnd);
     if(!sim.ok) continue;
     if(!fallback) fallback = { map, sim };
     const secs = sim.frames/60;
-    if(secs >= RACE_MIN_S && secs <= RACE_MAX_S && sim.leadChanges >= (n===2 ? 2 : 3)) return { map, sim };
+    if(secs >= RACE_MIN_S && secs <= RACE_MAX_S && sim.distinctLeaders >= raceNeedLeaders(n)) return { map, sim };
   }
   return fallback;
 }
@@ -3705,20 +3795,27 @@ function playRace(players, onDone){
         if(stamp[bi] === stampNo) continue;
         stamp[bi] = stampNo;
         const b = map.bodies[bi];
-        if(b.fl){ drawField(b, camY, tt); continue; }   // 힘장은 선이 아니라 띠로 그린다
-        let x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2;
-        if(b.sp){ const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
-          x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa; }
-        // 색으로 성격을 갈라 둔다 — 도는 것(바람개비)과 세게 튕기는 것(범퍼)은 미리 알아볼 수 있어야 한다
-        ctx.strokeStyle = b.sp ? "#a08a6a" : b.e ? "#c98a3a" : "#e0d5c4";
         ctx.lineWidth = 2*b.rad;
+        if(b.sp){
+          /* 큰 날은 두 팔을 축에서 따로, 다른 색으로 그린다. 길이 비대칭만으로도 회전은 읽히지만
+             색 대비가 훨씬 즉각적이다 — 지나가는 1~1.5초 안에 '돌고 있다'가 보여야 한다.
+             축 점은 그 위에 찍는다. 축이 보여야 도는 물건으로 읽힌다. */
+          const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
+          ctx.strokeStyle="#8a7355";                     // 긴 팔
+          ctx.beginPath(); ctx.moveTo(b.cx, b.cy-camY);
+          ctx.lineTo(b.cx+b.hl*ca, b.cy+b.hl*sa-camY); ctx.stroke();
+          ctx.strokeStyle="#bfa887";                     // 짧은 팔
+          ctx.beginPath(); ctx.moveTo(b.cx, b.cy-camY);
+          ctx.lineTo(b.cx-b.hl0*ca, b.cy-b.hl0*sa-camY); ctx.stroke();
+          ctx.beginPath(); ctx.arc(b.cx, b.cy-camY, 4, 0, Math.PI*2);
+          ctx.fillStyle="#7a6a52"; ctx.fill();
+          continue;
+        }
+        // 색으로 성격을 갈라 둔다 — 세게 튕기는 것(탄성 못밭·범퍼)은 미리 알아볼 수 있어야 한다
+        ctx.strokeStyle = b.e>=0.85 ? "#b8442a" : b.e ? "#c98a3a" : "#e0d5c4";
         ctx.beginPath();
-        ctx.moveTo(x1, y1-camY); ctx.lineTo(x2, y2-camY);
+        ctx.moveTo(b.x1, b.y1-camY); ctx.lineTo(b.x2, b.y2-camY);
         ctx.stroke();
-        // 회전축을 점으로 찍는다 — 축이 보여야 '도는 물건'으로 읽힌다. 막대 둘이 중심을 공유해
-        // 두 번 찍히지만 같은 자리라 표시가 달라지지 않는다.
-        if(b.sp){ ctx.beginPath(); ctx.arc(b.cx, b.cy-camY, 4, 0, Math.PI*2);
-          ctx.fillStyle="#7a6a52"; ctx.fill(); }
       }
     }
     // 결승선 — 체커 두 줄. 1위가 도착하는 순간 화면에 무엇이 걸렸는지 보여야 한다
@@ -3730,25 +3827,6 @@ function playRace(players, onDone){
         ctx.fillRect(x, fy + row*cell, cell, cell);
       }
     }
-  }
-
-  /* 힘장(에어샤워·분수)을 눈에 보이게 그린다. 안 그리면 구슬이 이유 없이 떠오르는 것처럼 보인다 —
-     물리를 진짜로 돌리는 값어치가 '왜 저렇게 됐는지 보인다'에 있으므로 원인을 화면에 남긴다.
-     위로 흐르는 갈매기 표시가 시간에 따라 올라가서 방향과 '지금 작동 중'을 함께 말한다.
-     분수(중력보다 센 것)는 띠도 표시도 진하게 — 세기 차이가 곧 결과 차이라서 미리 알아볼 수 있어야 한다. */
-  function drawField(b, camY, tt){
-    const y0=b.y0-camY, y1=b.y1b-camY;
-    if(y1 < -12 || y0 > H+12) return;
-    const strong = b.fy < -RACE_G;
-    ctx.fillStyle = strong ? "rgba(158,136,104,.22)" : "rgba(158,136,104,.13)";
-    ctx.fillRect(b.fx0, y0, b.fx1-b.fx0, y1-y0);
-    const step=26, ph=(tt*72)%step, cx=(b.fx0+b.fx1)/2, w=Math.min(15,(b.fx1-b.fx0)/4);
-    ctx.strokeStyle = strong ? "#8a7350" : "#a5917a";
-    ctx.lineWidth=2; ctx.beginPath();
-    for(let yy=y1-ph; yy>y0; yy-=step){
-      ctx.moveTo(cx-w, yy+7); ctx.lineTo(cx, yy); ctx.lineTo(cx+w, yy+7);
-    }
-    ctx.stroke();
   }
 
   // 구슬 = gcolor(i, n) 색 원 + 흰 번호. 선두만 어두운 테두리로 강조한다 —
