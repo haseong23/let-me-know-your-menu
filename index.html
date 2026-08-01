@@ -600,7 +600,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.83";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.84";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1812,124 +1812,265 @@ function ladderGeometry(n){
   return { GAP, BOX_W: Math.min(30, GAP*0.82), NCH: n<=7?4 : n<=9?3 : 2, NFS: n<=7?11 : n<=9?10 : 8.5 };
 }
 
-/* ─────────── 🏁 구슬 레이스 (R19) ───────────
-   물리 엔진을 쓰지 않는다. 물리가 결과를 만들면 확률 정책(R6)의 1/3 가중치를 걸 지점이 없어지고,
-   20초 안에 끝난다는 보장도 사라진다. 그래서 다른 세 게임과 같다 — 당첨자를 먼저 뽑고,
-   경로가 그 결과를 향한다. 역전 장면은 '구간별 속도 편차'라는 장치 하나로만 만든다.
-   난수는 예외 없이 인자(rnd)로 받는다. 블록 안에서 Math.random 을 부르면 도착 순서·역전 횟수를
-   결정론적으로 검증할 수 없고, R19-17 이 요구하는 게 바로 그 검증 가능성이다. */
-const RACE_SEGS = 12;            // 구간 수 = 속도 편차를 넣을 수 있는 자리 수. 적으면 역전이 안 생긴다
-const RACE_SEG_LEN = 200;        // 구간 길이 → 전체 2400 (약 7화면)
-const RACE_W = 340;              // 다른 게임과 같은 논리 폭
-const RACE_AMP_MIN = 40, RACE_AMP_VAR = 70;   // 사행 진폭 [40,110) — CX=170 이라 x 는 (60,280)
-const RACE_SPD_MIN = 0.55, RACE_SPD_VAR = 0.9;// 구간 속도 배수 [0.55,1.45) — 위아래로 2.6배 차
-/* 도착 시간 배분 구간. 1위는 duration*0.80, 꼴찌는 duration*0.99.
-   꼴찌를 1.00 에 두지 않는 이유: 지터가 위로 삐져나가 duration 을 넘는 도착 시간이 생긴다.
-   0.99 + 지터 절반(≤0.0075) = 0.9975 로 항상 duration 안이고, 아래쪽도 0.80-0.0075=0.7925 로
-   duration*0.75 위다. 두 경계를 지터 폭과 함께 계산해 둔 값이다. */
-const RACE_F_LO = 0.80, RACE_F_HI = 0.99;
-const RACE_JITTER = 0.015;       // 지터 최대 폭(전체). 아래에서 인접 등수 간격에 맞춰 더 좁힌다
+/* ─────────── 🏁 구슬 레이스 (물리) ───────────
+   예전에는 모든 구슬이 같은 사인 곡선 위를 타고 속도만 달랐다. 그러면 화면에 남는 건
+   "세로로 늘어선 점들이 나란히 흐르는 것"뿐이고, 구슬끼리 부딪혀 예측이 안 되는 재미가 없다.
+   그래서 작은 강체 솔버를 직접 짰다(라이브러리는 여전히 0개다).
 
-// 코스 생성 — 구간별 진폭·위상·꺾임 수. 구간 길이는 고정이라 총 길이가 인원과 무관하게 일정하다.
-function raceCourse(rnd){
-  const segs = [];
-  for(let s=0; s<RACE_SEGS; s++){
-    segs.push({
-      len:   RACE_SEG_LEN,
-      amp:   RACE_AMP_MIN + rnd()*RACE_AMP_VAR,   // 좌우 흔들림 폭
-      phase: rnd()*Math.PI*2,
-      turns: 1 + Math.floor(rnd()*2)              // 구간 안에서 몇 번 꺾이는지
-    });
+   구성 원칙:
+     · 길은 세 가지다 — 1자길 · 지그재그길 · 깔때기길.
+     · 속도를 흩는 일은 길이 아니라 장애물이 한다 — 못 · 바람개비 · 가운데 물길 · 범퍼.
+     · 마찰은 없다. 에너지를 잃는 경로는 벽·장애물과의 반발과 구슬끼리의 반발뿐이고 나머지는
+       중력이 준다. 그래서 RACE_TFRIC 이 없다(접선 방향을 아예 건드리지 않는다).
+
+   확률 정책과의 관계 — 이 게임은 승자를 미리 뽑지 않는다. 물리가 정하고, 이름은 시뮬레이션이
+   끝난 뒤 구슬에 붙는다. 구슬의 반지름·질량·반발이 모두 같고 출발 x 도 각자 독립 난수라
+   구슬 번호에는 아무 의미가 없다 — 즉 이 게임은 언제나 '평등'이다. [확률 낮추기]를 걸 자리가
+   없고(손가락 룰렛과 같은 이유), [제외]는 gamePlayers() 가 명단에서 이미 빼주므로 지켜진다.
+
+   난수는 예외 없이 인자(rnd)로 받는다. 블록 안에서 Math.random 을 부르면 같은 시드로 두 번
+   돌렸을 때 같은 결과가 나오는지 검증할 수 없다. */
+const RACE_W = 200;          // 논리 폭. 예전 340 에서 좁혔다 — 같은 화면 폭에서 배율이 커져 구슬 번호가 읽힌다
+const RACE_R = 9;            // 구슬 반지름
+const RACE_DT = 1/240;       // 물리 스텝
+const RACE_SUB = 4;          // 프레임당 서브스텝 → 60fps 로 기록된다
+const RACE_G = 1400;         // 중력
+const RACE_VMAX = 780;       // 속도 상한. VMAX*DT = 3.25 < R 이라 한 스텝에 캡슐을 건너뛸 수 없다(터널링 방지)
+const RACE_E_WALL = 0.34;    // 벽·장애물 반발
+const RACE_E_BALL = 0.18;    // 구슬끼리 반발
+const RACE_MAXF = 4200;      // 70초. 이 안에 1등이 안 나오면 그 시드는 버린다
+const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하나가 훑을 물체를 이 단위로 줄인다
+const RACE_SEG_MIX = ["s","s","s","s","z","z","z","f","f","f"];   // 1자 4 · 지그재그 3 · 깔때기 3
+
+/* 캡슐 하나로 못·벽·경사·기둥을 전부 표현한다 — 원-선분 거리 계산 하나면 넷이 다 풀린다.
+   회전 막대(바람개비)는 sp!==0 이고 매 스텝 끝점을 다시 잡는다. y0/y1b 는 격자에 넣을 때 쓰는
+   세로 범위이고, 회전 막대는 어느 각도로도 돌 수 있으니 반지름 전체를 범위로 잡는다. */
+function rcap(x1,y1,x2,y2,rad){ return {x1,y1,x2,y2,rad,sp:0,cx:0,cy:0,hl:0,ph:0,e:0,
+  y0:Math.min(y1,y2)-rad, y1b:Math.max(y1,y2)+rad}; }
+function rpeg(x,y,rad){ return rcap(x,y,x,y,rad); }
+function rbar(cx,cy,hl,rad,sp,ph){
+  const b={x1:cx-hl,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,ph,e:0};
+  b.y0=cy-hl-rad; b.y1b=cy+hl+rad; return b;
+}
+
+/* ══ 길 세 가지 ══ 좌우 바깥벽은 시뮬레이터가 직접 잡으므로 여기서는 안쪽 지형만 놓는다. */
+
+// 1자길 — 지형이 없다. 이 구간의 성격은 안에 들어가는 장애물이 정한다.
+function rpathStraight(B, y, rnd){ return 340; }
+
+// 지그재그길 — 좌우에서 번갈아 나온 이빨이 통로를 좁히고, 그 통로가 줄마다 반대쪽으로 옮겨간다.
+// 두 이빨이 마주 보지 않고 어긋나 있어 구슬이 낄 V 가 생기지 않는다.
+function rpathZig(B, y, rnd){
+  const rows=5, dy=84, r=4, reach=118;
+  for(let j=0;j<rows;j++){
+    const yy=y+34+j*dy;
+    if(j%2===0) B.push(rcap(-8, yy, reach, yy+50, r));
+    else        B.push(rcap(RACE_W+8, yy, RACE_W-reach, yy+50, r));
   }
-  return { segs, W: RACE_W, CX: RACE_W/2, total: RACE_SEGS*RACE_SEG_LEN };
+  return 34+rows*dy+46;
 }
 
-// 진행률 p(0..1) → 코스 위 좌표. x 는 진폭 상한 때문에 (60,280) 을 벗어나지 않으므로
-// 구슬 반지름 여유가 좌우로 최소 60px 남는다 — 렌더러가 반지름을 키워도 벽을 뚫지 않는다.
-function raceXY(course, p){
-  const y = Math.max(0, Math.min(1, p)) * course.total;
-  let acc = 0, s = 0;
-  while(s < course.segs.length-1 && acc + course.segs[s].len < y){ acc += course.segs[s].len; s++; }
-  const g = course.segs[s], u = (y - acc) / g.len;
-  const x = course.CX + g.amp * Math.sin(u * Math.PI * 2 * g.turns + g.phase);
-  return { x, y };
+// 깔때기길 — 모아서 문 하나로 내보낸다. 문 폭 36 은 지름 18 의 두 배라 한 줄로 통과하며 순서가 섞인다.
+function rpathFunnel(B, y, rnd){
+  const g=18, r=4;
+  B.push(rcap(-8, y+30, RACE_W/2-g, y+210, r));
+  B.push(rcap(RACE_W+8, y+30, RACE_W/2+g, y+210, r));
+  return 300;
 }
 
-// 구슬 i 의 구간별 속도 배수 — 구간마다 빠름/느림이 달라 역전이 생긴다
-function raceSpeeds(n, segCount, rnd){
-  const sp = [];
+/* ══ 장애물 네 가지 ══ 1자길 안에만 들어간다.
+   지그재그·깔때기 위에 겹쳐 봤더니 이빨의 아랫면과 기둥의 옆면이 만나 주머니가 생겨서, 계측한
+   60판 중 54판이 그 자리에서 멈췄다. 벽이 이미 방향을 트는 길에 또 방향을 트는 물체를 두면 둘
+   사이에 닫힌 구석이 반드시 나온다. 그래서 역할을 나눈다 — 지그재그·깔때기는 '벽으로',
+   1자길은 '장애물로' 흐름을 바꾼다. */
+
+// 못밭 — 바깥 못을 벽에서 26 이상 띄운다. 18 에 두면 벽에 붙은 구슬(중심 x=9)이 못과 벽 사이에
+// 껴서 영원히 안 내려온다(중심 거리 9 < R + 못반지름 14). 벽 쪽에 통로가 생기지만 그대로 둔다 —
+// 출발이 깔때기라 이 구간에 들어올 때의 x 는 출발 위치와 무관하고, 통로를 타는 건 그때그때의 운이다.
+function robPins(B, y, h, rnd){
+  const dy=46, dx=37, r=5, edge=26;
+  const rows=Math.max(2, Math.floor((h-60)/dy));
+  const y0=y+(h-rows*dy)/2+dy/2;
+  for(let j=0;j<rows;j++){
+    const off=(j%2)?dx/2:0;
+    for(let x=edge+off; x<=RACE_W-edge; x+=dx) B.push(rpeg(x, y0+j*dy, r));
+  }
+}
+
+// 바람개비 — 막대 둘을 90° 어긋나게 같은 중심에 걸어 네 날로 만든다. 접촉점의 표면 속도가 구슬에
+// 그대로 실려서, 올라가는 날에 맞으면 붙잡히고 내려가는 날에 맞으면 튕겨 나간다.
+function robWheel(B, y, h, rnd){
+  const cy=y+h*0.5, hl=56, r=5;
+  const sp=(rnd()<0.5?1:-1)*(1.1+rnd()*1.0), ph=rnd()*6.283;
+  B.push(rbar(RACE_W/2, cy, hl, r, sp, ph));
+  B.push(rbar(RACE_W/2, cy, hl, r, sp, ph+1.5708));
+}
+
+// 가운데 물길 — 굵은 기둥이 흐름을 좌우로 가른다. 끝이 반원이라 얹힌 구슬은 굴러 떨어지고,
+// 양옆 통로가 각각 79 이상이라 막히지 않는다.
+function robIsland(B, y, h, rnd){
+  const cx=RACE_W/2+(rnd()-0.5)*26;
+  B.push(rcap(cx, y+h*0.24, cx, y+h*0.76, 12));
+}
+
+// 범퍼 — 큰 원에 반발을 따로 준다(0.78). 여기 들어온 구슬은 몇 번 튕기며 순위가 흔들린다.
+function robBumpers(B, y, h, rnd){
+  const r=16;
+  const P=[[54,0.20],[146,0.20],[100,0.46],[40,0.72],[160,0.72]];
+  for(let k=0;k<P.length;k++){ const b=rpeg(P[k][0], y+h*P[k][1], r); b.e=0.78; B.push(b); }
+}
+
+const RACE_OBS = [robPins, robWheel, robIsland, robBumpers];
+
+/* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
+   만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
+   돌림판에서 라벨 기울기가 답이었던 것과 같은 종류의 누출이다. */
+function raceMapBuild(rnd){
+  const B=[];
+  let y=0;
+  B.push(rcap(-8, y+50, RACE_W/2-17, y+250, 4));
+  B.push(rcap(RACE_W+8, y+50, RACE_W/2+17, y+250, 4));
+  y+=300;
+  /* 구성 비율을 고정하고 순서만 섞는다. 매 구간을 독립으로 뽑았더니 어떤 판은 1자길만 나와
+     4.5초, 어떤 판은 깔때기가 몰려 20초가 됐다 — 같은 게임이라고 보기 어려운 편차다.
+     비율을 묶으면 길이가 모이고, 다양성은 '어떤 장애물이 어느 순서로 오느냐'가 맡는다. */
+  const mix=RACE_SEG_MIX.slice();
+  for(let i=mix.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=mix[i]; mix[i]=mix[j]; mix[j]=t; }
+  for(let s=0;s<mix.length;s++){
+    if(mix[s]==="s"){
+      const ob=RACE_OBS[Math.floor(rnd()*RACE_OBS.length)];
+      const h=rpathStraight(B, y, rnd);
+      ob(B, y, h, rnd); y+=h;
+    } else if(mix[s]==="z") y+=rpathZig(B, y, rnd);
+    else                    y+=rpathFunnel(B, y, rnd);
+  }
+  y+=rpathFunnel(B, y, rnd);              // 마지막은 항상 좁은 문 — 결승 직전에 몰린다
+  const finishY=y+150;
+  B.push(rcap(-8, y+20, RACE_W/2-34, y+130, 4));
+  B.push(rcap(RACE_W+8, y+20, RACE_W/2+34, y+130, 4));
+  y+=190;
+  const cells=Math.ceil(y/RACE_CELL)+1;
+  const grid=[]; for(let i=0;i<cells;i++) grid.push([]);
+  for(let i=0;i<B.length;i++){
+    const b=B[i];
+    const a=Math.max(0, Math.floor(b.y0/RACE_CELL)), z=Math.min(cells-1, Math.floor(b.y1b/RACE_CELL));
+    for(let c=a;c<=z;c++) grid[c].push(i);
+  }
+  return { bodies:B, grid, cells, total:y, finishY };
+}
+
+/* 한 판을 끝까지 돌리고 프레임마다 모든 구슬의 (x,y) 를 Float32Array 에 녹화한다.
+   재생은 그 배열을 읽기만 한다 — 물리를 두 번 돌리지 않으므로 화면과 결과가 어긋날 여지가
+   원천적으로 없다. 24명 × 1200프레임이면 115K 실수(≈460KB)라 폰에서도 부담이 아니다. */
+function raceSimulate(map, n, rnd){
+  const px=new Float64Array(n), py=new Float64Array(n), vx=new Float64Array(n), vy=new Float64Array(n);
   for(let i=0;i<n;i++){
-    const row = [];
-    for(let s=0;s<segCount;s++) row.push(RACE_SPD_MIN + rnd()*RACE_SPD_VAR);
-    sp.push(row);
+    px[i]=RACE_R+6+rnd()*(RACE_W-2*RACE_R-12);   // 출발 x 는 각자 독립 난수 — 구슬 번호에 의미가 없다
+    py[i]=16+rnd()*30;
+    vx[i]=(rnd()-0.5)*40; vy[i]=0;
   }
-  return sp;
+  const path=new Float32Array(RACE_MAXF*n*2);
+  const idx=new Int32Array(n); for(let i=0;i<n;i++) idx[i]=i;
+  const B=map.bodies, grid=map.grid, cells=map.cells;
+  let frames=0, winner=-1, leadPrev=-1, leadChanges=0;
+
+  for(let f=0; f<RACE_MAXF && winner<0; f++){
+    for(let s=0; s<RACE_SUB; s++){
+      const tt=(f*RACE_SUB+s)*RACE_DT;
+      for(let i=0;i<n;i++){
+        vy[i]+=RACE_G*RACE_DT;
+        const q=vx[i]*vx[i]+vy[i]*vy[i];
+        if(q>RACE_VMAX*RACE_VMAX){ const k=RACE_VMAX/Math.sqrt(q); vx[i]*=k; vy[i]*=k; }
+        px[i]+=vx[i]*RACE_DT; py[i]+=vy[i]*RACE_DT;
+      }
+      for(let i=0;i<n;i++){                       // 지형·장애물
+        const c=Math.floor(py[i]/RACE_CELL);
+        if(c<0||c>=cells) continue;
+        const list=grid[c];
+        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, tt, px, py, vx, vy);
+      }
+      // 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
+      // 매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
+      for(let a=1;a<n;a++){ const v=idx[a]; let b=a-1; while(b>=0&&py[idx[b]]>py[v]){ idx[b+1]=idx[b]; b--; } idx[b+1]=v; }
+      const D=2*RACE_R;
+      for(let a=0;a<n;a++){
+        const i=idx[a];
+        for(let b=a+1;b<n;b++){
+          const j=idx[b];
+          if(py[j]-py[i]>D) break;
+          let nx=px[j]-px[i], ny=py[j]-py[i];
+          const d2=nx*nx+ny*ny;
+          if(d2>=D*D||d2===0) continue;
+          const d=Math.sqrt(d2); nx/=d; ny/=d;
+          const push=(D-d)*0.5;
+          px[i]-=nx*push; py[i]-=ny*push; px[j]+=nx*push; py[j]+=ny*push;
+          const rvn=(vx[j]-vx[i])*nx+(vy[j]-vy[i])*ny;
+          if(rvn<0){
+            const jm=-(1+RACE_E_BALL)*rvn*0.5;    // 질량이 같아 1/m+1/m = 2
+            vx[i]-=nx*jm; vy[i]-=ny*jm; vx[j]+=nx*jm; vy[j]+=ny*jm;
+          }
+        }
+      }
+      /* 좌우 바깥벽은 서브스텝의 '마지막'에 잡는다. 앞에 두면 지형이나 옆 구슬이 벽 너머로
+         밀어낸 결과가 그대로 기록되어, 구슬이 한 프레임 벽을 삐져나온 그림이 나온다
+         (테스트에서 x=8.4 로 잡혔다 — 반지름이 9 인데). 마지막에 두면 기록되는 좌표가 항상
+         코스 안이다. 장애물 캡슐이 벽 너머(-8, W+8)까지 뻗어 있어서 순서를 바꿔도 지형 판정에
+         빈틈이 생기지 않는다. */
+      for(let i=0;i<n;i++){
+        if(px[i]<RACE_R){ px[i]=RACE_R; if(vx[i]<0) vx[i]=-vx[i]*RACE_E_WALL; }
+        else if(px[i]>RACE_W-RACE_R){ px[i]=RACE_W-RACE_R; if(vx[i]>0) vx[i]=-vx[i]*RACE_E_WALL; }
+      }
+    }
+    const base=f*n*2;
+    for(let i=0;i<n;i++){ path[base+i*2]=px[i]; path[base+i*2+1]=py[i]; }
+    frames=f+1;
+    let lead=0;
+    for(let i=1;i<n;i++) if(py[i]>py[lead]) lead=i;
+    if(leadPrev>=0&&lead!==leadPrev) leadChanges++;
+    leadPrev=lead;
+    if(py[lead]>=map.finishY) winner=lead;
+  }
+  return { ok:winner>=0, winner, frames, leadChanges, path:path.subarray(0, frames*n*2), n };
 }
 
-/* order[0] 이 1위. 총 소요 시간을 그 순서로 배분하고, 각 구슬의 구간 속도를 그 총합에 맞춰 스케일한다.
-   반환된 cum[i] 는 구슬 i 가 각 구간 끝에 도달하는 누적 시간(ms), want[i] 는 도착 시간.
-
-   지터 폭을 인접 등수 간격에 묶는 이유(R19-4 는 '항상'이다):
-   등수 간격은 0.19/(n-1) 이라 인원이 많으면 좁아진다 — n=24 에서 0.00826 이다. 지터를 고정 0.015
-   폭으로 주면 그 폭이 간격보다 넓어서 2등이 1등을 앞지르는 배분이 실제로 나온다. 그래서 폭을
-   간격의 0.9 배로 제한한다. 인접 도착 시간 차가 최소 간격의 0.1 배(n=24, duration=20000 에서
-   약 16ms)로 남아 순서가 절대 뒤집히지 않는다. 인원이 적으면 간격이 넓어 0.015 가 그대로 쓰인다. */
-function raceSchedule(course, speeds, order, duration, rnd){
-  const n = speeds.length, segs = course.segs;
-  const raw = speeds.map(row => segs.reduce((a,g,s)=> a + g.len/row[s], 0));
-  const band = RACE_F_HI - RACE_F_LO;
-  const gap  = n<=1 ? band : band/(n-1);
-  const span = Math.min(RACE_JITTER, gap*0.9);
-  const want = new Array(n);
-  order.forEach((idx, rank)=>{
-    const f = n<=1 ? RACE_F_LO : RACE_F_LO + band*(rank/(n-1));
-    want[idx] = duration * (f + (rnd()-0.5)*span);
-  });
-  const cum = [];
-  for(let i=0;i<n;i++){
-    const k = want[i]/raw[i];              // 이 구슬 전체를 want[i] 에 맞추는 배율
-    let t = 0; const row = [0];
-    for(let s=0;s<segs.length;s++){ t += (segs[s].len/speeds[i][s]) * k; row.push(t); }
-    /* 마지막 칸을 want[i] 로 덮는다. sum((len/v)*k) 는 raw*k=want 와 부동소수 잔차만큼 어긋나서,
-       그대로 두면 t=want[i] 에서 진행률이 1 에 아주 못 미치는 경우가 생긴다(실측 3.5%).
-       루프 종료 판정이 want 를 보는데 그림은 아직 결승선 앞이라는 불일치가 그것이다. */
-    row[segs.length] = want[i];
-    cum.push(row);
+/* 구슬 i 와 캡슐 하나. 위치를 밀어내고 법선 반사 + 반발계수만 적용한다 — 접선은 손대지 않으므로
+   마찰이 0 이다. 회전 막대는 접촉점의 표면 속도를 기준계로 삼아 그만큼 되돌려 준다(그래야 날개가
+   구슬을 실제로 밀어낸다). */
+function raceHit(b, i, tt, px, py, vx, vy){
+  let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2, sxv=0, syv=0;
+  if(b.sp){
+    const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
+    x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa;
   }
-  return { cum, want };
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
+  let t = L2>0 ? ((px[i]-x1)*dx+(py[i]-y1)*dy)/L2 : 0;
+  t = t<0?0 : t>1?1 : t;
+  const qx=x1+t*dx, qy=y1+t*dy;
+  let nx=px[i]-qx, ny=py[i]-qy;
+  const rr=RACE_R+b.rad, d2=nx*nx+ny*ny;
+  if(d2>=rr*rr) return;
+  let d=Math.sqrt(d2);
+  if(d<1e-9){ nx=0; ny=-1; d=1e-9; } else { nx/=d; ny/=d; }
+  px[i]+=nx*(rr-d); py[i]+=ny*(rr-d);
+  if(b.sp){ sxv=-b.sp*(qy-b.cy); syv=b.sp*(qx-b.cx); }
+  const rvx=vx[i]-sxv, rvy=vy[i]-syv;
+  const vn=rvx*nx+rvy*ny;
+  if(vn>=0) return;
+  const e=b.e||RACE_E_WALL;
+  vx[i]=rvx-(1+e)*vn*nx+sxv;
+  vy[i]=rvy-(1+e)*vn*ny+syv;
 }
 
-// t(ms) 시점 구슬 i 의 진행률 0..1. t 를 양끝에서 잠근다 — 프레임 dt 가 어떻게 튀어도
-// 진행률이 뒤로 가거나 1 을 넘는 그림은 나오지 않아야 한다 (R19-14).
-function raceProgress(course, sched, i, t){
-  const row = sched.cum[i], segs = course.segs, last = row[row.length-1];
-  if(!(t > 0)) return 0;                   // t<=0 과 NaN 을 같이 막는다
-  if(t >= last) return 1;
-  let s = 0; while(s < segs.length-1 && row[s+1] < t) s++;
-  const dt = row[s+1] - row[s];
-  const u = dt > 0 ? (t - row[s]) / dt : 1;   // 0 길이 구간에서 0/0 이 되지 않게
-  let acc = 0; for(let k=0;k<s;k++) acc += segs[k].len;
-  return (acc + u*segs[s].len) / course.total;
-}
-
-/* 선두가 바뀐 횟수 — R19-5 를 검증 가능하게 만드는 함수.
-   표본 구간을 duration 이 아니라 '1위 도착 시각'까지로 자른다. 레이스는 1위가 들어오면 끝나므로
-   그 뒤는 화면에 없고, 게다가 모두 도착한 시점에는 전원 진행률이 1 이라 인덱스 순서로 선두가
-   바뀐 것처럼 세어진다 — 그 유령 1회가 '지루한 레이스'를 3회 문턱 위로 올려 재생성 루프를
-   무력화한다. 실제로 보이는 장면만 센다. */
-function raceLeadChanges(course, sched, n, duration, samples){
-  const N = samples || 120;
-  let end = duration;
-  for(let i=0;i<n;i++) if(sched.want[i] < end) end = sched.want[i];
-  let prev = -1, changes = 0;
-  for(let k=1;k<=N;k++){
-    const t = end*k/N;
-    let lead = 0, best = -1;
-    for(let i=0;i<n;i++){ const p = raceProgress(course, sched, i, t); if(p > best){ best = p; lead = i; } }
-    if(prev !== -1 && lead !== prev) changes++;
-    prev = lead;
-  }
-  return changes;
+// 시드 PRNG — 코스와 출발 배치가 판마다 달라진다. 시드 하나로 완전히 재현된다.
+function raceRnd(seed){
+  let a=seed>>>0;
+  return function(){
+    a=(a+0x6d2b79f5)>>>0;
+    let t=a;
+    t=Math.imul(t^(t>>>15), t|1);
+    t^=t+Math.imul(t^(t>>>7), t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;
+  };
 }
 /* @test-export:end */
 
@@ -2637,7 +2778,10 @@ function startGame(kind){
   // 구슬 레이스도 같은 지점에서 당첨자를 먼저 뽑는다 — 확률 정책이 그대로 반영된다 (R19-4).
   // 명단도 여기서 읽은 players 를 그대로 넘긴다. [한 판 더]가 이 지점을 다시 지나므로 그때의
   // gamePlayers() 로 새로 뽑히고, playRace 는 명단을 어디에도 캐시하지 않는다 (R19-15).
-  else if(kind==="race") startRace(players, gamePickWinner(players));
+  // 구슬 레이스만 예외다 — 승자를 미리 뽑지 않는다. 물리가 정하고 이름은 그 뒤에 붙으며,
+  // 구슬이 서로 구별되지 않으므로 결과는 균등하다. [확률 낮추기]를 걸 자리가 없고(손가락 룰렛과
+  // 같은 이유) [제외]는 gamePlayers() 가 이미 반영했다.
+  else if(kind==="race") startRace(players);
   // 손가락 룰렛은 예외다 (R6-10). 당첨되는 건 화면에 올라온 물리적 손가락이고 그게 누구인지는
   // 사후에 사람이 지목한다 — 미리 뽑아 강제하면 사람의 지목을 몰래 덮어쓰게 되므로 뽑지 않는다.
   // 명단도 넘기지 않는다. 이름 칩은 지목하는 그 순간의 gamePlayers() 를 읽어야 하므로(R3-7)
@@ -3180,93 +3324,55 @@ function playFinger(){
   refresh();
 }
 
-/* ---------- 🏁 구슬 레이스 (R19) ----------
-   순수 함수(raceCourse·raceSpeeds·raceSchedule·raceProgress·raceLeadChanges·raceXY)는 위 마커 블록에
-   있고 난수를 인자로만 받는다. 아래 두 함수는 Math.random 을 부르고 DOM·캔버스를 만지므로 블록 밖이다 —
-   그 경계가 R19-17(당첨자 1위·역전 3회를 결정론적으로 검증)의 전제다. */
+/* ---------- 🏁 구슬 레이스 (물리) ----------
+   순수 함수(raceMapBuild·raceSimulate·raceHit·raceRnd)는 위 마커 블록에 있고 난수를 인자로만
+   받는다. 아래는 Math.random 을 부르고 캔버스를 만지므로 블록 밖이다 — 그 경계가 테스트의 전제다. */
 
-/* 레이스 길이. 20000 이 아니라 25000 이다 — 되돌리지 말 것.
-   R19-3 이 요구하는 '18~22초'는 화면에서 보이는 레이스 길이이고, 그건 duration 이 아니라
-   '1위가 도착하는 시각'이다. 도착 배분은 duration*(0.80 ± 지터/2) 이라 실측 0.7925~0.8075 배 —
-   duration=20000 이면 15.85~16.15초로 18초에 못 미친다. 25000 × 0.80 = 19.8~20.2초라야 맞는다.
-   (레이스는 1위가 들어오면 끝난다. 꼴찌의 도착 시간 duration 은 화면에 나오지 않는다.) */
-const RACE_DUR = 25000;
-const RACE_TRIES = 40;           // 재생성 시도 횟수 — 사다리의 '제자리 사다리 다시 만들기'와 같은 처방
-const RACE_SAMPLES = 120;        // 역전 횟수를 셀 표본 수
+/* 논리 치수. 캔버스 좌표는 전부 이 값들로 쓰고 devicePixelRatio 는 setTransform 한 줄로만 다룬다 —
+   그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
+const RACE_VIEW_H = 260;         // 캔버스 논리 높이 (폭은 RACE_W = 200)
+const RACE_CAM = 0.40;           // 선두를 화면 위에서 이 비율 지점에 둔다
+const RACE_CAM_PAD = 20;         // 카메라 여유 — 코스 양 끝에서 선두가 테두리에 걸치지 않게 한다
+const RACE_HUD_MS = 200;         // HUD 갱신 간격
+const RACE_DPR_MAX = 3;
+// 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body(51행) 스택과 같은 순서다.
+const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif";
+/* 시드 재시도. 무엇을 보고 다시 뽑는지가 중요하다 — 승자는 보지 않는다. 소요 시간과 역전 횟수만
+   본다. 승자를 보고 다시 뽑으면 그게 거부 표집이고, 그러면 게임 앞에 설명할 수 없는 대기가 붙는다.
+   한 판 계산이 24명에서 최대 27ms 라 몇 번 돌려도 사용자는 못 느낀다.
+   n=2 는 역전이 구조적으로 드물어 문턱을 낮춘다(계측: 중앙값 2회). */
+const RACE_TRIES = 6;
+const RACE_MIN_S = 13, RACE_MAX_S = 23;
 
-/* 역전 문턱이 인원에 따라 갈리는 이유 (R19-5).
-   16.1 이 실측한 값이다: n>=3 은 40 회 안에 3 회 이상을 항상 찾지만, n=2 는 약 13.5% 가 40 회를
-   다 써도 못 찾는다. 두 구슬의 도착 시간 차가 24%(0.80 vs 0.99)로 벌어져 있어서, 그 둘이 네 번
-   교차하는(=선두가 3번 바뀌는) 스케줄이 구조적으로 드물다. 그래서 n=2 는 '한 번은 바뀐다'로 낮춘다 —
-   1 회 역전도 "쫓고 쫓기는" 장면이 되고, 문턱을 못 지킬 코스를 억지로 통과시키는 것보다 정직하다.
-   3 명 이상에서는 설계 그대로 3 회다. */
-function raceGate(n){ return n===2 ? 1 : 3; }
-
-/* 코스·속도·스케줄을 한 벌 만든다. order 는 [당첨자, ...나머지를 섞은 것] — 당첨자는 이미
-   gamePickWinner 으로 뽑혀 있으므로 확률 정책이 그대로 반영된다 (R19-4).
-   40 회를 다 써도 문턱을 못 넘으면 '마지막' 시도가 아니라 '가장 잘 나온' 시도를 쓴다. 마지막을 쓰면
-   40 번 중 최악이 나올 수도 있어서, 실패했을 때 화면이 오히려 더 지루해진다. */
-function raceBuild(players, winner, duration){
-  const n = players.length;
-  // -1 이면 order 가 망가져 당첨자가 1위로 도착하지 않는다. 호출부가 gamePlayers() 에서 뽑으므로
-  // 일어나지 않지만, 조용히 틀린 결과를 그리는 것보다 0 번으로 떨어뜨리고 경고를 남기는 쪽이 낫다.
-  let wi = players.indexOf(winner);
-  if(wi < 0){ console.warn("구슬 레이스 — 당첨자가 참가자 명단에 없다", winner); wi = 0; }
-  const rest = players.map((m,i)=>i).filter(i=>i!==wi);
-  for(let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=rest[i]; rest[i]=rest[j]; rest[j]=t; }
-  const order = [wi].concat(rest);
-  const gate = raceGate(n);
-  let best = null;
-  for(let k=0;k<RACE_TRIES;k++){
-    const course = raceCourse(Math.random);
-    const speeds = raceSpeeds(n, course.segs.length, Math.random);
-    const sched  = raceSchedule(course, speeds, order, duration, Math.random);
-    const changes = raceLeadChanges(course, sched, n, duration, RACE_SAMPLES);
-    if(!best || changes > best.changes) best = { course, speeds, sched, order, wi, changes, tries:k+1 };
-    if(changes >= gate) break;
+/* 판 하나를 만든다. 승자를 미리 뽑지 않는다 — 물리가 정한다.
+   문턱을 못 넘어도 완주한 판이 있으면 그걸 쓴다. 못 돌리는 것보다 조금 밋밋한 판이 낫다. */
+function raceBuild(n){
+  let fallback = null;
+  for(let t=0; t<RACE_TRIES; t++){
+    const rnd = raceRnd((Math.random()*0xffffffff)>>>0);
+    const map = raceMapBuild(rnd);
+    const sim = raceSimulate(map, n, rnd);
+    if(!sim.ok) continue;
+    if(!fallback) fallback = { map, sim };
+    const secs = sim.frames/60;
+    if(secs >= RACE_MIN_S && secs <= RACE_MAX_S && sim.leadChanges >= (n===2 ? 2 : 3)) return { map, sim };
   }
-  return best;
+  return fallback;
 }
 
-/* 논리 치수. 캔버스 좌표는 전부 이 값들로 쓰고, devicePixelRatio 는 setTransform 한 줄로만 다룬다 —
-   그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
-const RACE_VIEW_H = 440;         // 캔버스 논리 높이 (폭은 course.W = 340)
-const RACE_R = 11;               // 구슬 반지름. raceXY 의 x 는 (60,280) 이라 벽(±17)까지 넣어도 좌우 43px 이 남는다
-const RACE_WALL = 6;             // 구슬과 벽 사이 여유
-const RACE_CAM = 0.42;           // 선두를 화면 위에서 이 비율 지점에 둔다
-const RACE_CAM_PAD = 24;         // 카메라 여유 — 코스 양 끝에서 선두가 화면 테두리에 걸치지 않게 한다
-const RACE_HUD_MS = 200;         // HUD 갱신 간격 (R19-9)
-const RACE_DPR_MAX = 3;          // 화면 캔버스 dpr 상한
-/* 오프스크린 벽 캐시의 dpr 상한. 계산해 보면 상한이 필요한 이유가 드러난다 —
-   코스는 340×2400 논리 px 이고, dpr 3 을 그대로 곱하면 1020×7200 = 7.34MP × 4B ≈ 29MB 다.
-   폰에서 한 판에 29MB 를 잡는 것도 과하지만, 그보다 먼저 깨진다: iOS 사파리는 캔버스 한 변을
-   4096px 로 제한해서 7200px 캔버스는 그냥 빈 화면이 된다.
-   1.5 로 묶으면 510×3600 = 1.84MP × 4B ≈ 7.3MB 이고 한 변도 3600 < 4096 이라 안전하다.
-   흐려지는 것은 장식인 벽선·페그뿐이고, 읽어야 하는 구슬 번호는 매 프레임 화면 dpr 그대로 그린다. */
-const RACE_CACHE_DPR = 1.5;
-// 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body 의 스택과 같은
-// 순서로 맞춘다. 예전 주석은 "같은 순서다"라고 적어 놓고 실제로는 'Malgun Gothic' 이 빠져
-// 있었다 — Windows·일부 Android 에서 본문은 Malgun Gothic 인데 캔버스만 일반 sans-serif 로
-// 떨어졌다 (R13-1). 여기를 고칠 땐 51행 body 규칙과 나란히 놓고 대조할 것.
-const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif";
-
-/* playRace(players, winner[, onDone])
+/* playRace(players[, onDone])
    그리고 움직이는 것까지만 한다. 게임 등록·건너뛰기 버튼·GS.teardown·결과 발표는 아래 startRace 가
-   맡고, 그 둘을 잇는 이음매가 두 개다 — 돌려주는 ctl(raf·stop·finish)과 onDone 콜백이다.
+   맡고, 그 둘을 잇는 이음매가 두 개다 — 돌려주는 ctl(raf·stop·finish·winner)과 onDone 콜백이다.
    ctl.finish() 는 스스로 rAF 를 취소하므로 [건너뛰기]는 finish() 만 부르면 되고,
    ctl.stop() 은 예약된 프레임만 없앤다(결과를 만들지 않는다). */
-function playRace(players, winner, onDone){
+function playRace(players, onDone){
   const n = players.length;
-  // prefers-reduced-motion 이면 10ms — 도착 시간이 8~10ms 라 첫 프레임(dt≈16ms)에서 이미 지나 있어
-  // 연출이 사실상 생략된다 (R19-8). raceSchedule 의 구간 시간도 함께 줄어들 뿐 0 이 되지는 않으므로
-  // raceProgress 의 나눗셈이 0/0 이 되는 경로는 생기지 않는다.
-  const DUR = lessMotion() ? 10 : RACE_DUR;
-  const build = raceBuild(players, winner, DUR);
-  const course = build.course, sched = build.sched, wi = build.wi;
-  const W = course.W, H = RACE_VIEW_H, END = sched.want[wi];
+  const built = raceBuild(n);
+  const W = RACE_W, H = RACE_VIEW_H;
 
   openGameOv("🏁 구슬 레이스", `
     <div class="game-say" id="gvSay" aria-live="polite">출발!</div>
+    <div class="game-hint" style="margin-bottom:8px">물리로 굴러가요 — 확률 조정이 적용되지 않는 게임이에요</div>
     <div class="race-wrap">
       <canvas id="raceCv" role="img" aria-label="구슬 레이스 진행 중"></canvas>
       <div class="race-hud" id="raceHud">
@@ -3285,72 +3391,29 @@ function playRace(players, winner, onDone){
   cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // 이 뒤의 좌표는 전부 논리 px 이다
 
-  /* ── 코스 벽·페그 캐시 ──
-     벽은 정적이라 한 번만 그린다. 매 프레임 사인 곡선 600 점을 다시 잇는 것과 이미지 한 장을
-     오려 붙이는 것의 차이가 24 구슬 × 60fps 에서 그대로 프레임 시간으로 나타난다. */
-  const cDpr = Math.min(dpr, RACE_CACHE_DPR);
-  const wallCv = document.createElement("canvas");
-  wallCv.width = Math.round(W*cDpr); wallCv.height = Math.round(course.total*cDpr);
-  drawCourse(wallCv.getContext("2d"));
-
-  function drawCourse(g){
-    g.setTransform(cDpr, 0, 0, cDpr, 0, 0);
-    const half = RACE_R + RACE_WALL, step = 4;   // 4px 간격이면 진폭 110 사인도 각이 보이지 않는다
-    const pts = [];
-    for(let y=0; y<=course.total; y+=step) pts.push([raceXY(course, y/course.total).x, y]);
-    if(pts[pts.length-1][1] < course.total) pts.push([raceXY(course, 1).x, course.total]);
-    // 코스 안쪽을 한 겹 밝게 깔아 '길'로 읽히게 한다 — 캔버스 배경(#fffdf9)보다 밝은 흰색이다
-    g.beginPath();
-    pts.forEach((p,k)=> k ? g.lineTo(p[0]-half, p[1]) : g.moveTo(p[0]-half, p[1]));
-    for(let k=pts.length-1;k>=0;k--) g.lineTo(pts[k][0]+half, pts[k][1]);
-    g.closePath(); g.fillStyle = "#ffffff"; g.fill();
-    // 벽 두 줄 (사다리의 세로줄과 같은 --line 색)
-    g.lineWidth = 3; g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = "#e7ddcf";
-    [-half, half].forEach(off=>{ g.beginPath();
-      pts.forEach((p,k)=> k ? g.lineTo(p[0]+off, p[1]) : g.moveTo(p[0]+off, p[1])); g.stroke(); });
-    /* 페그 — 사인 극점의 '반대쪽'에 찍는다. 극점 위에 찍으면 구슬이 정확히 그 점을 지나가므로
-       못이 구슬에 가려 보이지 않는다. 반대쪽은 진폭의 2배(>=80px)만큼 떨어져 있어 겹치지 않는다. */
-    g.fillStyle = "#e7ddcf";
-    let acc = 0;
-    course.segs.forEach(sg=>{
-      // sin' = 0 → u*2π*turns + phase = π/2 + kπ. turns 는 1~2 라 극점은 구간마다 2~4 개다.
-      for(let k=0; k<8; k++){
-        const u = ((Math.PI/2 + k*Math.PI) - sg.phase) / (Math.PI*2*sg.turns);
-        if(u >= 1) break;
-        if(u < 0) continue;
-        const y = acc + u*sg.len, xe = raceXY(course, y/course.total).x;
-        g.beginPath(); g.arc(2*course.CX - xe, y, 3.5, 0, Math.PI*2); g.fill();
-      }
-      acc += sg.len;
-    });
-    // 결승선 — 체커 두 줄. 1위가 도착하는 순간 화면에 무엇이 걸렸는지 보여야 한다 (R19-16 의 전제)
-    const cell = 10, top = course.total - cell*2;
-    for(let row=0; row<2; row++) for(let cx=0; cx<W; cx+=cell){
-      g.fillStyle = ((cx/cell + row) % 2) ? "#2b2118" : "#ffffff";
-      g.fillRect(cx, top + row*cell, cell, cell);
-    }
+  /* 시뮬레이션이 실패할 자리는 사실상 없지만(계측에서 정체 0), 없다고 단정하지 않는다 —
+     여기서 막지 않으면 아래 전부가 null 을 읽는다. */
+  if(!built){
+    document.getElementById("gvSay").textContent = "코스를 못 만들었어요 — 다른 게임으로 돌려주세요";
+    return { raf:0, done:true, stop(){}, finish(){}, canvas:cv, winner:players[0] };
   }
+  const map = built.map, sim = built.sim, END = sim.frames*1000/60;
+  const winner = players[sim.winner];   // 구슬 번호에 의미가 없으므로 이 대응이 곧 균등 추첨이다
 
-  /* ── HUD ── 200ms 마다 갱신한다 (R19-9).
-     별도 setInterval 대신 루프 안에서 레이스 시각 t 를 검사한다. 이유가 셋이다:
-       ① 중단 경로에서 끌 것이 rAF 하나로 유지된다 — 타이머를 두면 R19-13 이 지워야 할 대상이 늘어난다.
-       ② dt 상한(아래)에 걸려 레이스가 실제 시간보다 늦게 흐를 때 HUD 도 같은 시계를 쓴다.
-       ③ prefers-reduced-motion(DUR=10) 에서는 t 가 한 번에 끝까지 가므로 갱신이 한 번만 일어난다.
-     DOM 은 처음 한 번 만들어 두고 바뀐 문자열만 갈아 넣는다 — 매 프레임 innerHTML 을 다시 쓰면
-     레이아웃 비용이 프레임을 먹는다. */
+  /* ── HUD ── 200ms 마다 갱신한다. 별도 setInterval 대신 루프 안에서 레이스 시각을 검사하는
+     이유는 중단 경로에서 끌 것을 rAF 하나로 유지하기 위해서다. */
   const barEl = document.getElementById("raceBar");
   const rowEls = [...document.querySelectorAll("#raceHud .rc-row")].map(r=>({
-    sw: r.querySelector(".rc-sw"), no: r.querySelector(".rc-no"), nm: r.querySelector(".rc-nm"), cur: -1
-  }));
+    sw:r.querySelector(".rc-sw"), no:r.querySelector(".rc-no"), nm:r.querySelector(".rc-nm"), cur:-1 }));
   let hudAt = -Infinity, barCur = "";
   function drawHud(t, order, force){
     if(!force && t - hudAt < RACE_HUD_MS) return;
     hudAt = t;
-    const pct = Math.round(prog[order[0]]*100) + "%";
+    const pct = Math.round(Math.min(1, ypos[order[0]]/map.finishY)*100) + "%";
     if(pct !== barCur){ barCur = pct; if(barEl) barEl.style.width = pct; }
     rowEls.forEach((row,k)=>{
       const i = order[k];
-      if(i === undefined || row.cur === i) return;   // 순위가 그대로면 아무것도 만지지 않는다
+      if(i === undefined || row.cur === i) return;
       row.cur = i;
       row.sw.style.background = gcolor(i, n);
       row.no.textContent = (i+1) + ".";
@@ -3358,85 +3421,111 @@ function playRace(players, winner, onDone){
     });
   }
 
-  /* ── 한 프레임 ── */
-  const prog = new Array(n).fill(0);      // 진행률을 한 번만 계산해 카메라·그림·HUD 가 같은 값을 쓴다
-  const rank = players.map((m,i)=>i);
-  function draw(t){
-    for(let i=0;i<n;i++) prog[i] = raceProgress(course, sched, i, t);
-    rank.sort((a,b)=> prog[b]-prog[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
-    const lead = rank[0], leadY = prog[lead]*course.total;
-    /* 카메라 (R19-10). 선두를 화면 42% 지점에 두되 코스 밖을 보여주지 않는다.
-       클램프 범위에 ±RACE_CAM_PAD 를 주는 이유: 0..total-H 로 묶으면 출발 순간 leadY=0 이
-       화면 y=0 이 되어 구슬이 위쪽 테두리에 반쯤 잘린다. 24px 여유를 주면
-         · 출발: camY=-24 → 선두가 화면 y=24 (반지름 11 이라 온전히 보인다)
-         · 도착: camY=total-H+24=1984 → 선두가 화면 y=416, 아래 테두리까지 24px
-       세 경우(여유 안 / 위 클램프 / 아래 클램프) 모두 선두가 [R, H-R] 안에 남는다. */
-    const camY = Math.max(-RACE_CAM_PAD, Math.min(course.total - H + RACE_CAM_PAD, leadY - H*RACE_CAM));
-    ctx.clearRect(0, 0, W, H);
-    // 캐시에서 보이는 띠만 오려 붙인다. 코스 밖(camY<0 이거나 camY+H>total)은 캔버스 배경으로 남는다.
-    const y0 = Math.max(0, camY), y1 = Math.min(course.total, camY + H);
-    if(y1 > y0) ctx.drawImage(wallCv, 0, y0*cDpr, wallCv.width, (y1-y0)*cDpr, 0, y0-camY, W, y1-y0);
-    for(let k=n-1;k>=0;k--){
-      const i = rank[k], xy = raceXY(course, prog[i]);
-      drawMarble(i, xy.x, xy.y - camY, k===0);
+  /* ── 코스 그리기 ──
+     예전에는 코스 전체를 오프스크린 한 장에 미리 그렸는데, 그러면 iOS 사파리의 캔버스 한 변
+     4096px 제한에 코스 길이가 묶인다. 물리 코스는 화면에 보이는 띠(260 논리 px)만 매 프레임
+     그리면 되고, 격자 덕에 그 띠에 걸친 물체만 훑으므로 40개 남짓이다 — 제한이 아예 사라졌다.
+     stamp 는 한 물체가 여러 셀에 걸쳐 있을 때 두 번 그리지 않으려는 것이다(Set 을 매 프레임
+     새로 만들지 않는다). */
+  const stamp = new Int32Array(map.bodies.length).fill(-1);
+  let stampNo = 0;
+  function drawCourse(camY, f){
+    const tt = f*RACE_SUB*RACE_DT;
+    stampNo++;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const c0 = Math.max(0, Math.floor(camY/RACE_CELL));
+    const c1 = Math.min(map.cells-1, Math.floor((camY+H)/RACE_CELL));
+    for(let c=c0;c<=c1;c++){
+      const list = map.grid[c];
+      for(let k=0;k<list.length;k++){
+        const bi = list[k];
+        if(stamp[bi] === stampNo) continue;
+        stamp[bi] = stampNo;
+        const b = map.bodies[bi];
+        let x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2;
+        if(b.sp){ const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
+          x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa; }
+        // 색으로 성격을 갈라 둔다 — 도는 것(바람개비)과 세게 튕기는 것(범퍼)은 미리 알아볼 수 있어야 한다
+        ctx.strokeStyle = b.sp ? "#a08a6a" : b.e ? "#c98a3a" : "#e0d5c4";
+        ctx.lineWidth = 2*b.rad;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1-camY); ctx.lineTo(x2, y2-camY);
+        ctx.stroke();
+      }
     }
-    return rank;
+    // 결승선 — 체커 두 줄. 1위가 도착하는 순간 화면에 무엇이 걸렸는지 보여야 한다
+    const fy = map.finishY - camY;
+    if(fy > -24 && fy < H+24){
+      const cell = 10;
+      for(let row=0;row<2;row++) for(let x=0;x<W;x+=cell){
+        ctx.fillStyle = ((x/cell + row) % 2) ? "#2b2118" : "#ffffff";
+        ctx.fillRect(x, fy + row*cell, cell, cell);
+      }
+    }
   }
 
-  // 구슬 = gcolor(i, n) 색 원 + 흰 번호 (R19-6). 선두만 어두운 테두리로 강조한다 —
+  // 구슬 = gcolor(i, n) 색 원 + 흰 번호. 선두만 어두운 테두리로 강조한다 —
   // 나머지의 흰 테두리는 구슬이 겹칠 때 경계를 남기는 용도다.
   function drawMarble(i, x, y, lead){
     ctx.beginPath(); ctx.arc(x, y, RACE_R, 0, Math.PI*2);
     ctx.fillStyle = gcolor(i, n); ctx.fill();
-    ctx.lineWidth = lead ? 3 : 1.5;
+    ctx.lineWidth = lead ? 2.6 : 1.4;
     ctx.strokeStyle = lead ? "#2b2118" : "rgba(255,255,255,.92)";
     ctx.stroke();
-    /* 두 자리 번호는 한 글자 크기로 그리면 원을 넘는다 — 10 이상만 줄인다(11명부터의 경로다).
-       미측정 (R13-5): 이건 논리 캔버스 px 이라 화면 크기가 아니다. 논리 폭 340 을
-       .race-wrap(max-width min(340px,45vh))에 맞추므로 320×568 화면에서 배율이 0.752 이고,
-       10번째 이후 구슬의 숫자는 CSS 7.5px 로 렌더된다(667px 높이 화면에서 8.8px).
-       크기는 RACE_R(11)에 묶여 있어 단독으로 못 올린다 — 키우려면 raceXY 의 벽 여유를 다시
-       확인해야 한다. 실기기에서 판독 여부를 잰 뒤 결정한다. */
-    ctx.font = "800 " + (i >= 9 ? 10 : 12.5) + "px " + RACE_FONT;
+    /* 논리 폭을 340 에서 200 으로 좁힌 덕에 배율이 0.752 → 1.28 로 올라갔다. 두 자리 번호 9px 도
+       화면에서는 CSS 11.5px 이라, 예전 7.5px 문제(R13-5)가 여기서 해소된다. */
+    ctx.font = "800 " + (i >= 9 ? 9 : 11) + "px " + RACE_FONT;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff"; ctx.fillText(String(i+1), x, y+0.5);
   }
 
+  /* ── 한 프레임 ── 물리는 이미 끝나 있다. 여기서는 녹화된 좌표를 읽어 그리기만 한다. */
+  const ypos = new Array(n).fill(0);
+  const rank = players.map((m,i)=>i);
+  function draw(t){
+    const f = Math.max(0, Math.min(sim.frames-1, Math.floor(t*60/1000)));
+    const base = f*n*2;
+    for(let i=0;i<n;i++) ypos[i] = sim.path[base+i*2+1];
+    rank.sort((a,b)=> ypos[b]-ypos[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
+    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - H + RACE_CAM_PAD, ypos[rank[0]] - H*RACE_CAM));
+    ctx.clearRect(0, 0, W, H);
+    drawCourse(camY, f);
+    for(let k=n-1;k>=0;k--){ const i=rank[k]; drawMarble(i, sim.path[base+i*2], ypos[i]-camY, k===0); }
+    return rank;
+  }
+
   /* ── 루프 ──
-     dt 를 64ms(≈4프레임)로 묶는다. 탭이 숨었다 돌아오면 now-last 가 몇 초가 되는데, 그대로
-     더하면 구슬이 화면 절반을 순간이동한다 (R19-14). 대가는 명확하다 — 숨어 있던 시간만큼
-     레이스가 실제 시각보다 뒤처진다. 벽시계를 맞추는 것보다 '이어서 보이는' 쪽을 고른 것이다. */
+     dt 를 64ms(≈4프레임)로 묶는다. 탭이 숨었다 돌아오면 now-last 가 몇 초가 되는데 그대로 더하면
+     구슬이 화면 절반을 순간이동한다. 대가는 명확하다 — 숨어 있던 시간만큼 레이스가 뒤처진다.
+     벽시계를 맞추는 것보다 '이어서 보이는' 쪽을 고른 것이다. */
   let t = 0, last = performance.now();
   const ctl = {
     raf: 0,
     done: false,
+    winner: winner,
     stop(){ if(ctl.raf) cancelAnimationFrame(ctl.raf); ctl.raf = 0; ctl.done = true; },
     finish(){
-      if(ctl.done) return;      // stop() 이 먼저 지나갔으면(중단) 결과를 만들지 않는다
+      if(ctl.done) return;
       ctl.done = true;
       if(ctl.raf) cancelAnimationFrame(ctl.raf);
       ctl.raf = 0;
-      drawHud(END, draw(END), true);   // 결승선 통과 상태를 마지막으로 그린다
+      drawHud(END, draw(END), true);
       if(typeof onDone === "function") onDone();
     },
-    canvas: cv,
-    build: build
+    canvas: cv
   };
   function frame(now){
     ctl.raf = 0;
-    /* 오버레이가 닫힌 뒤 이미 예약돼 있던 프레임 방어. 정상 경로는 startRace 가 GS.teardown 에
-       걸어둔 stop() 에서 끊기지만, 그 등록이 빠진 경로가 하나라도 생기면 여기서 멈춘다 —
-       빈 캔버스에 계속 그리며 배터리를 먹는 상태를 남기지 않는다 (R19-13). */
-    if(!cv.isConnected){ ctl.stop(); return; }
+    if(!cv.isConnected){ ctl.stop(); return; }   // 오버레이가 닫힌 뒤 이미 예약돼 있던 프레임 방어
     const dt = Math.min(64, now - last);
     last = now; t += dt;
     if(t >= END){ ctl.finish(); return; }
     drawHud(t, draw(t), false);
     ctl.raf = requestAnimationFrame(frame);
   }
-  // 첫 프레임은 즉시 그린다 — rAF 를 기다리면 출발 직전에 빈 캔버스가 한 번 보인다
-  drawHud(0, draw(0), true);
-  ctl.raf = requestAnimationFrame(frame);
+  drawHud(0, draw(0), true);          // 첫 프레임은 즉시 — rAF 를 기다리면 빈 캔버스가 한 번 보인다
+  if(lessMotion()) gtimer(()=>ctl.finish(), 10);   // 연출을 건너뛰고 결과로 간다
+  else ctl.raf = requestAnimationFrame(frame);
   return ctl;
 }
 
@@ -3450,8 +3539,10 @@ function playRace(players, winner, onDone){
    내려와야 하므로, 마크업과 배선을 두 곳으로 쪼개지 않고 한 곳에서 한다.
    두 버튼을 .row-2 로 한 줄에 놓는다 — .game-foot 은 형제 버튼을 위아래로 쌓아서, 그냥 두면
    푸터가 한 줄 더 두꺼워지고 그만큼 캔버스(max-width:min(340px,45vh))가 줄어든다. */
-function startRace(players, winner){
-  const ctl = playRace(players, winner, ()=>showGameResult(winner));
+function startRace(players){
+  /* 승자를 넘기지 않는다 — 이 게임만은 물리가 정하고, 이름은 시뮬레이션이 끝난 뒤 붙는다.
+     그래서 결과 발표도 ctl.winner 를 읽는다(playRace 가 정한 그 사람). */
+  const ctl = playRace(players, ()=>showGameResult(ctl.winner));
   /* 예약된 프레임을 없애는 정상 경로 (R19-13). ✕·뒤로가기·[그만두기]는 closeGame 이, [한 판 더]는
      gvAgain 이 GS.teardown 을 부른다 — 네 경로가 모두 여기 등록한 stop 하나로 끊긴다.
      playRace 의 frame() 이 보는 cv.isConnected 는 이 등록이 빠졌을 때를 위한 방어선이고,

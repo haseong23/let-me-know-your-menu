@@ -519,282 +519,128 @@ test("경계값 — skip 정책 적용 후 참가자가 1명이 될 수 있다 (
   assert.equal(playersFrom(roster, "even", roster[0].id).length, 2);
 });
 
-// ===================== 16.1 구슬 레이스 순수 함수 =====================
-// **Validates: Requirements 19.3, 19.4, 19.5, 19.12, 19.17**
-//
-// R19-17 이 요구하는 것은 "당첨자가 항상 1위인지, 역전이 최소 3회인지 검증 가능하다"다.
-// 그래서 이 구역은 전부 시드 고정 PRNG(위 mulberry32)로 돌아간다 — Math.random 이 한 번이라도
-// 끼면 "가끔 2등이 이긴다"를 재현할 수 없고, 그 재현 불가능이 곧 R19-4 위반의 은폐다.
-
+// ===================== 구슬 레이스 (물리) =====================
+// 예전 레이스는 '당첨자를 먼저 뽑고 경로가 그 결과를 향하는' 구조라, 검증할 것이 도착 시간
+// 배분표였다. 지금은 물리가 결과를 만들므로 검증할 것이 완전히 다르다 —
+//   ① 같은 시드로 두 번 돌리면 완전히 같은가(재현성). 녹화-재생 구조의 전제다.
+//   ② 구슬이 벽·장애물을 뚫고 지나가지 않는가(터널링).
+//   ③ 정체 없이 끝나는가, 몇 초 걸리는가, 역전이 몇 번 나는가.
+//   ④ 승자가 특정 구슬 번호에 쏠리지 않는가 — 이름을 그 번호에 붙이므로 이게 곧 균등성이다.
 const RACE_REQUIRED = [
-  "raceCourse",
-  "raceXY",
-  "raceSpeeds",
-  "raceSchedule",
-  "raceProgress",
-  "raceLeadChanges",
-  "RACE_F_LO",
-  "RACE_F_HI",
+  "raceMapBuild",
+  "raceSimulate",
+  "raceRnd",
+  "RACE_W",
+  "RACE_R",
+  "RACE_VMAX",
+  "RACE_DT",
+  "RACE_MAXF",
 ];
-
 export const raceLogic = loadGameLogic(HTML, RACE_REQUIRED);
-const { raceCourse, raceXY, raceSpeeds, raceSchedule, raceProgress, raceLeadChanges, RACE_F_LO, RACE_F_HI } =
-  raceLogic;
+const { raceMapBuild, raceSimulate, raceRnd, RACE_W, RACE_R, RACE_VMAX, RACE_DT, RACE_MAXF } = raceLogic;
 
-// 테스트 안에서만 쓰는 duration 이다. 앱의 RACE_DUR 은 25000 이지만(1위 도착이 duration*0.80 이라
-// 화면에서 보이는 레이스가 약 20초가 되는 값), 아래 판정이 전부 duration 에 대한 비율이라 값이
-// 달라도 결과가 같다 — 그래서 읽기 쉬운 20000 하나로 고정한다.
-const RACE_DUR = 20000;
-const RACE_N_MAX = 24; // GAME_MAX.race 와 같아야 한다 — 아래 경계값 테스트가 그 일치를 본다
-
-// 16.3 의 호출부를 그대로 흉내낸다: 코스 → 속도 → order([당첨자, ...섞은 나머지]) → 스케줄.
-// order 를 여기서 섞는 게 중요하다. 당첨자 인덱스가 늘 0 이면 "인덱스 0 이 1위"라는 우연한
-// 구현으로도 통과해버린다.
-function raceBuild(rnd, n) {
-  const course = raceCourse(rnd);
-  const speeds = raceSpeeds(n, course.segs.length, rnd);
-  const order = Array.from({ length: n }, (_, i) => i);
-  for (let i = n - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    const t = order[i];
-    order[i] = order[j];
-    order[j] = t;
-  }
-  const sched = raceSchedule(course, speeds, order, RACE_DUR, rnd);
-  return { course, speeds, order, sched, n };
+const RACE_N_MAX = 24;
+// 한 판을 시드로 재현 가능하게 만든다. 앱의 raceBuild 와 같은 순서로 부른다 —
+// rnd 하나를 맵과 시뮬레이션이 이어서 쓰므로 순서가 바뀌면 결과가 달라진다.
+function raceRun(seed, n) {
+  const rnd = raceRnd(seed >>> 0);
+  const map = raceMapBuild(rnd);
+  return { map, sim: raceSimulate(map, n, rnd) };
 }
-
-// 인접 등수 사이 도착 시간 간격의 이론적 하한. 지터 폭을 간격의 0.9 배로 묶어두었으므로
-// 최소 0.1 배가 남는다. 이 식이 무너지면(=지터가 간격보다 넓어지면) 순서가 뒤집힌다.
-const raceMinGapMs = (n) => (n <= 1 ? RACE_DUR : RACE_DUR * ((RACE_F_HI - RACE_F_LO) / (n - 1)) * 0.095);
 
 test("구슬 레이스 — 마커 블록에서 순수 함수가 모두 나온다", () => {
   for (const name of RACE_REQUIRED) assert.ok(name in raceLogic, `${name} 이(가) 추출되지 않았다`);
-  for (const name of ["raceCourse", "raceXY", "raceSpeeds", "raceSchedule", "raceProgress", "raceLeadChanges"]) {
-    assert.equal(typeof raceLogic[name], "function", `${name} 은(는) 함수여야 한다`);
-  }
-  // 코스는 인원과 무관하게 같은 길이여야 한다 — 도착 시간 배분이 인원에 따라 흔들리지 않게 하는 전제다.
-  const a = raceCourse(mulberry32(1)),
-    b = raceCourse(mulberry32(2));
-  assert.equal(a.total, b.total, "코스 총 길이가 시드에 따라 달라졌다");
-  assert.equal(a.W / 2, a.CX, "CX 가 W/2 가 아니다");
-  assert.ok(a.segs.length >= 8, `구간이 ${a.segs.length} 개면 역전을 넣을 자리가 부족하다`);
-  const sp = raceSpeeds(3, a.segs.length, mulberry32(9));
-  assert.equal(sp.length, 3);
-  assert.equal(sp[0].length, a.segs.length, "구슬마다 구간 수만큼의 속도가 있어야 한다");
-  for (const row of sp) for (const v of row) assert.ok(v > 0, `속도 ${v} 가 0 이하다 — 구간 시간이 무한이 된다`);
+  assert.equal(typeof raceMapBuild, "function");
+  assert.equal(typeof raceSimulate, "function");
+  // 터널링을 막는 부등식이 상수 안에 들어 있다 — 한 스텝 최대 이동이 구슬 반지름보다 작아야 한다.
+  assert.ok(RACE_VMAX * RACE_DT < RACE_R,
+    `한 스텝 최대 이동 ${(RACE_VMAX * RACE_DT).toFixed(2)} 가 반지름 ${RACE_R} 이상이다 — 캡슐을 건너뛸 수 있다`);
 });
 
-test("raceSchedule — order[0] 의 도착 시간이 항상 최소다 (R19-4, R19-17)", () => {
-  // 여기가 R19-4 의 전부다. '거의 항상'은 통과가 아니다.
-  // 부록 A.3 원안은 지터 폭이 고정 0.015 였고, 인접 등수 간격은 0.20/(n-1) 이라 n=24 에서 0.0087 —
-  // 지터가 간격보다 넓어 2등이 1등을 앞지르는 배분이 실제로 나왔다. 구현은 지터 폭을 간격의
-  // 0.9 배로 묶어 그 구멍을 막았고, 이 테스트가 그 보장을 지킨다.
-  let checked = 0;
-  let minMargin = Infinity;
-  let worst = null;
-  for (const seed of [1, 42, 1337, 20240115, 987654321]) {
-    const rnd = mulberry32(seed);
-    for (let round = 0; round < 8; round++) {
-      for (let n = 2; n <= RACE_N_MAX; n++) {
-        const b = raceBuild(rnd, n);
-        const w = b.sched.want;
-        const wi = b.order[0];
-        const others = w.filter((_, i) => i !== wi);
-        const runnerUp = Math.min(...others);
-        const ctx = at(seed, `round=${round} n=${n}`, `want=${show(w.map((v) => +(v / RACE_DUR).toFixed(5)))} order=${show(b.order)}`);
-        assert.ok(w[wi] < runnerUp, `${ctx} — 당첨자(idx=${wi})가 1위가 아니다`);
-        // 등수 순서 전체가 order 와 일치하는지도 본다. 1위만 맞고 중간이 뒤섞이면
-        // 순위 표시(HUD)와 도착 순서가 어긋난다.
-        for (let r = 1; r < n; r++) {
-          assert.ok(
-            w[b.order[r - 1]] < w[b.order[r]],
-            `${ctx} — ${r}등(idx=${b.order[r]})이 ${r - 1}등(idx=${b.order[r - 1]})보다 먼저 도착한다`
-          );
-        }
-        const margin = runnerUp - w[wi];
-        assert.ok(
-          margin >= raceMinGapMs(n),
-          `${ctx} — 1·2위 간격 ${margin.toFixed(2)}ms 가 하한 ${raceMinGapMs(n).toFixed(2)}ms 미만이다`
-        );
-        if (margin < minMargin) {
-          minMargin = margin;
-          worst = `n=${n} seed=${seed}`;
-        }
-        checked++;
-      }
-    }
-  }
-  assert.ok(checked >= 900, `표본이 ${checked} 개면 부족하다`);
-  assert.ok(minMargin > 0, `최소 간격이 ${minMargin} 이다 (${worst})`);
-});
-
-test("raceSchedule — 모든 도착 시간이 duration*0.75 이상 duration 이하다 (R19-3)", () => {
-  // 아래로 벗어나면 레이스가 너무 빨리 끝나고, 위로 벗어나면 duration 안에 못 들어오는 구슬이 생긴다.
-  // 부록 A.3 원안은 꼴찌를 1.00 에 두고 지터를 얹어 최대 1.0075 — duration 을 넘겼다. 상한을 0.99 로
-  // 내려 지터를 포함해도 항상 duration 안이다.
-  let lo = Infinity,
-    hi = -Infinity;
-  for (const seed of [2, 77, 31337, 5150]) {
-    const rnd = mulberry32(seed);
-    for (let round = 0; round < 6; round++) {
-      for (let n = 2; n <= RACE_N_MAX; n++) {
-        const b = raceBuild(rnd, n);
-        for (let i = 0; i < n; i++) {
-          const f = b.sched.want[i] / RACE_DUR;
-          assert.ok(
-            f >= 0.75 && f <= 1,
-            at(seed, `round=${round} n=${n}`, `구슬 ${i} 도착 시간 비율 ${f.toFixed(6)} 가 [0.75, 1] 밖이다`)
-          );
-          if (f < lo) lo = f;
-          if (f > hi) hi = f;
-        }
-      }
-    }
-  }
-  // 실측 범위가 경계에 붙어 있지 않은지도 남긴다. 여유가 사라지면 다음 파라미터 변경에서 터진다.
-  assert.ok(lo > 0.78, `최소 비율 ${lo.toFixed(6)} 가 0.75 경계에 너무 가깝다`);
-  assert.ok(hi < 0.999, `최대 비율 ${hi.toFixed(6)} 가 duration 에 너무 가깝다`);
-});
-
-test("raceProgress — t=0 에서 0, 도착 이후 정확히 1, 그 사이 단조 증가다", () => {
-  const STEPS = 400;
-  for (const seed of [3, 101, 424242]) {
-    const rnd = mulberry32(seed);
-    for (let round = 0; round < 4; round++) {
-      for (const n of [2, 5, 13, RACE_N_MAX]) {
-        const b = raceBuild(rnd, n);
-        for (let i = 0; i < n; i++) {
-          const arrive = b.sched.want[i];
-          const ctx = at(seed, `round=${round} n=${n} i=${i}`, `arrive=${arrive.toFixed(2)}`);
-          assert.equal(raceProgress(b.course, b.sched, i, 0), 0, `${ctx} — t=0 에서 0 이 아니다`);
-          // 음수 t 와 NaN 도 0 으로 잠근다. 프레임 dt 계산이 어긋나도 구슬이 뒤로 가지 않아야 한다.
-          assert.equal(raceProgress(b.course, b.sched, i, -1), 0, `${ctx} — t<0 에서 0 이 아니다`);
-          assert.equal(raceProgress(b.course, b.sched, i, NaN), 0, `${ctx} — t=NaN 에서 0 이 아니다`);
-          // 도착 시각 '정확히 그 순간'에 1 이어야 한다. 16.2 의 종료 판정이 want 를 보기 때문에,
-          // 여기서 1 에 못 미치면 결승선 앞에서 레이스가 끝나는 그림이 된다.
-          assert.equal(raceProgress(b.course, b.sched, i, arrive), 1, `${ctx} — 도착 시각에 1 이 아니다`);
-          assert.equal(raceProgress(b.course, b.sched, i, arrive * 1.5), 1, `${ctx} — 도착 이후 1 이 아니다`);
-          assert.equal(raceProgress(b.course, b.sched, i, RACE_DUR * 10), 1, `${ctx} — 한참 뒤에도 1 이 아니다`);
-          let prev = 0;
-          for (let k = 1; k < STEPS; k++) {
-            const p = raceProgress(b.course, b.sched, i, (arrive * k) / STEPS);
-            assert.ok(p >= prev, `${ctx} — t 가 커졌는데 진행률이 ${prev} → ${p} 로 줄었다`);
-            assert.ok(p > prev, `${ctx} — k=${k} 에서 진행률이 ${p} 로 멈췄다 (구슬이 서 있다)`);
-            assert.ok(p < 1, `${ctx} — 도착 전인데 진행률이 ${p} 다`);
-            prev = p;
-          }
-        }
+test("raceSimulate — 같은 시드로 두 번 돌리면 완전히 같다 (녹화-재생의 전제)", () => {
+  for (const seed of [1, 77, 4242]) {
+    for (const n of [2, 7, RACE_N_MAX]) {
+      const a = raceRun(seed, n), b = raceRun(seed, n);
+      assert.equal(a.sim.winner, b.sim.winner, `seed=${seed} n=${n}: 승자가 다르다`);
+      assert.equal(a.sim.frames, b.sim.frames, `seed=${seed} n=${n}: 프레임 수가 다르다`);
+      assert.equal(a.sim.path.length, b.sim.path.length, `seed=${seed} n=${n}: 녹화 길이가 다르다`);
+      for (let k = 0; k < a.sim.path.length; k += 977) {   // 전수는 느리다 — 성긴 표본으로 충분하다
+        assert.equal(a.sim.path[k], b.sim.path[k], `seed=${seed} n=${n}: ${k}번째 좌표가 다르다`);
       }
     }
   }
 });
 
-test("raceXY — 임의의 p 에서 x 가 [0, W] 안이고 벽까지 여유가 남는다", () => {
-  // 목적은 '구슬이 코스 밖으로 나가지 않는지'다. 진폭 상한이 40+70=110, CX=170 이라 x 는
-  // (60, 280) 안이고 좌우로 60px 이 남는다 — 반지름 10px 짜리 구슬과 벽선을 그려도 넉넉하다.
-  const MARGIN = 30; // 렌더러가 반지름·벽선에 쓸 수 있는 최소 여유
-  let xmin = Infinity,
-    xmax = -Infinity;
-  for (const seed of [4, 555, 8675309]) {
-    const rnd = mulberry32(seed);
-    for (let round = 0; round < 30; round++) {
-      const course = raceCourse(rnd);
-      let prevY = -1;
-      for (let k = 0; k <= 500; k++) {
-        const p = k / 500;
-        const { x, y } = raceXY(course, p);
-        const ctx = at(seed, `round=${round} p=${p.toFixed(3)}`, `x=${x.toFixed(3)} y=${y.toFixed(3)}`);
-        assert.ok(x >= 0 && x <= course.W, `${ctx} — x 가 [0, ${course.W}] 밖이다`);
-        assert.ok(x >= MARGIN && x <= course.W - MARGIN, `${ctx} — 벽까지 여유가 ${MARGIN}px 미만이다`);
-        assert.ok(y >= 0 && y <= course.total, `${ctx} — y 가 [0, ${course.total}] 밖이다`);
-        assert.ok(y >= prevY, `${ctx} — p 가 커졌는데 y 가 줄었다`);
-        prevY = y;
-        if (x < xmin) xmin = x;
-        if (x > xmax) xmax = x;
-      }
-      // p 를 벗어난 값으로 불러도 코스 안에 머문다 — 카메라·마지막 프레임 계산이 1 을 살짝 넘길 수 있다.
-      for (const p of [-1, 0, 1, 1.5]) {
-        const { x, y } = raceXY(course, p);
-        assert.ok(x >= 0 && x <= course.W, `p=${p} 에서 x=${x} 가 코스 밖이다`);
-        assert.ok(y >= 0 && y <= course.total, `p=${p} 에서 y=${y} 가 코스 밖이다`);
-      }
-    }
+test("raceSimulate — 정체 없이 끝나고, 소요 시간과 역전이 예산 안에 있다", () => {
+  const secs = [], leads = [];
+  for (let s = 1; s <= 40; s++) {
+    const n = 2 + (s % (RACE_N_MAX - 1));
+    const { sim } = raceRun(s * 7919, n);
+    assert.ok(sim.ok, `seed=${s} n=${n}: ${RACE_MAXF} 프레임 안에 아무도 결승선을 못 넘었다(정체)`);
+    secs.push(sim.frames / 60);
+    leads.push(sim.leadChanges);
   }
-  assert.ok(xmin > 0 && xmax < 340, `실측 x 범위 ${xmin.toFixed(2)}~${xmax.toFixed(2)} 가 코스를 벗어났다`);
+  const min = Math.min(...secs), max = Math.max(...secs);
+  assert.ok(min >= 8, `가장 짧은 판이 ${min.toFixed(1)}초다 — 연출이라기엔 너무 짧다`);
+  assert.ok(max <= 30, `가장 긴 판이 ${max.toFixed(1)}초다 — 다 같이 보기엔 너무 길다`);
+  // 앱의 raceBuild 는 문턱을 못 넘으면 시드를 다시 뽑는다. 그 재시도가 대부분 한 번에 끝나려면
+  // 애초에 대다수 판이 문턱을 넘어야 한다 — 그 비율을 여기서 지킨다.
+  const ok3 = leads.filter((x) => x >= 3).length;
+  assert.ok(ok3 >= leads.length * 0.6,
+    `역전 3회 이상이 ${ok3}/${leads.length} 뿐이다 — 시드 재시도가 자주 돌게 된다`);
 });
 
-test("raceLeadChanges — 재생성 루프를 통과한 코스는 3 이상, 루프 없이는 3 미만이 나온다 (R19-5, R19-17)", () => {
-  const GATE = 3; // R19-5 의 '최소 3회'
-  const TRIES = 40; // 16.3 재생성 루프의 시도 횟수
-  // (1) 루프가 죽은 코드가 아님 — 그냥 생성하면 3 미만이 실제로 나온다.
-  //     여기서 0 이 나오면 게이트가 무의미하다는 뜻이라 16.3 의 루프를 지워야 한다.
-  let below = 0,
-    total = 0;
-  let firstBelow = null;
-  for (const seed of [5, 35, 909, 1234567]) {
-    const rnd = mulberry32(seed);
-    for (let round = 0; round < 10; round++) {
-      for (const n of [2, 3, 6, 12, RACE_N_MAX]) {
-        const b = raceBuild(rnd, n);
-        const c = raceLeadChanges(b.course, b.sched, n, RACE_DUR, 120);
-        assert.ok(Number.isInteger(c) && c >= 0, `역전 횟수 ${c} 가 음수거나 정수가 아니다`);
-        if (c < GATE) {
-          below++;
-          if (!firstBelow) firstBelow = `seed=${seed} round=${round} n=${n} changes=${c}`;
-        }
-        total++;
+test("raceSimulate — 구슬이 코스 밖으로 나가지 않는다 (터널링·탈출)", () => {
+  for (const seed of [3, 31, 313]) {
+    const n = 12;
+    const { map, sim } = raceRun(seed, n);
+    const F = sim.frames;
+    for (let f = 0; f < F; f++) {
+      const base = f * n * 2;
+      for (let i = 0; i < n; i++) {
+        const x = sim.path[base + i * 2], y = sim.path[base + i * 2 + 1];
+        assert.ok(x >= RACE_R - 0.5 && x <= RACE_W - RACE_R + 0.5,
+          `seed=${seed} f=${f} i=${i}: x=${x.toFixed(1)} 가 벽 밖이다`);
+        assert.ok(y >= -40 && y <= map.total + 60,
+          `seed=${seed} f=${f} i=${i}: y=${y.toFixed(1)} 가 코스(${map.total.toFixed(0)}) 밖이다`);
       }
     }
   }
-  assert.ok(below > 0, `${total} 개 표본에서 역전 ${GATE} 회 미만이 한 번도 안 나왔다 — 재생성 루프가 죽은 코드다`);
-  assert.ok(below < total, `${total} 개 표본이 전부 ${GATE} 회 미만이다 — 루프가 통과할 코스를 못 찾는다`);
+});
 
-  // (2) 재생성 루프를 통과한 코스는 반드시 3 이상 — 16.3 이 쓸 판정이 실제로 성립하는지.
-  //     n>=3 은 40 회 안에 항상 찾는다(실측 실패 0%). n=2 는 두 구슬이 네 번 교차해야 해서
-  //     구조적으로 어렵고 40 회를 다 써도 못 찾는 경우가 약 13% 있다 — 그래서 n=2 는
-  //     '적어도 찾아지기는 한다'만 확인하고, 못 찾았을 때의 처리는 16.3 의 몫으로 남긴다.
-  let twoFound = 0,
-    twoTried = 0;
-  for (const seed of [6, 6060, 77777]) {
-    const rnd = mulberry32(seed);
-    for (const n of [2, 3, 4, 8, 16, RACE_N_MAX]) {
-      let accepted = null;
-      for (let t = 0; t < TRIES; t++) {
-        const b = raceBuild(rnd, n);
-        if (raceLeadChanges(b.course, b.sched, n, RACE_DUR, 120) >= GATE) {
-          accepted = b;
-          break;
-        }
-      }
-      if (n === 2) {
-        twoTried++;
-        if (accepted) twoFound++;
-      } else {
-        assert.ok(accepted, at(seed, `n=${n}`, `${TRIES} 회 안에 역전 ${GATE} 회 이상인 코스를 못 만들었다`));
-      }
-      if (accepted) {
-        const c = raceLeadChanges(accepted.course, accepted.sched, n, RACE_DUR, 120);
-        assert.ok(c >= GATE, at(seed, `n=${n}`, `통과했다는 코스의 역전이 ${c} 회다`));
-        // 통과한 코스에서도 1위는 당첨자여야 한다 — 재생성이 R19-4 를 깨지 않는지.
-        const wi = accepted.order[0];
-        assert.equal(
-          accepted.sched.want.indexOf(Math.min(...accepted.sched.want)),
-          wi,
-          at(seed, `n=${n}`, "재생성된 스케줄에서 당첨자가 1위가 아니다")
-        );
-      }
-    }
+test("raceSimulate — 승자가 구슬 번호에 쏠리지 않는다 (이 대응이 곧 균등 추첨이다)", () => {
+  // 이름은 구슬 번호에 그대로 붙는다. 번호가 유리하면 그게 곧 특정 사람의 이점이 된다.
+  // 출발 x 가 각자 독립 난수라 번호에는 의미가 없어야 하고, 이 테스트가 그것을 지킨다.
+  const n = 6, R = 600;
+  const hit = new Array(n).fill(0);
+  let done = 0;
+  for (let s = 1; s <= R; s++) {
+    const { sim } = raceRun(s * 2654435761, n);
+    if (!sim.ok) continue;
+    hit[sim.winner]++; done++;
   }
-  assert.ok(twoFound > 0, `n=2 에서 ${twoTried} 번 시도해 한 번도 역전 ${GATE} 회를 못 만들었다`);
+  assert.ok(done > R * 0.95, `완주한 판이 ${done}/${R} 뿐이다`);
+  const exp = done / n;
+  // 카이제곱 대신 폭으로 본다 — 600판 · 6칸이면 기대 100, 표준편차 ≈9.1 이라 ±40% 는 4σ 밖이다.
+  hit.forEach((c, i) => {
+    assert.ok(c > exp * 0.6 && c < exp * 1.4,
+      `구슬 ${i} 번이 ${c}회 이겼다(기대 ${exp.toFixed(0)}) — 번호에 유불리가 있다`);
+  });
+});
 
-  // samples 를 생략하면 120 이 기본값이다 — 16.3 이 인자를 빼먹어도 같은 판정을 받아야 한다.
-  const b = raceBuild(mulberry32(31), 8);
-  assert.equal(
-    raceLeadChanges(b.course, b.sched, 8, RACE_DUR),
-    raceLeadChanges(b.course, b.sched, 8, RACE_DUR, 120),
-    "samples 기본값이 120 이 아니다"
-  );
+test("raceMapBuild — 코스 길이는 고정이고 구성만 섞인다", () => {
+  // 길 구성 비율(1자 4 · 지그재그 3 · 깔때기 3)을 고정했으므로 총 길이는 판마다 같아야 한다.
+  // 그게 이 설계의 요점이다 — 판마다 게임 시간이 들쭉날쭉하지 않게 만드는 장치다.
+  const totals = [], shapes = [];
+  for (let s = 1; s <= 30; s++) {
+    const m = raceRun(s * 104729, 2).map;
+    totals.push(Math.round(m.total));
+    shapes.push(m.bodies.length);
+  }
+  assert.equal(new Set(totals).size, 1, `코스 길이가 ${new Set(totals).size} 가지다 — 비율 고정이 깨졌다`);
+  // 구성은 섞여야 한다. 장애물마다 물체 수가 달라서(못밭 수십 · 바람개비 2 · 기둥 1 · 범퍼 5)
+  // 물체 수가 한 가지로 고정돼 있으면 매 판 같은 코스를 그리고 있다는 뜻이다.
+  assert.ok(new Set(shapes).size >= 3, `물체 수가 ${new Set(shapes).size} 가지뿐이다 — 구성이 안 섞이고 있다`);
 });
 
 test("경계값 — 구슬 레이스 24/25 (R19-12)", () => {
@@ -803,7 +649,6 @@ test("경계값 — 구슬 레이스 24/25 (R19-12)", () => {
   assert.ok(!gameFits("race", GAME_MAX.race + 1), "상한+1 에서 구슬 레이스는 막혀야 한다");
   assert.ok(gameFits("race", 2), "2명에서 구슬 레이스가 막혔다");
   assert.equal(RACE_N_MAX, GAME_MAX.race, "테스트가 상한과 다른 인원까지만 검증하고 있다");
-  // 상한이 돌림판과 같은 이유: 색·번호 구분이 한계이고, 구슬 지름 기준은 그보다 여유가 있다.
   assert.equal(GAME_MAX.race, GAME_MAX.wheel, "구슬 레이스 상한은 돌림판과 같은 근거(색 구분)를 쓴다");
 });
 
