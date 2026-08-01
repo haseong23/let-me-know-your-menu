@@ -638,7 +638,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.91";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.92";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2262,6 +2262,7 @@ function raceMapBuild(rnd, soft){
   // 축을 좌우 중 한쪽 바깥에 둔다. 매 판 뒤집어 어느 한쪽이 구조적으로 유리해지지 않게 한다.
   const gx = rnd()<0.5 ? -70 : RACE_W+70;
   B.push(rbar(gx, y+46, 340, 6, (rnd()<0.5?1:-1)*(0.9+rnd()*0.6), rnd()*6.283, 0));
+  const neckY=y+20;                              // 결승 깔때기 벽이 시작되는 자리
   const finishY=y+120+CHAN+34;
   y=finishY+46;
   const cells=Math.ceil(y/RACE_CELL)+1;
@@ -2271,7 +2272,7 @@ function raceMapBuild(rnd, soft){
     const a=Math.max(0, Math.floor(b.y0/RACE_CELL)), z=Math.min(cells-1, Math.floor(b.y1b/RACE_CELL));
     for(let c=a;c<=z;c++) grid[c].push(i);
   }
-  return { bodies:B, grid, cells, total:y, finishY };
+  return { bodies:B, grid, cells, total:y, finishY, neckY };
 }
 
 /* 한 판을 끝까지 돌리고 프레임마다 모든 구슬의 (x,y) 를 Float32Array 에 녹화한다.
@@ -3835,6 +3836,13 @@ const RACE_CAM = 0.55;
    줌을 그대로 따라가면 프레임마다 값이 떨려서 화면이 울렁인다 — 지수 평활로 천천히 따라간다. */
 const RACE_ZOOM_MIN = 0.70;
 const RACE_ZOOM_EASE = 0.05;
+/* 결승 깔때기부터는 반대로 조인다. 여기까지는 '누가 어디쯤인지'가 궁금해서 넓게 보다가,
+   통로에 들어서는 순간부터는 '누가 먼저 들어가느냐' 한 가지만 남는다 — 그 몇 초를 가장 크게
+   보여준다. 넓히기와 조이기가 한 값을 두고 다투지 않게, 기준선(map.neckY)을 넘으면 조이기가
+   그냥 이기도록 갈라 놓는다.
+   조일 때는 보간을 빠르게 한다(0.14). 깔때기 입구에서 결승까지가 300 남짓이라 0.05 로는
+   다 조이기 전에 판이 끝난다 — 긴장을 만들려던 연출이 어정쩡한 배율로 지나가 버린다. */
+const RACE_ZOOM_MAX = 2.0, RACE_ZOOM_IN_EASE = 0.14;
 const RACE_CAM_PAD = 20;         // 카메라 여유 — 코스 양 끝에서 선두가 테두리에 걸치지 않게 한다
 const RACE_HUD_MS = 200;         // HUD 갱신 간격
 const RACE_DPR_MAX = 3;
@@ -4008,12 +4016,22 @@ function playRace(players, onDone){
     const base = f*n*2;
     for(let i=0;i<n;i++) ypos[i] = sim.path[base+i*2+1];
     rank.sort((a,b)=> ypos[b]-ypos[a]);   // 0 번이 선두. 뒤에서부터 그려 선두가 맨 위에 오게 한다
-    // 무리 전체(맨 앞~맨 뒤)를 담을 만큼 시야를 넓힌다. 50 은 위아래 여백이다.
-    const spread = ypos[rank[0]] - ypos[rank[n-1]] + 50;
-    const zTarget = Math.max(RACE_ZOOM_MIN, Math.min(1, H/spread));
-    camZ += (zTarget - camZ) * RACE_ZOOM_EASE;
+    /* 두 모드. 결승 깔때기 전에는 무리 전체(맨 앞~맨 뒤)를 담을 만큼 넓히고, 선두가 깔때기에
+       들어선 뒤에는 남은 거리에 비례해 조인다. 경계에서 목표값이 뛰지만 보간이 그걸 흡수한다. */
+    const lead = ypos[rank[0]];
+    let zTarget, zEase;
+    if(lead >= map.neckY){
+      const p = Math.max(0, Math.min(1, (lead-map.neckY)/Math.max(1, map.finishY-map.neckY)));
+      zTarget = 1 + (RACE_ZOOM_MAX-1)*p;
+      zEase = RACE_ZOOM_IN_EASE;
+    } else {
+      const spread = lead - ypos[rank[n-1]] + 50;   // 50 은 위아래 여백
+      zTarget = Math.max(RACE_ZOOM_MIN, Math.min(1, H/spread));
+      zEase = RACE_ZOOM_EASE;
+    }
+    camZ += (zTarget - camZ) * zEase;
     const vh = H / camZ;                                     // 지금 화면이 담는 코스 높이
-    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, ypos[rank[0]] - vh*RACE_CAM));
+    const camY = Math.max(-RACE_CAM_PAD, Math.min(map.total - vh + RACE_CAM_PAD, lead - vh*RACE_CAM));
     /* 줌을 걸면 코스(폭 200)가 캔버스보다 좁아져 양옆에 여백이 생긴다. 그 여백을 캔버스와 같은
        색으로 두면 구슬이 보이지 않는 벽에 튕기는 것처럼 보이므로, 배경을 한 톤 어둡게 깔고
        코스 폭만 밝게 칠해 '길'이 어디까지인지 눈에 남긴다. */
