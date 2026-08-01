@@ -149,6 +149,23 @@
   /* 알약(.pill)과 같은 자리에 선다 — 행마다 이름·메뉴 길이가 달라도 오른쪽 끝에 고정된다.
      margin-left:auto 가 없으면 가운데 블록 바로 뒤에 붙어 행마다 좌우로 흔들린다. */
   .sameas { flex:none; margin-left:auto; }
+  /* 게임 시트의 사람별 당첨 확률. 칩으로 흘려 담아 24명도 몇 줄로 접힌다(범례와 같은 처방).
+     .low 는 [확률 낮추기]가 걸린 분 — 숫자만으로는 목록에서 한 명을 찾아내야 한다. */
+  .gpr { display:flex; flex-wrap:wrap; gap:4px 6px; margin-top:8px; }
+  .gpr-it { display:inline-flex; align-items:baseline; gap:5px; background:var(--bg); border:1px solid var(--line);
+    border-radius:8px; padding:3px 8px; font-size:var(--fs-sm); line-height:1.4; max-width:100%; min-width:0; }
+  .gpr-it b { font-weight:700; color:var(--ink); overflow-wrap:anywhere; }
+  .gpr-it i { font-style:normal; font-weight:800; color:var(--brand); font-variant-numeric:tabular-nums; flex:none; }
+  .gpr-it.low { border-color:var(--accent); background:#fdf4e6; }
+  .gpr-it.low i { color:var(--accent-ink); }
+  /* 확률 낮추기 강도 슬라이더. range 입력은 이 파일에서 여기만 쓴다 — 손잡이·트랙을 다시 그리지
+     않고 기본 모양을 쓴다(다시 그리면 기기별 키보드·보이스오버 조작을 직접 떠맡게 된다).
+     accent-color 한 줄이면 브랜드 색은 입힐 수 있다. */
+  .gsl { margin-top:10px; }
+  .gsl-l { display:block; font-size:var(--fs-sm); color:var(--sub); font-weight:700; margin-bottom:2px; }
+  .gsl-l b { color:var(--brand); font-variant-numeric:tabular-nums; }
+  .gsl input[type=range] { width:100%; accent-color:var(--brand); min-height:32px; }
+  .gsl-e { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--sub); margin-top:-2px; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   /* 온도·옵션 칩은 주문 핵심 경로 — 탭 영역 44px 확보 */
   .chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-base); font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
@@ -583,7 +600,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.82";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.83";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1223,7 +1240,7 @@ function renderOpen(){
   // "누가 섬길지 아직 안 정했다면"이라고 적혀 있었다 (R16-1).
   const amHostNow = SESSION.hostId===ME;
   const gameLabel = amHostNow ? "섬길 사람을 다시 정하려면" : "누가 섬길지 아직 안 정했다면";
-  const gameBtnText = amHostNow ? "🎲 다른 분에게 넘길지 게임으로 정하기" : "🎲 게임으로 섬길 사람 정하기";
+  const gameBtnText = amHostNow ? "🎲 어떤 분이 섬겨주실지 게임으로 정하기" : "🎲 게임으로 섬길 사람 정하기";
   // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
   // 자리는 로스터 '위'다 (R12-11). 아래에 두면 버튼이 ~1,200px 지점으로 밀려, 예전에 탭 문제로
   // 나타났던 G9("기본 탭에 없어서 아무도 못 봤다")가 스크롤 깊이 문제로 되돌아온다.
@@ -1965,6 +1982,11 @@ const GS_NONE = new Set();
 function gsOn(){  return GS ? GS.on  : GS_NONE; }
 function gsOff(){ return GS ? GS.off : GS_NONE; }
 function gsPolicy(){ return GS ? GS.policy : "soft"; }          // 기본 soft — 명단을 줄이지 않는다
+/* [확률 낮추기]의 강도. 예전엔 1/3 고정이었는데, "얼마나 낮출지"는 그날 사람들이 정할 문제라
+   슬라이더로 열었다. 상한을 0.9 로 둔 이유: 1.0 이면 평등과 같아져 [평등] 칩과 뜻이 겹친다.
+   하한 0.1 도 마찬가지로 [제외](0)와 구분되는 자리까지만 내려간다. */
+const GS_SOFT_MIN = 0.1, GS_SOFT_MAX = 0.9;
+function gsSoftW(){ const w = GS ? GS.softW : GS_SOFT_W; return (typeof w === "number" && w > 0) ? w : GS_SOFT_W; }
 function gsLastHost(){ return GS ? GS.lastHostId : undefined; }  // undefined = 아직 조회 안 됨, '없음'과 같게 다룬다
 
 /* ---------- 직전에 섬긴 분 조회 (R5) ----------
@@ -2013,7 +2035,7 @@ function gameEnsure(opener){
   const seq = SESSION.seq ?? null;   // 호스트 없는 섬김에서 하단바로 들어오면 null — 그대로 키로 쓴다
   if(!GS || GS.seq !== seq){         // 보고 있는 섬김이 바뀌면 명단·정책을 그 섬김의 기본값으로 되돌린다
     GS = { seq, on:new Set(), off:new Set(), kind:null,
-           policy:"soft", lastHostId:undefined, sig:null,
+           policy:"soft", softW:GS_SOFT_W, lastHostId:undefined, sig:null,
            open:false, pushed:false, opener:null, timers:[], teardown:null };
   }
   GS.opener = opener || null;        // 같은 섬김이면 명단·정책은 그대로 살아 있다
@@ -2065,7 +2087,7 @@ function gameDropServed(){ gameServedIds().forEach(id=>gameToggle(id,false)); }
    사용자가 그분을 이미 껐으면 명단에 없으니 가중치가 걸릴 자리도 없다 (R6-13). */
 function gameWeights(players){
   const soft = gsPolicy()==="soft", last = gsLastHost();
-  return players.map(m => (soft && last && m.id===last) ? GS_SOFT_W : 1);
+  return players.map(m => (soft && last && m.id===last) ? gsSoftW() : 1);
 }
 function gamePickWinner(players){ return pickWeighted(players, gameWeights(players)); }
 
@@ -2202,13 +2224,29 @@ function openGameSheet(){
 // 기준 안내 한 줄이 필요한 이유: 무응답인 분이 왜 안 보이는지 여기서 말하지 않으면 [바꾸기]를
 // 열어봐야 알 수 있다 (R2-6). 예전의 '오늘 이미 섬긴 분은 기본으로 빠져 있어요'는 이제 사실이
 // 아니라서 2.1 에서 지웠다 — 오늘 섬긴 분 제외는 수동 버튼으로만 남는다.
+/* 사람별 당첨 확률을 미리 보여준다 (사용자 요청). 이름만 나열하면 [확률 낮추기]가 실제로
+   얼마나 낮추는지 알 수 없다 — 1/3 이라는 말보다 "7.7%" 라는 숫자가 바로 읽힌다.
+   출처는 gameWeights() 하나다. 화면이 따로 계산하면 언젠가 추첨과 어긋난다.
+   낮춰진 분은 색으로도 갈라 둔다 — 숫자만으로는 목록에서 한 명을 찾아내야 한다. */
+function gameOddsHtml(){
+  const players=gamePlayers();
+  if(!players.length) return "—";
+  const w=gameWeights(players), sum=w.reduce((a,b)=>a+b,0);
+  const last=gsLastHost();
+  return players.map((m,i)=>{
+    const pct = sum>0 ? (w[i]/sum*100) : 0;
+    const low = w[i] < 1;
+    return `<span class="gpr-it${low?" low":""}"><b>${esc(m.name)}</b><i>${pct.toFixed(1)}%</i></span>`;
+  }).join("");
+}
 function gamePlayerCardHtml(){
   const players=gamePlayers();
   return `<div class="card" style="padding:13px 14px;margin-bottom:12px">
       <div class="row-between"><b style="font-size:14px">참가자 ${players.length}명</b>
         <button class="btn btn-sm btn-soft" id="gRoster">바꾸기</button></div>
-      <div class="muted" style="margin-top:6px">${players.length?players.map(m=>esc(m.name)).join(" · "):"—"}</div>
-      <div class="muted" style="margin-top:6px;font-size:12px">메뉴를 고른 분이 기본으로 들어가 있어요</div>
+      <div class="gpr" id="gOdds">${gameOddsHtml()}</div>
+      <div class="muted" style="margin-top:8px;font-size:12px">메뉴를 고른 분이 기본으로 들어가 있어요.<br>
+        확률 조절은 <b>사다리타기·돌림판</b>에만 적용돼요 — 손가락 룰렛은 올라온 손가락에서, 구슬 레이스는 물리로 정해져서 가중치를 걸 자리가 없어요.</div>
     </div>`;
 }
 
@@ -2228,7 +2266,23 @@ const GS_POLICIES = [
 function gamePolicyHint(p){
   if(p==="skip") return "이번 판에는 아예 안 넣어요. 참가자 수도 한 분 줄어요.";
   if(p==="even") return "다른 분들과 똑같은 확률로 걸려요.";
-  return "다른 분 한 분의 1/3 확률로만 걸려요. 아예 안 걸리는 건 아니에요.";
+  return "다른 분 한 분의 "+Math.round(gsSoftW()*100)+"% 확률로 걸려요. 아예 안 걸리는 건 아니에요.";
+}
+
+/* 강도 슬라이더. [확률 낮추기]일 때만 나온다 — 다른 두 정책에는 조절할 값이 없다.
+   숫자를 '다른 분 대비 %'로 말한다. 절대 당첨 확률(예: 7.7%)은 인원에 따라 변해서 슬라이더를
+   움직여도 얼마나 센지 감이 안 오고, 그 값은 어차피 위 참가자 카드가 사람별로 보여준다.
+   input[type=range] 는 이 파일에서 처음 쓰는 컨트롤이라 기본 스타일을 그대로 둔다 — 굳이 다시
+   그리면 기기별 접근성 동작(키보드 화살표·보이스오버 조작)을 직접 떠맡게 된다. */
+function gameSoftSliderHtml(){
+  if(gsPolicy() !== "soft") return "";
+  const v = Math.round(gsSoftW()*100);
+  return `<div class="gsl" id="gSoftWrap">
+      <label class="gsl-l" for="gSoftW">덜 걸리게 <b id="gSoftV">${v}%</b></label>
+      <input type="range" id="gSoftW" min="${Math.round(GS_SOFT_MIN*100)}" max="${Math.round(GS_SOFT_MAX*100)}" step="5" value="${v}"
+             aria-label="직전에 섬긴 분의 상대 확률" aria-valuetext="다른 분의 ${v}퍼센트">
+      <div class="gsl-e"><span>거의 안 걸림</span><span>평등에 가까움</span></div>
+    </div>`;
 }
 
 // 단일선택 칩은 파일에 이미 쓰는 패턴이 있다(주문 옵션 그룹) — .chips + role="radiogroup" +
@@ -2252,6 +2306,7 @@ function gamePolicyCardHtml(){
       <div class="chips" id="gPolicyChips" role="radiogroup" aria-labelledby="gPolicyName">${
         GS_POLICIES.map(o=>`<div class="chip ${o.k===p?"sel":""}" role="radio" tabindex="0" aria-checked="${o.k===p}" data-p="${o.k}">${o.label}</div>`).join("")}</div>
       <div class="muted" id="gPolicyHint" style="margin-top:8px;font-size:12px">${gamePolicyHint(p)}</div>
+      <div id="gSoftBlock">${gameSoftSliderHtml()}</div>
       ${inRoster?"":`<div class="muted" style="margin-top:4px;font-size:12px">지금은 이분이 명단에서 빠져 있어 이 설정이 결과를 바꾸지 않아요. [바꾸기]로 다시 넣으면 적용돼요.</div>`}
     </div>`;
 }
@@ -2298,11 +2353,17 @@ function gamePickBlockHtml(){
     return `<div class="banner-warn"><b>${r.why}</b><br>${r.how}</div>
       <button class="btn btn-soft" id="gRosterB">참가자 바꾸기</button>`;
   }
-  return `<div class="label">게임 고르기</div>
+  /* 게임을 두 무리로 갈라 놓는다 (사용자 요청). 위 카드에서 사람별 확률 %를 보여주는데,
+     그 숫자가 네 게임 모두에 적용된다고 읽히면 안 된다 — 손가락 룰렛은 올라온 손가락에서
+     정해지고 구슬 레이스는 물리가 정해서, 둘 다 걸 자리가 없다.
+     제목만으로 갈라 두면 스크롤하다 놓치므로 구분선(.sec-div)을 쓴다. */
+  return `<div class="sec-div" style="margin-top:18px">🎯 확률 조정 가능</div>
       <button class="game-pick" data-g="ladder"${gamePickOff("ladder",n)}><span class="gp-em">🪜</span><span><b>사다리타기</b><small>${gamePickSub("ladder",n,"한 폰을 다 같이 보며 · 제일 두근거려요")}</small></span></button>
-      <button class="game-pick" data-g="finger"${gamePickOff("finger",n)}><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>${gamePickSub("finger",n,"폰 하나에 다 같이 손가락을 올려요")}</small></span></button>
       <button class="game-pick" data-g="wheel"${gamePickOff("wheel",n)}><span class="gp-em">🎡</span><span><b>돌림판</b><small>${gamePickSub("wheel",n,"가장 빠르게 · 한 번에 끝")}</small></span></button>
-      <button class="game-pick" data-g="race"${gamePickOff("race",n)}><span class="gp-em">🏁</span><span><b>구슬 레이스</b><small>${gamePickSub("race",n,"다 같이 20초 · 제일 오래 즐겨요")}</small></span></button>`;
+      <div class="sec-div">🎲 완전 랜덤</div>
+      <div class="muted" style="margin:-6px 0 8px;font-size:12px">이 둘은 위에 적힌 확률이 적용되지 않아요 — 모두 같은 확률입니다.</div>
+      <button class="game-pick" data-g="finger"${gamePickOff("finger",n)}><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>${gamePickSub("finger",n,"폰 하나에 다 같이 손가락을 올려요")}</small></span></button>
+      <button class="game-pick" data-g="race"${gamePickOff("race",n)}><span class="gp-em">🏁</span><span><b>구슬 레이스</b><small>${gamePickSub("race",n,"물리로 굴러가요 · 제일 오래 즐겨요")}</small></span></button>`;
 }
 
 // 블록을 다시 그린 뒤에도 그대로 부를 수 있게 배선을 한 곳에 모은다 — 부분 갱신이
@@ -2317,6 +2378,7 @@ function bindGameSheet(){
   $sheet.querySelectorAll(".game-pick").forEach(b=> b.onclick=()=>{ const k=b.dataset.g; closeSheet(); startGame(k); });
   const pc=document.getElementById("gPolicyChips");
   if(pc) pc.querySelectorAll(".chip").forEach(c=> c.onclick=()=>setGamePolicy(c.dataset.p));
+  bindSoftSlider();
 }
 
 // 참가자 수를 쓰는 두 블록은 항상 함께 그린다 — 따로 그리면 '참가자 2명'인데 아래엔 사유 배너가
@@ -2340,6 +2402,30 @@ function patchPolicyChips(){
     c.classList.toggle("sel", on); c.setAttribute("aria-checked", on?"true":"false"); });
   const hint=document.getElementById("gPolicyHint");
   if(hint) hint.textContent=gamePolicyHint(p);
+  // 슬라이더는 soft 일 때만 있다 — 블록째 갈아 끼운다. 칩과 달리 포커스를 잃어도 되는 이유는
+  // 사용자가 방금 누른 것이 칩이지 슬라이더가 아니기 때문이다.
+  const sb=document.getElementById("gSoftBlock");
+  if(sb){ sb.innerHTML=gameSoftSliderHtml(); bindSoftSlider(); }
+  // 확률 목록도 함께 고친다. soft↔even 은 인원이 안 바뀌어서 아래 syncGameCountBlocks 가 안 도는데,
+  // 숫자는 바뀌므로 그냥 두면 방금 누른 정책과 화면의 %가 어긋난다.
+  const odds=document.getElementById("gOdds");
+  if(odds) odds.innerHTML=gameOddsHtml();
+}
+
+/* 슬라이더를 끄는 동안 % 두 곳(슬라이더 옆 값 · 참가자 카드의 사람별 확률)이 같이 움직인다.
+   input 이벤트라 손을 떼기 전에도 따라온다 — 값을 확정한 뒤에야 바뀌면 얼마나 센지 알 수 없다.
+   정책 카드 전체를 다시 그리지 않는 이유: 그리는 순간 잡고 있던 슬라이더 손잡이가 사라진다. */
+function bindSoftSlider(){
+  const el=document.getElementById("gSoftW");
+  if(!el) return;
+  el.oninput=()=>{
+    const v=Math.max(GS_SOFT_MIN*100, Math.min(GS_SOFT_MAX*100, +el.value||33));
+    if(GS) GS.softW=v/100;
+    const lab=document.getElementById("gSoftV"); if(lab) lab.textContent=Math.round(v)+"%";
+    el.setAttribute("aria-valuetext","다른 분의 "+Math.round(v)+"퍼센트");
+    const hint=document.getElementById("gPolicyHint"); if(hint) hint.textContent=gamePolicyHint("soft");
+    const odds=document.getElementById("gOdds"); if(odds) odds.innerHTML=gameOddsHtml();
+  };
 }
 
 // 칩 클릭. 인원이 실제로 달라졌을 때만 아래 두 블록을 다시 그린다 — skip↔나머지 전환이 그 경우다.
