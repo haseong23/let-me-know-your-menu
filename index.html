@@ -2020,6 +2020,7 @@ const RACE_E_WALL = 0.34;    // 벽·장애물 반발
 const RACE_E_BALL = 0.18;    // 구슬끼리 반발
 const RACE_MAXF = 4200;      // 70초. 이 안에 1등이 안 나오면 그 시드는 버린다
 const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하나가 훑을 물체를 이 단위로 줄인다
+const RACE_ITER = 3;         // 구슬끼리 위치 분리 반복 횟수. 근거는 raceSimulate 안 주석에 있다
 /* 1자 5 · 지그재그 3 · 깔때기 2. 깔때기를 셋에서 둘로 줄였다 — 한 줄로 세워 통과시키는 구간이라
    들어간 순서가 거의 그대로 나온다(실사용 제보: "깔때기에서는 순위 역전이 안 일어난다").
    그 자리를 1자길로 돌리면 장애물이 하나 더 들어가고, 순위를 흔드는 건 장애물이다.
@@ -2232,24 +2233,37 @@ function raceMapBuild(rnd, soft){
      결승 직전이야말로 가장 흔들려야 하는 자리다.
      좁은 문으로 모으는 그림은 바로 아래 결승 구역 캡슐(틈 68)이 여전히 맡는다. */
   y+=straightWithObstacle(y);
-  const finishY=y+150;
-  /* 결승 관문 — 마지막 깔때기 입구를 가로지르는 느린 큰 막대. 이 판의 마지막 사건이다.
-     길이가 86+6=92 라 수평일 때 x=8~192 를 덮는다. 양옆에 8 씩밖에 안 남아 지름 18 인 구슬은
-     한 마리도 못 들어간다 — 즉 주기적으로 결승 진입이 통째로 막힌다. 그동안 앞선 구슬이
-     문 앞에 붙잡히고 뒤따르던 무리가 따라붙어, 열리는 순간 누가 먼저 빠지느냐로 순위가 다시
-     정해진다. 여기까지 와서 뒤집히는 그림이 이 게임에서 제일 재미있는 장면이다.
-     느려야(0.7~1.2 rad/s, 한 바퀴 5~9초) 막힌 게 '보이고' 열리는 순간을 기다리게 된다.
-     빠르면 그냥 스치는 장애물이 되고 붙잡히는 장면이 안 나온다.
+  /* ── 결승 구역 ── 깔때기 + 좁고 긴 통로 + 그 입구를 쓸고 다니는 관문.
 
-     y+28 에 두는 이유가 중요하다. 깔때기 벽은 y+20 에서 x=-8/208 로 시작해 아래로 좁아지는데,
-     그 벽이 코스 안(x 0~200)으로 들어오는 건 y+31 부터다. 막대를 그보다 위에 두면 막대가
-     '기울어진 정적 벽면'과 만나지 않는다 — 회전 팔과 정적 경사면 사이는 진짜 정적 쐐기가
-     생기는 유일한 자리라서(장애물 배치 주석 참조) 일부러 피한 것이다. 매끈한 수직 바깥벽은
-     마찰이 0 이라 눌린 구슬이 그대로 미끄러져 내려가므로 안전하다. */
-  B.push(rbar(RACE_W/2, y+28, 86, 6, (rnd()<0.5?1:-1)*(0.7+rnd()*0.5), rnd()*6.283));
-  B.push(rcap(-8, y+20, RACE_W/2-34, y+130, 4));
-  B.push(rcap(RACE_W+8, y+20, RACE_W/2+34, y+130, 4));
-  y+=190;
+     통로를 길게 뽑는 것이 요점이다. 벽 안쪽 사이가 32 라 구슬 지름(18)의 1.8배 — 두 구슬이
+     나란히 못 지나가고, 길이 170 동안 추월할 자리가 없다. 통로에 들어간 순서가 곧 결승 순서다.
+     그래서 이 게임의 마지막 승부는 통로 안이 아니라 '통로에 누가 먼저 들어가느냐'로 옮겨간다.
+     그 한 지점에 관문을 걸어 두면 판 전체의 긴장이 거기 한 곳으로 모인다.
+
+     관문의 회전축을 코스 바깥(x=-70 또는 270)에 둔다. 축이 가운데 있으면 팔 끝이 급한 원을
+     그려 입구를 스치듯 지나가는데, 축을 밖으로 빼면 코스를 지나는 구간이 훨씬 완만한 호가 되어
+     같은 각속도로도 입구에 걸쳐 있는 시간이 길어진다. 팔 340 이면 반대쪽 벽을 340-70=270 로
+     넘겨 덮으므로 한 바퀴의 22% 동안 입구가 통째로 막힌다 — 축을 46 에 두고 팔을 250 으로
+     했을 때는 10% 였다(계측). 기울어 있는 동안에는 한쪽으로만 흘려보낸다.
+
+     이 배치는 회전 팔과 정적 경사면(깔때기 벽)이 실제로 만나는 자리다 — 다른 곳에서는 정적
+     쐐기가 생긴다고 일부러 피해 온 조합이라, 여기만은 계측으로 확인하고 쓴다(120판 정체 0).
+     쐐기가 안 생기는 이유는 팔이 계속 돌아 그 조합이 유지되지 않기 때문이다.
+
+     각속도 0.9~1.5(한 바퀴 4.2~7.0초)는 계측으로 골랐다. 더 느리게(한 바퀴 8.4초) 두면 무리가
+     결승에 다가가는 몇 초 동안 관문이 한 자세로 서 있다시피 해서 열고 닫는 장면이 안 나오고,
+     실제로 3/4 지점 역전이 24명 판에서 58% 로 떨어졌다(지금 62%). 더 빠르면 '느리게 도는
+     관문'이라는 성격이 사라지고 역전도 다시 내려간다(57%). */
+  const NECK=20, CHAN=170;                       // 통로 벽 중심의 반간격 · 통로 길이
+  B.push(rcap(-8, y+20, RACE_W/2-NECK, y+120, 4));
+  B.push(rcap(RACE_W+8, y+20, RACE_W/2+NECK, y+120, 4));
+  B.push(rcap(RACE_W/2-NECK, y+120, RACE_W/2-NECK, y+120+CHAN, 4));
+  B.push(rcap(RACE_W/2+NECK, y+120, RACE_W/2+NECK, y+120+CHAN, 4));
+  // 축을 좌우 중 한쪽 바깥에 둔다. 매 판 뒤집어 어느 한쪽이 구조적으로 유리해지지 않게 한다.
+  const gx = rnd()<0.5 ? -70 : RACE_W+70;
+  B.push(rbar(gx, y+46, 340, 6, (rnd()<0.5?1:-1)*(0.9+rnd()*0.6), rnd()*6.283, 0));
+  const finishY=y+120+CHAN+34;
+  y=finishY+46;
   const cells=Math.ceil(y/RACE_CELL)+1;
   const grid=[]; for(let i=0;i<cells;i++) grid.push([]);
   for(let i=0;i<B.length;i++){
@@ -2296,25 +2310,33 @@ function raceSimulate(map, n, rnd){
         const list=grid[c];
         for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, tt, px, py, vx, vy);
       }
-      // 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
-      // 매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
+      /* 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
+         매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
+         RACE_ITER 번 반복하는 이유 — 결승 통로처럼 좁은 곳에 스물넷이 눌리면 한 쌍을 떼어 놓은
+         결과가 옆 쌍을 다시 파고들게 만든다. 한 번만 돌리면 그 되밀림이 남아 프레임에 기록되고,
+         화면에서는 구슬이 서로를 통과한 것처럼 보인다(통로를 넣자 최소 간격이 10.9 → 4.9 로
+         떨어졌다. 지름이 18 이므로 73% 가 겹친 것이다). 반사(임펄스)는 첫 회에만 건다 —
+         반복마다 걸면 같은 충돌로 에너지를 여러 번 얻어 구슬이 튀어 오른다. */
       for(let a=1;a<n;a++){ const v=idx[a]; let b=a-1; while(b>=0&&py[idx[b]]>py[v]){ idx[b+1]=idx[b]; b--; } idx[b+1]=v; }
       const D=2*RACE_R;
-      for(let a=0;a<n;a++){
-        const i=idx[a];
-        for(let b=a+1;b<n;b++){
-          const j=idx[b];
-          if(py[j]-py[i]>D) break;
-          let nx=px[j]-px[i], ny=py[j]-py[i];
-          const d2=nx*nx+ny*ny;
-          if(d2>=D*D||d2===0) continue;
-          const d=Math.sqrt(d2); nx/=d; ny/=d;
-          const push=(D-d)*0.5;
-          px[i]-=nx*push; py[i]-=ny*push; px[j]+=nx*push; py[j]+=ny*push;
-          const rvn=(vx[j]-vx[i])*nx+(vy[j]-vy[i])*ny;
-          if(rvn<0){
-            const jm=-(1+RACE_E_BALL)*rvn*0.5;    // 질량이 같아 1/m+1/m = 2
-            vx[i]-=nx*jm; vy[i]-=ny*jm; vx[j]+=nx*jm; vy[j]+=ny*jm;
+      for(let it=0; it<RACE_ITER; it++){
+        for(let a=0;a<n;a++){
+          const i=idx[a];
+          for(let b=a+1;b<n;b++){
+            const j=idx[b];
+            if(py[j]-py[i]>D) break;
+            let nx=px[j]-px[i], ny=py[j]-py[i];
+            const d2=nx*nx+ny*ny;
+            if(d2>=D*D||d2===0) continue;
+            const d=Math.sqrt(d2); nx/=d; ny/=d;
+            const push=(D-d)*0.5;
+            px[i]-=nx*push; py[i]-=ny*push; px[j]+=nx*push; py[j]+=ny*push;
+            if(it) continue;
+            const rvn=(vx[j]-vx[i])*nx+(vy[j]-vy[i])*ny;
+            if(rvn<0){
+              const jm=-(1+RACE_E_BALL)*rvn*0.5;    // 질량이 같아 1/m+1/m = 2
+              vx[i]-=nx*jm; vy[i]-=ny*jm; vx[j]+=nx*jm; vy[j]+=ny*jm;
+            }
           }
         }
       }
@@ -2442,7 +2464,7 @@ let GS = null;
 const GS_NONE = new Set();
 function gsOn(){  return GS ? GS.on  : GS_NONE; }
 function gsOff(){ return GS ? GS.off : GS_NONE; }
-function gsPolicy(){ return GS ? GS.policy : "soft"; }          // 기본 soft — 명단을 줄이지 않는다
+function gsPolicy(){ return GS ? GS.policy : "even"; }          // 기본 even — 아무도 손해 보지 않는 쪽이 기본값이다
 /* [확률⬇️]의 강도. 예전엔 1/3 고정이었는데, "얼마나 낮출지"는 그날 사람들이 정할 문제라
    슬라이더로 열었다. 상한을 0.9 로 둔 이유: 1.0 이면 평등과 같아져 [평등] 칩과 뜻이 겹친다.
    하한 0.1 도 마찬가지로 [제외](0)와 구분되는 자리까지만 내려간다. */
@@ -2496,7 +2518,7 @@ function gameEnsure(opener){
   const seq = SESSION.seq ?? null;   // 호스트 없는 섬김에서 하단바로 들어오면 null — 그대로 키로 쓴다
   if(!GS || GS.seq !== seq){         // 보고 있는 섬김이 바뀌면 명단·정책을 그 섬김의 기본값으로 되돌린다
     GS = { seq, on:new Set(), off:new Set(), kind:null,
-           policy:"soft", softW:GS_SOFT_W, lastHostId:undefined, sig:null,
+           policy:"even", softW:GS_SOFT_W, lastHostId:undefined, sig:null,
            open:false, pushed:false, opener:null, timers:[], teardown:null };
   }
   GS.opener = opener || null;        // 같은 섬김이면 명단·정책은 그대로 살아 있다
@@ -2723,9 +2745,9 @@ function gamePlayerCardHtml(){
    방에서는 끝까지 안 뜨는 자리라, 깜빡였다 사라지는 쪽이 아무것도 없는 쪽보다 나쁘다 (R6-12).
    응답이 오면 syncPolicyBlock() 이 이 블록만 채운다 — 시트를 다시 그리지 않으므로 스크롤이 그대로다(R7-6). */
 const GS_POLICIES = [
-  { k:"soft", label:"확률⬇️" },        // 기본값 (R6-3)
+  { k:"soft", label:"확률⬇️" },
   { k:"skip", label:"제외" },
-  { k:"even", label:"평등" }
+  { k:"even", label:"평등" }        // 기본값 — 직전에 섬긴 분도 남들과 똑같이 건다
 ];
 
 /* 칩 아래 한 줄. 세 정책 모두 '이 판에서 실제로 어떻게 되는지'를 같은 자리·같은 단위로 말한다.
