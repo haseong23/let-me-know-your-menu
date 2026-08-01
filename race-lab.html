@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>구슬 레이스 랩 — 레퍼런스 방식</title>
+<style>
+  :root{--bg:#f6f1ea;--card:#fff;--ink:#2b2118;--sub:#6f6253;--line:#e7ddcf;--brand:#6f4e37;
+        --brand-soft:#efe6da;--accent:#c98a3a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;
+       font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif}
+  .wrap{max-width:480px;margin:0 auto;padding:14px 16px 40px}
+  h2{margin:0 0 4px;font-size:18px}
+  .sub{font-size:12px;color:var(--sub);margin:0 0 14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;
+       border-radius:14px;font-size:16px;font-weight:700;border:none;cursor:pointer}
+  .btn-brand{background:var(--brand);color:#fff}
+  .btn-soft{background:var(--brand-soft);color:var(--brand);border:1px solid var(--line)}
+  .btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--line)}
+  .row-2{display:flex;gap:10px;margin-top:10px}.row-2>*{flex:1;min-width:0}
+  label{display:block;font-size:13px;color:var(--sub);font-weight:700;margin-bottom:6px}
+  input[type=number]{width:76px;padding:8px;border:1.5px solid var(--line);border-radius:10px;font-size:16px}
+  .say{font-size:15px;font-weight:700;text-align:center;color:var(--sub);margin:0 0 8px;min-height:23px}
+  canvas{display:block;width:100%;height:auto;border-radius:12px;background:#fffdf9;border:1.5px solid var(--line)}
+  .hud{margin-top:8px;font-size:12px;color:var(--sub);font-weight:600}
+  .hud .r{display:flex;align-items:center;gap:6px;min-width:0;line-height:1.6}
+  .hud .k{flex:none;width:16px;font-weight:800;color:var(--sub)}
+  .hud .sw{flex:none;width:9px;height:9px;border-radius:3px}
+  .hud .nm{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--ink);font-weight:700}
+  .win{text-align:center;margin-top:12px}
+  .win .e{font-size:38px;line-height:1.15}
+  .win .n{font-size:25px;font-weight:900;color:var(--brand);line-height:1.1}
+</style></head><body>
+<div class="wrap">
+  <h2>구슬 레이스 랩</h2>
+  <p class="sub">레퍼런스(lazygyu/roulette, MIT)의 <b>엔티티 체계 · 맵 구성 · 카메라</b>를 본뜬 별도 구현입니다.
+     앱에서 링크하지 않습니다. 현재 앱의 레이스는 <b>race-legacy.html</b> 에 그대로 남겨 두었습니다.</p>
+  <div id="setup">
+    <label>인원 <input id="cnt" type="number" min="2" max="24" value="10"></label>
+    <button class="btn btn-brand" id="make">코스 만들기</button>
+  </div>
+  <div id="stage" style="display:none">
+    <div class="say" id="say">준비됐어요 — 내 번호를 찾아두세요</div>
+    <canvas id="cv"></canvas>
+    <div class="hud" id="hud"></div>
+    <div id="res"></div>
+    <div class="row-2">
+      <button class="btn btn-brand" id="go">▶ 출발!</button>
+      <button class="btn btn-ghost" id="back">처음으로</button>
+    </div>
+  </div>
+</div>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   구슬 레이스 — 레퍼런스 방식 재구현
+
+   본뜬 것 세 가지:
+     ① 엔티티 체계 — 몸체 타입(static / kinematic) × 형태(polyline / box / circle)
+        × 물리 속성(restitution · angularVelocity · life). 회전 장애물, 반발 1.5 범퍼,
+        life 가 있는 파괴형(버블), 고정 사선 막대가 전부 이 조합으로 나온다.
+     ② 맵 구성 — 바깥 벽이 폴리라인이라 방이 좁아졌다 넓어지고, 그 방 안에 원·상자를 깐다.
+        세계 좌표도 그쪽 규모를 따른다(코스 폭 26, 길이 120, 구슬 반지름 0.25).
+        우리 앱의 레이스는 폭 200 에 반지름 9 라 코스 하나에 구슬 11개 폭이었는데,
+        이쪽은 52개 폭이라 '작은 구슬이 많이 흐르는' 그림이 나온다.
+     ③ 카메라 — 추적 대상 선정(순위가 확정된 만큼 다음 다툼으로) · goalDist<5 에서 줌 시작 ·
+        zoom = max(1, (1-goalDist/5)*4) · 매 프레임 차이의 1/10 만 이동 · 접전 슬로모션.
+
+   맵 데이터는 우리가 직접 지었다. 좌표를 옮겨 오지 않고 구성 방식만 따랐다.
+   물리 풀이는 원-캡슐 거리 하나로 통일한다 — 폴리라인은 캡슐 사슬, 상자는 두꺼운 캡슐,
+   원은 길이 0 인 캡슐이다. 형태가 셋이어도 충돌 코드는 하나다.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 세계 상수 ── 레퍼런스 규모(미터급 Box2D 좌표)를 그대로 쓴다. */
+const W = 26;              // 코스 폭
+const R = 0.25;            // 구슬 반지름
+const G = 10;              // 중력
+const DT = 1/240, SUB = 4; // 물리 스텝 · 프레임당 서브스텝(→ 60fps 기록)
+const VMAX = 40;           // 속도 상한. VMAX*DT = 0.167 < R 이라 한 스텝에 캡슐을 건너뛸 수 없다
+const E_WALL = 0.25;       // 벽 기본 반발
+const E_BALL = 0.20;       // 구슬끼리
+const MAXF = 5400;         // 90초. 이 안에 아무도 못 들어오면 그 시드는 버린다
+const CELL = 6;            // y 격자 셀 높이
+
+/* ── 엔티티 ──
+   cap  : 캡슐(폴리라인 한 마디 · 상자 · 원 전부 이것)
+   spin : 0 이 아니면 kinematic(각속도 rad/s). 축은 (cx,cy)
+   e    : 반발계수. 1 을 넘으면 에너지를 얻는다(레퍼런스의 범퍼 핀이 1.5 다)
+   life : 있으면 파괴형. 구슬이 닿는 순간 사라진다 */
+function cap(x1,y1,x2,y2,rad,e){
+  return { x1,y1,x2,y2,rad, e:e||0, spin:0, cx:0, cy:0, hl:0, ph:0, life:0, dead:null,
+           y0:Math.min(y1,y2)-rad, y1b:Math.max(y1,y2)+rad };
+}
+const circle = (x,y,rad,e) => cap(x,y,x,y,rad,e);
+function bar(cx,cy,hl,rad,spin,ph,e){          // kinematic box
+  const b = { x1:cx-hl,y1:cy,x2:cx+hl,y2:cy, rad, e:e||0, spin, cx,cy,hl,ph, life:0, dead:null };
+  b.y0 = cy-hl-rad; b.y1b = cy+hl+rad; return b;
+}
+function bubble(x,y,rad){ const b=circle(x,y,rad,0.3); b.life=1; return b; }
+// 고정 사선 막대 — 각도만 주고 각속도는 0. 레퍼런스의 static box 와 같은 자리다.
+function slab(cx,cy,hl,ang,rad,e){
+  const c=Math.cos(ang), s=Math.sin(ang);
+  return cap(cx-hl*c, cy-hl*s, cx+hl*c, cy+hl*s, rad, e);
+}
+// 폴리라인 → 캡슐 사슬. 마디 끝이 반원이라 꺾이는 자리에 각진 틈이 안 남는다.
+function poly(E, pts, rad){
+  for(let i=1;i<pts.length;i++)
+    E.push(cap(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1], rad));
+}
+
+/* ── 시드 난수 ── 한 판을 시드 하나로 완전히 재현한다. */
+function rnd32(seed){
+  let a = seed>>>0;
+  return function(){ a=(a+0x6d2b79f5)>>>0; let t=a;
+    t=Math.imul(t^(t>>>15), t|1); t^=t+Math.imul(t^(t>>>7), t|61);
+    return ((t^(t>>>14))>>>0)/4294967296; };
+}
+
+/* ══ 스테이지 ══
+   바깥 벽 두 줄이 방을 만들고, 방마다 성격이 다른 장애물이 들어간다.
+   레퍼런스의 스테이지가 하는 일이 정확히 이것이다 — 벽이 흐름을 몰고, 안의 물체가 흩는다.
+   구역을 y 로 적어 두면 어디를 고칠지 한눈에 보인다. */
+function buildStage(rnd){
+  const E = [];
+  const WT = 0.18;                                     // 벽 두께 절반
+
+  /* ① 바깥 벽. 위쪽은 코스 밖까지 길게 뽑아 출발 순간 구슬이 위로 새지 못하게 막는다.
+        좌우가 같은 y 에서 함께 좁아졌다 넓어지며 방을 만든다. */
+  const LW = [[3,-30],[3,10],[7,17],[7,25],[3,32],[3,47],[8,54],[8,62],[3,69],[3,86],
+              [6,92],[6,99],[10.4,106],[10.4,118]];
+  const RW = [[23,-30],[23,10],[19,17],[19,25],[23,32],[23,47],[18,54],[18,62],[23,69],[23,86],
+              [20,92],[20,99],[15.6,106],[15.6,118]];
+  poly(E, LW, WT); poly(E, RW, WT);
+
+  /* ② y 11~24 · 못밭(static circle). 가장 싼 장치이자 이 장르의 기본기다.
+        가로 간격 3.4 는 구슬 지름(0.5)의 여섯 배가 넘어 낄 자리가 없다. */
+  for(let j=0;j<5;j++){
+    const y = 11.5 + j*2.6, off = (j%2)?1.7:0;
+    for(let x=5.2+off; x<=W-5.2; x+=3.4) E.push(circle(x, y, 0.34));
+  }
+
+  /* ③ y 26~31 · 고정 사선 막대(static box, 각속도 0). 흐름을 한쪽으로 몰아 준다.
+        레퍼런스에도 같은 자리에 같은 물건이 있다. */
+  E.push(slab(9.5, 27.4, 4.6, 0.30, 0.22));
+  E.push(slab(17.0, 30.2, 4.2, -0.28, 0.22));
+
+  /* ④ y 34~45 · 바람개비 밭(kinematic box). 나란히 놓고 서로 반대로 돌린다 —
+        레퍼런스가 ±3.5 로 쓰는 그 구성이다. 이웃이 반대로 돌아야 구슬이 한쪽으로만
+        쏠리지 않고, 어느 날에 맞느냐로 결과가 갈린다. */
+  for(let j=0;j<3;j++){
+    const y = 35.5 + j*3.6;
+    const xs = (j%2===0) ? [8, 13, 18] : [10.5, 15.5];
+    xs.forEach((x,k)=> E.push(bar(x, y, 1.9, 0.16, ((k+j)%2?1:-1)*3.5, rnd()*6.283)));
+  }
+
+  /* ⑤ y 49~61 · 범퍼 핀(static circle, restitution 1.5).
+        1 을 넘는 반발은 충돌마다 에너지를 '만든다'. 그래서 여기 들어온 구슬은 튕겨 올라가고
+        순위가 크게 흔들린다. 속도 상한(VMAX)이 있어 발산하지는 않는다 — 상한이 없으면
+        몇 번 튕기다 화면 밖으로 날아간다. */
+  const bump = [[8,50.5],[18,50.5],[13,54.5],[7.5,58.5],[18.5,58.5]];
+  bump.forEach(p=> E.push(circle(p[0], p[1], 0.75, 1.5)));
+
+  /* ⑥ y 65~76 · 버블(circle + life). 닿으면 사라진다.
+        간격을 지름보다 좁게(0.35) 깔아 그냥은 못 지나가게 한다 — 반드시 하나는 터뜨려야 하고,
+        터진 자리가 그대로 길이 되어 뒤 구슬이 더 빨리 온다. 이 코스에서 판 중에 지형이 변하는
+        유일한 자리다. 막힐 걱정은 없다: 닿기만 하면 사라지므로 눌릴수록 빨리 열린다. */
+  for(let j=0;j<2;j++){
+    const y = 66.5 + j*4.2, off = (j%2)?0.68:0;
+    for(let x=5+off; x<=W-5; x+=1.35) E.push(bubble(x, y, 0.5));
+  }
+
+  /* ⑦ y 79~85 · 큰 회전 날 하나. 축을 코스 바깥 멀리 두면 코스를 지나는 구간이 완만한 호가
+        되어 '천천히 쓸고 지나가는' 그림이 된다. 팔이 코스 반대쪽 끝까지 닿는다. */
+  E.push(bar(rnd()<0.5 ? -14 : W+14, 82, 44, 0.22, (rnd()<0.5?1:-1)*1.1, rnd()*6.283));
+
+  /* ⑧ y 88~100 · 못밭 + 사선 한 장. 결승 앞 마지막 흩기. */
+  for(let j=0;j<3;j++){
+    const y = 88.5 + j*2.8, off = (j%2)?1.5:0;
+    for(let x=6+off; x<=W-6; x+=3.0) E.push(circle(x, y, 0.3));
+  }
+  E.push(slab(13, 97.5, 3.4, rnd()<0.5?0.24:-0.24, 0.2));
+
+  /* ⑨ y 106~118 · 결승 통로. 폭 5.2(구슬 지름의 열 배)라 서넛이 나란히 서고, 그 입구를
+        큰 날이 쓸어 마지막 순위를 흔든다. */
+  E.push(bar(rnd()<0.5 ? -12 : W+12, 104.5, 40, 0.22, (rnd()<0.5?1:-1)*1.5, rnd()*6.283));
+
+  const goalY = 117, zoomY = 113;
+  const total = 120;
+
+  // y 격자 — 구슬 하나가 훑을 물체를 셀 단위로 줄인다.
+  const cells = Math.ceil(total/CELL)+8;
+  const grid = []; for(let i=0;i<cells;i++) grid.push([]);
+  E.forEach((b,i)=>{
+    const a = Math.max(0, Math.floor((b.y0+30)/CELL)), z = Math.min(cells-1, Math.floor((b.y1b+30)/CELL));
+    for(let c=a;c<=z;c++) grid[c].push(i);
+  });
+  return { E, grid, cells, goalY, zoomY, total };
+}
+
+/* ══ 시뮬레이션 ══
+   모두가 결승선을 넘을 때까지 돌리고, 프레임마다 좌표를 녹화한다.
+   1등만 뽑는 게임이라도 끝까지 돌리는 이유는 카메라 때문이다 — 레퍼런스처럼 '순위가 확정된
+   만큼 다음 다툼으로' 옮겨 가려면 그 뒤 장면이 있어야 한다. */
+function simulate(st, n, rnd){
+  const px=new Float64Array(n), py=new Float64Array(n), vx=new Float64Array(n), vy=new Float64Array(n);
+  const done=new Int32Array(n).fill(-1);          // 결승선을 넘은 프레임
+  // 출발 정렬 — 격자로 세우되 자리는 시드로 섞는다(자리가 유리하면 번호가 곧 답이 된다).
+  const per = 8, SPX = 2.2, slot=[];
+  for(let i=0;i<n;i++) slot.push(i);
+  for(let i=n-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=slot[i]; slot[i]=slot[j]; slot[j]=t; }
+  for(let i=0;i<n;i++){
+    const s=slot[i], row=Math.floor(s/per), col=s%per, cnt=Math.min(per, n-row*per);
+    px[i] = W/2 + (col-(cnt-1)/2)*SPX + (rnd()-0.5)*0.06;
+    py[i] = 1 - row*1.6;
+    vx[i] = (rnd()-0.5)*0.5; vy[i]=0;
+  }
+  const path = new Float32Array(MAXF*n*2);
+  const idx = new Int32Array(n); for(let i=0;i<n;i++) idx[i]=i;
+  const E=st.E, grid=st.grid, cells=st.cells;
+  let frames=0, order=[], winner=-1, tail=-1;
+
+  /* 끝내는 조건이 '전원 완주'가 아니라 '1등 + 꼬리'다. 전원을 기다리면 어딘가에 걸린 한 명
+     때문에 판 전체가 상한(90초)까지 돌아가고, 실제로 40판 중 17판이 그렇게 됐다.
+     카메라가 뒷 순위를 중계하려면 1등 이후 장면이 있어야 하므로 6초는 더 돌린다 —
+     그동안 들어온 만큼만 순위가 확정되고, 남은 구슬은 그 자리에서 화면을 뜬다. */
+  const TAIL = 360;
+  for(let f=0; f<MAXF; f++){
+    if(tail>=0 && f-tail>=TAIL) break;
+    for(let s=0;s<SUB;s++){
+      const tt=(f*SUB+s)*DT;
+      for(let i=0;i<n;i++){
+        if(done[i]>=0) continue;
+        vy[i]+=G*DT;
+        const q=vx[i]*vx[i]+vy[i]*vy[i];
+        if(q>VMAX*VMAX){ const k=VMAX/Math.sqrt(q); vx[i]*=k; vy[i]*=k; }
+        px[i]+=vx[i]*DT; py[i]+=vy[i]*DT;
+      }
+      for(let i=0;i<n;i++){                        // 지형·장애물
+        if(done[i]>=0) continue;
+        const c=Math.floor((py[i]+30)/CELL);
+        if(c<0||c>=cells) continue;
+        const list=grid[c];
+        for(let k=0;k<list.length;k++){
+          const b=E[list[k]];
+          if(b.dead!=null) continue;               // 이미 터진 버블
+          if(hit(b, i, tt, px, py, vx, vy) && b.life) b.dead=f;
+        }
+      }
+      // 구슬끼리 — y 로 정렬해 창 밖은 볼 것 없이 끊는다.
+      for(let a=1;a<n;a++){ const v=idx[a]; let b=a-1; while(b>=0&&py[idx[b]]>py[v]){ idx[b+1]=idx[b]; b--; } idx[b+1]=v; }
+      const D=2*R;
+      for(let a=0;a<n;a++){
+        const i=idx[a]; if(done[i]>=0) continue;
+        for(let b2=a+1;b2<n;b2++){
+          const j=idx[b2]; if(done[j]>=0) continue;
+          if(py[j]-py[i]>D) break;
+          let nx=px[j]-px[i], ny=py[j]-py[i];
+          const d2=nx*nx+ny*ny;
+          if(d2>=D*D||d2===0) continue;
+          const d=Math.sqrt(d2); nx/=d; ny/=d;
+          const push=(D-d)*0.5;
+          px[i]-=nx*push; py[i]-=ny*push; px[j]+=nx*push; py[j]+=ny*push;
+          const rvn=(vx[j]-vx[i])*nx+(vy[j]-vy[i])*ny;
+          if(rvn<0){ const jm=-(1+E_BALL)*rvn*0.5;
+            vx[i]-=nx*jm; vy[i]-=ny*jm; vx[j]+=nx*jm; vy[j]+=ny*jm; }
+        }
+      }
+      for(let i=0;i<n;i++){                        // 좌우 최후 안전망(벽이 먼저 막는다)
+        if(px[i]<R){ px[i]=R; if(vx[i]<0) vx[i]=-vx[i]*E_WALL; }
+        else if(px[i]>W-R){ px[i]=W-R; if(vx[i]>0) vx[i]=-vx[i]*E_WALL; }
+      }
+    }
+    const base=f*n*2;
+    for(let i=0;i<n;i++){ path[base+i*2]=px[i]; path[base+i*2+1]=py[i]; }
+    frames=f+1;
+    for(let i=0;i<n;i++){
+      if(done[i]<0 && py[i]>=st.goalY){ done[i]=f; order.push(i); if(winner<0){ winner=i; tail=f; } }
+    }
+  }
+  return { ok:winner>=0, winner, order, done, frames, path:path.subarray(0, frames*n*2), n };
+}
+
+/* 구슬 i 와 캡슐 하나. 닿았으면 true — 버블을 터뜨릴지 판정하는 데 쓴다. */
+function hit(b, i, tt, px, py, vx, vy){
+  let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2, sxv=0, syv=0;
+  if(b.spin){
+    const a=b.ph+b.spin*tt, ca=Math.cos(a), sa=Math.sin(a);
+    x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa;
+  }
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
+  let t = L2>0 ? ((px[i]-x1)*dx+(py[i]-y1)*dy)/L2 : 0;
+  t = t<0?0 : t>1?1 : t;
+  const qx=x1+t*dx, qy=y1+t*dy;
+  let nx=px[i]-qx, ny=py[i]-qy;
+  const rr=R+b.rad, d2=nx*nx+ny*ny;
+  if(d2>=rr*rr) return false;
+  let d=Math.sqrt(d2);
+  if(d<1e-9){ nx=0; ny=-1; d=1e-9; } else { nx/=d; ny/=d; }
+  px[i]+=nx*(rr-d); py[i]+=ny*(rr-d);
+  if(b.spin){ sxv=-b.spin*(qy-b.cy); syv=b.spin*(qx-b.cx); }   // 접촉점의 표면 속도
+  const rvx=vx[i]-sxv, rvy=vy[i]-syv;
+  const vn=rvx*nx+rvy*ny;
+  if(vn>=0) return true;                                       // 겹쳤지만 멀어지는 중 — 접촉은 접촉
+  const e=b.e||E_WALL;
+  vx[i]=rvx-(1+e)*vn*nx+sxv;
+  vy[i]=rvy-(1+e)*vn*ny+syv;
+  return true;
+}
+
+/* ══ 카메라 ══ 레퍼런스의 알고리즘을 그대로 옮긴다.
+     · 추적 대상 — 순위가 확정된 만큼 '다음에 순위를 가릴 구슬'로 옮겨 간다.
+       초반엔 1등 다툼, 후반엔 남은 순위 다툼을 따라간다.
+     · 줌 조건 — 추적 대상과 zoomY 사이 거리가 ZOOM_TRIG 미만일 때만 시작한다.
+     · 줌 배율 — max(1, (1 - goalDist/ZOOM_TRIG) * ZOOM_MAX).
+     · 보간 — 목표를 바로 쓰지 않고 매 프레임 차이의 1/10 만 좁힌다. 오차가 아주 작으면 스냅.
+     · 슬로모션 — 결승 직전이고 바로 앞뒤에 경쟁자가 붙어 있을 때만 시간을 늦춘다. */
+const ZOOM_TRIG = 5, ZOOM_MAX = 4, LERP = 1/10, SNAP = 1/30;
+const SLOW_MIN = 0.2, SLOW_NEAR = 1.6;
+
+function lerp(cur, tgt){ return Math.abs(tgt-cur) < SNAP ? tgt : cur + (tgt-cur)*LERP; }
+
+/* ══ 한 판 ══ */
+function race(players){
+  const n = players.length;
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  const say = document.getElementById("say"), hud = document.getElementById("hud"), res = document.getElementById("res");
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio||1));
+
+  // 코스를 몇 번 만들어 보고 완주하는 판을 쓴다. 한 판 계산이 수십 ms 라 재시도가 눈에 안 띈다.
+  let st=null, sim=null;
+  for(let t=0;t<8;t++){
+    const rnd = rnd32((Math.random()*0xffffffff)>>>0);
+    const s = buildStage(rnd), r = simulate(s, n, rnd);
+    if(r.ok){ st=s; sim=r; break; }
+  }
+  if(!sim){ say.textContent = "코스를 못 만들었어요 — 다시 눌러주세요"; return null; }
+
+  /* 캔버스. 세로를 가로의 1.15 배로 잡는다 — 레퍼런스는 16:9 가로 화면이지만 폰은 세로라,
+     '폭을 거의 다 담고 세로는 그보다 조금 더' 정도가 그 느낌에 가장 가깝다. */
+  const CW = 340, CH = Math.round(CW*1.15);
+  cv.width = Math.round(CW*dpr); cv.height = Math.round(CH*dpr);
+  const base = CW / W;                              // 줌 1 일 때 코스 폭이 화면에 꽉 찬다
+
+  hud.innerHTML = players.slice(0,4).map((m,k)=>
+    '<div class="r"><b class="k">'+(k+1)+'</b><i class="sw"></i><span class="nm"></span></div>').join("");
+  const rows = [...hud.querySelectorAll(".r")].map(r=>({ sw:r.querySelector(".sw"), nm:r.querySelector(".nm"), cur:-1 }));
+
+  const ypos = new Array(n).fill(0);
+  const rank = players.map((m,i)=>i);
+  let camX = W/2, camY = 0, camZ = 1;
+
+  function colorOf(i){ return "hsl(" + ((i*137.508)%360).toFixed(1) + " 62% 46%)"; }
+
+  function frameAt(t){ return Math.max(0, Math.min(sim.frames-1, Math.floor(t*60/1000))); }
+
+  /* 추적 대상 — 아직 순위가 확정되지 않았으면 선두, 몇이 확정됐으면 그 다음 다툼. */
+  function targetIndex(f){
+    let settled = 0;
+    for(let i=0;i<n;i++) if(sim.done[i]>=0 && sim.done[i]<=f) settled++;
+    return Math.min(n-1, settled);                  // rank 배열에서 몇 번째를 볼지
+  }
+
+  function draw(t){
+    const f = frameAt(t), b0 = f*n*2;
+    for(let i=0;i<n;i++) ypos[i] = sim.path[b0+i*2+1];
+    rank.sort((a,b)=> ypos[b]-ypos[a]);
+    const ti = targetIndex(f), tgt = rank[ti];
+    const tx = sim.path[b0+tgt*2], ty = ypos[tgt];
+
+    // 줌 — zoomY 에 가까워질수록 최대 ZOOM_MAX 까지. 그 밖에서는 1.
+    const goalDist = Math.abs(st.zoomY - ty);
+    const wantZ = goalDist < ZOOM_TRIG ? Math.max(1, (1 - goalDist/ZOOM_TRIG) * ZOOM_MAX) : 1;
+    camZ = lerp(camZ, wantZ);
+    camX = lerp(camX, tx); camY = lerp(camY, ty);
+
+    const z = base*camZ;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle="#f1ebe1"; ctx.fillRect(0,0,CW,CH);
+    ctx.save();
+    ctx.translate(CW/2, CH*0.42);
+    ctx.scale(z, z);
+    ctx.translate(-camX, -camY);
+
+    // 코스 안쪽을 밝게 — '길'이 어디까지인지 남긴다
+    ctx.fillStyle="#fffdf9"; ctx.fillRect(0, -30, W, st.total+40);
+
+    const vTop = camY - (CH*0.42)/z, vBot = camY + (CH*0.58)/z;
+    for(const b of st.E){
+      if(b.dead!=null && f>=b.dead) continue;       // 터진 버블
+      if(b.y1b < vTop-2 || b.y0 > vBot+2) continue;
+      let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2;
+      if(b.spin){ const a=b.ph+b.spin*(f*SUB*DT), ca=Math.cos(a), sa=Math.sin(a);
+        x1=b.cx-b.hl*ca; y1=b.cy-b.hl*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa; }
+      // 성격을 색으로 가른다 — 도는 것 · 세게 튕기는 것 · 터지는 것은 미리 알아볼 수 있어야 한다
+      ctx.strokeStyle = b.spin ? "#a08a6a" : b.life ? "#c98a3a" : b.e>1 ? "#c2552f" : "#ddd0bc";
+      ctx.lineCap = "round"; ctx.lineWidth = 2*b.rad;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      if(b.spin){ ctx.fillStyle="#7a6a52"; ctx.beginPath(); ctx.arc(b.cx,b.cy,0.16,0,6.284); ctx.fill(); }
+    }
+    // 결승선 — 체커 두 줄
+    if(st.goalY > vTop-2 && st.goalY < vBot+2){
+      const c=0.7;
+      for(let r0=0;r0<2;r0++) for(let x=0;x<W;x+=c){
+        ctx.fillStyle = ((x/c + r0)%2) ? "#2b2118" : "#ffffff";
+        ctx.fillRect(x, st.goalY + r0*c, c, c);
+      }
+    }
+    // 구슬 — 뒤에서부터 그려 선두가 맨 위에
+    for(let k=n-1;k>=0;k--){
+      const i=rank[k];
+      if(sim.done[i]>=0 && sim.done[i]<f) continue;         // 이미 들어온 구슬은 치운다
+      const x=sim.path[b0+i*2], y=ypos[i];
+      ctx.beginPath(); ctx.arc(x,y,R,0,6.284);
+      ctx.fillStyle=colorOf(i); ctx.fill();
+      ctx.lineWidth = (i===tgt ? 0.09 : 0.05);
+      ctx.strokeStyle = (i===tgt ? "#2b2118" : "rgba(255,255,255,.92)");
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 이름표 — 화면 좌표로 그린다(줌과 무관하게 같은 크기)
+    ctx.font = "800 10px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="top"; ctx.lineWidth=3; ctx.lineJoin="round";
+    for(let k=n-1;k>=0;k--){
+      const i=rank[k];
+      if(sim.done[i]>=0 && sim.done[i]<f) continue;
+      const sx = CW/2 + (sim.path[b0+i*2]-camX)*z, sy = CH*0.42 + (ypos[i]-camY)*z;
+      if(sy<-14||sy>CH+8||sx<-20||sx>CW+20) continue;
+      const nm = players[i].name.slice(0,4);
+      ctx.strokeStyle="rgba(255,253,249,.95)"; ctx.strokeText(nm, sx, sy + R*z + 1);
+      ctx.fillStyle=colorOf(i);                 ctx.fillText(nm, sx, sy + R*z + 1);
+    }
+
+    // HUD — 상위 네 명
+    rows.forEach((row,k)=>{
+      const i=rank[k]; if(i===undefined || row.cur===i) return;
+      row.cur=i; row.sw.style.background=colorOf(i); row.nm.textContent=players[i].name;
+    });
+    return f;
+  }
+
+  /* 슬로모션 — 추적 대상이 결승 직전이고 바로 앞뒤에 경쟁자가 붙어 있을 때만. */
+  function timeScale(f){
+    const ti=targetIndex(f), tgt=rank[ti], ty=ypos[tgt];
+    const goalDist = st.zoomY - ty;
+    if(goalDist > ZOOM_TRIG || goalDist < -1) return 1;
+    const near = (ti>0 && Math.abs(ypos[rank[ti-1]]-ty) < SLOW_NEAR)
+              || (ti<n-1 && Math.abs(ty-ypos[rank[ti+1]]) < SLOW_NEAR);
+    if(!near) return 1;
+    return Math.max(SLOW_MIN, goalDist/ZOOM_TRIG);
+  }
+
+  const END = sim.frames*1000/60;
+  let t=0, last=0, raf=0, running=false;
+  function step(now){
+    raf=0;
+    if(!cv.isConnected) return;
+    const dt = Math.min(64, now-last) * timeScale(frameAt(t));
+    last=now; t+=dt;
+    if(t>=END){ draw(END); finish(); return; }
+    draw(t);
+    raf=requestAnimationFrame(step);
+  }
+  function finish(){
+    running=false;
+    say.textContent = "결과가 나왔어요";
+    res.innerHTML = '<div class="win"><div class="e">☕</div><div class="n">'
+      + players[sim.winner].name + '</div></div>';
+  }
+  draw(0);
+  return {
+    start(){ if(running) return; running=true; say.textContent="출발!";
+             last=performance.now(); raf=requestAnimationFrame(step); },
+    stop(){ if(raf) cancelAnimationFrame(raf); raf=0; running=false; },
+    info: { frames:sim.frames, secs:(sim.frames/60).toFixed(1), bodies:st.E.length }
+  };
+}
+
+/* ── 화면 배선 ── */
+const NAMES=["가온","나래","다솜","라온","마루","바다","사랑","아라","자람","차오","카린","타래",
+             "파랑","하늘","보리","솔이","여울","윤슬","이든","주아","한별","해온","호수","단비"];
+let cur=null;
+document.getElementById("make").onclick = ()=>{
+  if(cur) cur.stop();
+  const n = Math.max(2, Math.min(24, +document.getElementById("cnt").value || 10));
+  document.getElementById("res").innerHTML="";
+  document.getElementById("stage").style.display="";
+  document.getElementById("setup").style.display="none";
+  document.getElementById("say").textContent="준비됐어요 — 내 번호를 찾아두세요";
+  cur = race(NAMES.slice(0,n).map((name,i)=>({ id:"m"+i, name })));
+};
+document.getElementById("go").onclick = ()=>{ if(cur) cur.start(); };
+document.getElementById("back").onclick = ()=>{
+  if(cur) cur.stop(); cur=null;
+  document.getElementById("stage").style.display="none";
+  document.getElementById("setup").style.display="";
+};
+</script>
+</body></html>
