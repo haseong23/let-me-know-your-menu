@@ -628,7 +628,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.86";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.87";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -874,6 +874,35 @@ function tileHtml(m, selId){ const c=myMenuCount(m.id);
 /* ===================== 공통 유틸 ===================== */
 let ME = null; // 셀별 스코프 — enterCell()에서 loadMe()로 채움
 function meKey(){ return "coffee_me_v3_" + (CELL ? CELL.id : "none"); }
+
+/* ---------- 지난번 주문 다시 담기 ----------
+   왜 기기(localStorage)에 두는가. 서버의 get_room_history 는 member_id·menu_id·menu_name 만
+   돌려주고 온도·옵션·메모를 갖고 있지 않다 — 그걸 얻으려면 RPC 를 새로 만들고 마이그레이션을
+   돌려야 한다. '늘 같은 걸 마시는 사람이 자기 폰으로 주문한다'가 이 기능이 실제로 쓰이는
+   상황의 거의 전부라서, 기기 저장으로 시작하고 한계를 밝히는 쪽을 골랐다.
+   한계: 폰을 바꾸거나 다른 기기로 들어오면 기억이 없다. 그 경우를 위해 오늘의 지난 섬김에서
+   한 번 더 찾는다(아래 lastOrder 의 두 번째 갈래).
+   키에 셀과 사람을 함께 넣는다 — 한 폰을 여러 사람이 돌려 쓰는 상황(대표 폰)에서 남의 주문이
+   내 것으로 뜨면 안 된다. */
+function lastOrdKey(){ return "coffee_last_order_v1|" + (CELL?CELL.id:"none") + "|" + (ME||""); }
+function rememberOrder(o){
+  if(!ME || !o || o.type!=="drink" || !o.menuId) return;
+  try{ localStorage.setItem(lastOrdKey(), JSON.stringify({
+    menuId:o.menuId, menuName:o.menuName||"", temp:o.temp||null,
+    extras:Array.isArray(o.extras)?o.extras:[], note:o.note||"" })); }catch(e){}
+}
+function lastOrder(){
+  if(!ME) return null;
+  try{ const r=localStorage.getItem(lastOrdKey()); if(r){ const o=JSON.parse(r); if(o&&o.menuId) return o; } }catch(e){}
+  // 폴백 — 오늘의 지난 섬김. seq 가 큰 쪽부터 보고 지금 보고 있는 섬김은 건너뛴다.
+  const past=SERVINGS.slice().sort((a,b)=>b.seq-a.seq);
+  for(let i=0;i<past.length;i++){
+    if(past[i].seq===SESSION.seq) continue;
+    const o=past[i].orders && past[i].orders[ME];
+    if(o && o.type==="drink" && o.menuId) return o;
+  }
+  return null;
+}
 function loadMe(){ ME = localStorage.getItem(meKey()) || null; }
 function setMe(id){ ME = id; try{ if(id) localStorage.setItem(meKey(), id); else localStorage.removeItem(meKey()); }catch(e){} }
 function meName(){ const m=memberById(ME); return m?m.name:null; }
@@ -1231,7 +1260,38 @@ function renderOpen(){
   const skipHtml = isSkip ? "" : `
       <div class="label">음료를 안 드신다면</div>
       <button class="btn btn-skip skip-btn">🙅 안 마실게요, 감사합니다</button>`;
+  /* 지난번 주문 다시 담기.
+     새 시각 언어를 만들지 않는다 — 아래 '다른 분들' 로스터의 [나도] 행과 같은 .person 마크업을
+     그대로 쓴다. 하는 일이 똑같기 때문이다(남의 주문 그대로 vs 지난번 내 주문 그대로).
+     보일 조건을 좁게 잡는다: 고르는 중이고 · 기억이 있고 · 그 메뉴가 지금 메뉴판에 아직 있을 때만.
+     비활성 버튼이나 빈 상태를 두지 않으므로 평소에는 이 줄이 아예 없다.
+     자리는 메뉴 그리드 '위'다 — 타일을 훑기 전에 보여야 훑는 일 자체를 없앨 수 있다. */
+  const lastOrd = showGrid ? lastOrder() : null;
+  const lastMenu = lastOrd ? anyMenuById(lastOrd.menuId) : null;
+  /* 지금 담긴 주문과 똑같으면 감춘다. 주문하면 그 즉시 기억하므로, 담은 뒤 [🔄 다른 메뉴로]를
+     누르면 '지난번엔 이렇게 드셨어요'가 방금 담은 바로 그것을 가리키게 된다 — 다른 걸 고르러
+     들어온 사람에게 아무 쓸모가 없고, 바로 위 내 주문 카드와 같은 말을 두 번 하는 셈이다. */
+  const sameAsNow = !!(lastOrd && myOrder && myOrder.type==="drink"
+    && myOrder.menuId===lastOrd.menuId && (myOrder.temp||null)===(lastOrd.temp||null)
+    && (myOrder.note||"")===(lastOrd.note||"")
+    && (myOrder.extras||[]).slice().sort().join("|")===(lastOrd.extras||[]).slice().sort().join("|"));
+  let againHtml = "";
+  if(lastOrd && lastMenu && !sameAsNow){
+    const bits = (lastOrd.extras||[]).slice();
+    if(lastOrd.note) bits.push("📝 "+lastOrd.note);
+    againHtml = `
+      <div class="label">지난번엔 이렇게 드셨어요</div>
+      <div class="card" style="padding:6px 14px">
+        <div class="person">
+          <div class="avatar" style="background:var(--brand-soft);color:var(--brand)">↺</div>
+          <div><div class="pname">${esc(lastMenu.emoji+" "+lastMenu.name)}${lastOrd.temp?" · "+esc(lastOrd.temp):""}</div>
+            <div class="pmenu">${bits.length?esc(bits.join(" · ")):"옵션 없이"}</div></div>
+          <button class="btn btn-sm btn-soft" id="againOrder">이걸로</button>
+        </div>
+      </div>`;
+  }
   const gridHtml = showGrid ? `
+      ${againHtml}
       <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
       ${skipHtml}` : "";
@@ -1333,7 +1393,15 @@ function renderOpen(){
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ bumpFreq(o.menuId); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
+  /* 지난번 주문 → 주문 시트를 채워서 연다. 바로 서버에 쓰지 않는 이유가 둘이다.
+     ① 검증. 저장된 옵션이 지금도 유효한지는 시트의 draw() 가 판정한다(온도는 temps 로 조이고
+        extras 는 availExtras 로 거른다). 여기서 바로 쓰면 그 판정을 한 벌 더 만들어야 하고,
+        옵션 규칙이 바뀔 때 둘이 갈린다.
+     ② 대부분의 '지난번 그대로'는 사실 '지난번에서 하나만 빼고'다 — 시트가 열려 있으면 그
+        수정이 공짜다. 탭 한 번을 더 쓰는 대신 얻는 것이다. */
+  const ag=document.getElementById("againOrder");
+  if(ag) ag.onclick=()=>{ const p=lastOrder(); if(p) openOrderSheet(p.menuId, myOrder||null, p); };
 }
 
 // 서로 배반인 옵션: 한쪽을 켜면 다른 쪽은 자동 해제 (샷추가 ↔ 연하게)
@@ -1373,10 +1441,16 @@ function menuFlatToggles(m){                              // 그룹에 안 담�
   if((m.extras||[]).includes("덜달게")) t.push("덜달게");
   return t;
 }
-function openOrderSheet(menuId, existing){
-  let temp = existing&&existing.temp ? existing.temp : null;
-  let extras = existing&&existing.extras ? [...existing.extras] : [];
-  let note = existing&&existing.note ? existing.note : "";
+/* prefill 은 '값을 미리 채워라'이고 existing 은 '이미 주문이 있다'(→ 버튼이 [주문 수정]/[주문 취소])
+   라는 뜻이다. 지난번 주문 다시 담기는 앞엣것만 필요하고 뒤엣것은 실제 상태를 따라야 해서 갈랐다.
+   값 검증은 아래 draw() 가 이미 다 한다 — 온도는 지금 메뉴의 temps 로 조이고 extras 는
+   availExtras 에 없는 걸 걸러낸다. 지난 주문을 여기로 흘려보내는 이유가 그것이다: 검증을
+   두 벌 만들지 않는다. */
+function openOrderSheet(menuId, existing, prefill){
+  const src = prefill || existing;
+  let temp = src&&src.temp ? src.temp : null;
+  let extras = src&&src.extras ? [...src.extras] : [];
+  let note = src&&src.note ? src.note : "";
   function draw(keepScroll){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
@@ -1446,7 +1520,8 @@ function openOrderSheet(menuId, existing){
     const noteEl=document.getElementById("note"); if(noteEl) noteEl.onfocus=()=>{ setTimeout(()=>{ try{ noteEl.scrollIntoView({block:"center",behavior:"smooth"}); }catch(e){} },250); };  // 키보드가 입력창 가리지 않게
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
       if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
-      if(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId,menuName:m.name,temp,extras,note},SESSION.seq))){ bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
+      const ord={type:"drink",menuId,menuName:m.name,temp,extras,note};
+      if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
   }
@@ -1542,7 +1617,9 @@ function openCustomSheet(existing, prefillName, prefillNote){
     const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
     if(!name){ toast("메뉴 이름을 입력해주세요"); return; }
     forceGrid=false;
-    if(!(await safeWrite(Sync.setOrder(ME,{type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note},SESSION.seq)))) return;
+    const cOrd={type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note};
+    if(!(await safeWrite(Sync.setOrder(ME,cOrd,SESSION.seq)))) return;
+    rememberOrder(cOrd);
     bumpFreq("c:"+name);
     // 직접입력 메뉴는 이 셀 주문(menu_name)으로만 저장 — 그날 이 셀 그리드에 표시(customMenusFromOrders).
     // (공유 카페로의 자동 승격은 익명 오염 방지를 위해 제거; 카페 공식 메뉴 추가는 관리자만)
@@ -2804,7 +2881,7 @@ function openRosterSheet(){
     <div class="rst-pre">
       <button class="btn btn-sm btn-soft" id="gAll">전원 참가</button>
       <button class="btn btn-sm btn-soft" id="gDefault">음료 고른 분</button>
-      <button class="btn btn-sm btn-soft" id="gDropLast">직전 섬긴 분 빼기</button>
+      <button class="btn btn-sm btn-soft" id="gDropLast">직전 섬긴 분 제외</button>
       <button class="btn btn-sm btn-soft" id="gNone">전부 해제</button></div>
     <div class="sheet-scroll">
       <div class="card" id="gRosterList" style="padding:6px 14px;margin-bottom:4px">${MEMBERS.map(m=>rosterRowHtml(m,snap)).join("")}</div>
