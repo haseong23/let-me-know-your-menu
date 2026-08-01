@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.95";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.96";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2030,8 +2030,14 @@ const RACE_E_WALL = 0.34;    // 벽·장애물 반발
 const RACE_E_BALL = 0.18;    // 구슬끼리 반발
 const RACE_MAXF = 4200;      // 70초. 이 안에 1등이 안 나오면 그 시드는 버린다
 const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하나가 훑을 물체를 이 단위로 줄인다
-const RACE_ITER = 3;         // 구슬끼리 위치 분리 반복 횟수. 근거는 raceSimulate 안 주석에 있다
-/* 1자 5 · 지그재그 3 · 깔때기 2. 깔때기를 셋에서 둘로 줄였다 — 한 줄로 세워 통과시키는 구간이라
+const RACE_ITER = 3;
+/* 자유 회전체 각속도 상한. 터널링과 같은 근거다 — 팔이 가장 긴 것이 74 라 8 rad/s 면 날개 끝이
+   592px/s, 한 스텝 2.5px 로 구슬 반지름 9 안에 들어온다. */
+const RACE_RAV_MAX = 8;         // 구슬끼리 위치 분리 반복 횟수. 근거는 raceSimulate 안 주석에 있다
+/* 1자 4 · 지그재그 2 · 깔때기 2. 장애물 여섯 종을 새로 짜면서 한 칸씩 줄였다 — 새 장애물이
+   전부 묵직해서 예전 길이(5100)로는 한 판이 21초대가 됐다. 4260 으로 줄여 16.5~18.5초로 돌아왔고,
+   3/4 지점 역전은 오히려 66% 로 올랐다(계측 200판).
+   예전 근거: 깔때기를 셋에서 둘로 줄였다 — 한 줄로 세워 통과시키는 구간이라
    들어간 순서가 거의 그대로 나온다(실사용 제보: "깔때기에서는 순위 역전이 안 일어난다").
    그 자리를 1자길로 돌리면 장애물이 하나 더 들어가고, 순위를 흔드는 건 장애물이다.
 
@@ -2039,19 +2045,42 @@ const RACE_ITER = 3;         // 구슬끼리 위치 분리 반복 횟수. 근거
    지점 역전 43%→42%, 순위 변동 3.07→3.15 로 오차 안이고, 2인 판만 길어졌다(>23초 2%→5.5%).
    빼서 얻는 게 없으면 한 줄로 흐르는 그림이라도 남기는 편이 낫다. 정작 문제였던 건 개수가
    아니라 '마지막이 항상 깔때기'라는 자리였고, 그건 raceMapBuild 아래에서 걷어냈다. */
-const RACE_SEG_MIX = ["s","s","s","s","s","z","z","z","f","f"];
+const RACE_SEG_MIX = ["s","s","s","s","z","z","f","f"];
 
 /* 캡슐 하나로 못·벽·경사·기둥을 전부 표현한다 — 원-선분 거리 계산 하나면 넷이 다 풀린다.
    회전 막대(큰 날)는 sp!==0 이고 매 스텝 끝점을 다시 잡는다. y0/y1b 는 격자에 넣을 때 쓰는
    세로 범위이고, 회전 막대는 어느 각도로도 돌 수 있으니 반지름 전체를 범위로 잡는다. */
-function rcap(x1,y1,x2,y2,rad){ return {x1,y1,x2,y2,rad,sp:0,cx:0,cy:0,hl:0,ph:0,e:0,
+function rcap(x1,y1,x2,y2,rad){ return {x1,y1,x2,y2,rad,sp:0,cx:0,cy:0,hl:0,ph:0,e:0,invI:0,lim:0,ri:-1,
   y0:Math.min(y1,y2)-rad, y1b:Math.max(y1,y2)+rad}; }
 function rpeg(x,y,rad){ return rcap(x,y,x,y,rad); }
+/* 다이아몬드(◆)와 피라미드(▲). 새 충돌 코드를 만들지 않고 캡슐 몇 개로 테두리를 닫는다 —
+   원-선분 거리 하나로 다 풀리므로 물리는 그대로다. 테두리가 닫혀 있어 안쪽에 갇힐 일도 없다
+   (한 스텝 최대 이동 3.25 가 캡슐 반지름+구슬 반지름보다 훨씬 작아 뚫고 들어가지 못한다). */
+function rdia(B,cx,cy,d,rad,e){
+  const p=[[cx,cy-d],[cx+d,cy],[cx,cy+d],[cx-d,cy]];
+  for(let k=0;k<4;k++){ const a=p[k], c=p[(k+1)%4];
+    const s=rcap(a[0],a[1],c[0],c[1],rad); if(e) s.e=e; B.push(s); }
+}
+function rtri(B,cx,cy,w,h,rad,e){
+  const p=[[cx,cy-h/2],[cx+w/2,cy+h/2],[cx-w/2,cy+h/2]];
+  for(let k=0;k<3;k++){ const a=p[k], c=p[(k+1)%3];
+    const s=rcap(a[0],a[1],c[0],c[1],rad); if(e) s.e=e; B.push(s); }
+}
 // hl 은 축 오른쪽 팔, hl0 은 왼쪽 팔이다. hl0 을 안 주면 예전처럼 대칭이라 기존 호출부가 그대로 산다.
 // 팔을 따로 두는 이유는 robVane 주석에 있다 — 대칭 막대는 돌고 있는 게 안 보인다.
+/* 자유 회전체(비동력 로터). 등속으로 도는 막대는 무한 질량이라 구슬을 '밀어붙이기'만 한다 —
+   폭을 거의 막는 큰 날에서 구슬이 벽과 날 사이에 짓눌리는 것처럼 보였던 것이 이 때문이다.
+   충격을 받아 도는 물건으로 바꾸면 구슬이 때린 만큼 날이 물러나므로 그 압착이 사라진다.
+   invI 는 관성 모멘트의 역수다. 가는 막대(길이 2L·질량 M)의 중심 관성은 M(2L)²/12 = ML²/3 이고,
+   구슬 질량을 1 로 두었으므로 M 은 '구슬 몇 개 무게인가'가 된다. */
+function rrotor(cx,cy,hl,rad,mass,ph,spin){
+  const b=rbar(cx,cy,hl,rad,spin||0,ph);
+  b.invI = 3/(mass*hl*hl);
+  return b;
+}
 function rbar(cx,cy,hl,rad,sp,ph,hl0){
   const h0=(hl0===undefined?hl:hl0);
-  const b={x1:cx-h0,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,hl0:h0,ph,e:0};
+  const b={x1:cx-h0,y1:cy,x2:cx+hl,y2:cy,rad,sp,cx,cy,hl,hl0:h0,ph,e:0,invI:0,lim:0,ri:-1};
   const m=Math.max(hl,h0);
   b.y0=cy-m-rad; b.y1b=cy+m+rad; return b;
 }
@@ -2121,123 +2150,115 @@ function robBackPins(B, y, h, rnd, from){
   }
 }
 
-function robPins(B, y, h, rnd){
-  const dy=46, dx=37, r=5, edge=26;
-  const rows=Math.max(2, Math.floor((h-60)/dy));
-  const y0=y+(h-rows*dy)/2+dy/2;
+/* ══ 장애물 여섯 종 ══ 1자길 안에만 들어간다.
+   지그재그·깔때기 위에 겹쳐 봤더니 이빨의 아랫면과 기둥의 옆면이 만나 주머니가 생겨서, 계측한
+   60판 중 54판이 그 자리에서 멈췄다. 벽이 이미 방향을 트는 길에 또 방향을 트는 물체를 두면 둘
+   사이에 닫힌 구석이 반드시 나온다. 그래서 역할을 나눈다 — 지그재그·깔때기는 '벽으로',
+   1자길은 '장애물로' 흐름을 바꾼다.
+
+   여섯 종은 레퍼런스 영상 분석의 '주요 트랙 요소'를 그대로 옮긴 것이다 —
+   경사로 · 고정 피라미드 · 회전 바 · 대각선 바운서 · 핀볼 격자 · 시소 게이트.
+
+   배치를 지배하는 규칙 하나: 지나갈 수 있는 목은 구슬 지름(2*RACE_R = 18)보다 넓어야 한다.
+   마찰이 0 이라 정체는 '접촉 법선들이 중력을 정적으로 떠받치는가'로만 결정되는데, 목이 지름보다
+   좁으면 구슬이 양쪽에 동시에 닿아 그 조합이 성립한다. 예전 못밭이 벽 여유 18 로 겪은 사고다. */
+
+/* ① 경사로 — 좌우로 꺾이는 급경사 레일. 무리를 세로 한 줄로 세운다. 여섯 중 가장 얌전해서
+   세기 차례의 첫 자리다. 높은 쪽 끝은 벽 너머까지 밀어 넣는다 — 벽과 레일 사이에 지름(18)보다
+   좁은 틈을 남기면 거기가 곧 주머니가 된다(대각선 바운서에서 그 사고를 겪었다). */
+function robSlope(B, y, h, rnd){
+  const rows=2, dy=h/(rows+1), r=4, reach=RACE_W*0.52;
   for(let j=0;j<rows;j++){
-    const off=(j%2)?dx/2:0;
-    for(let x=edge+off; x<=RACE_W-edge; x+=dx) B.push(rpeg(x, y0+j*dy, r));
+    const yy=y+dy*(j+0.9), left=(j%2===0);
+    const x1=left? -8 : RACE_W+8, x2=left? reach : RACE_W-reach;
+    B.push(rcap(x1, yy, x2, yy+38, r));
   }
 }
 
-/* 큰 날 — 축 하나에 걸린 비대칭 외날이다. 접촉점의 표면 속도가 구슬에 그대로 실려서, 올라가는
-   날에 맞으면 붙잡히고 내려가는 날에 맞으면 던져진다.
+/* ② 고정 피라미드 — 삼각형을 2-1-2 로 엇갈려 세운다. 빗면이 구슬을 좌우로 갈라 보내고,
+   꼭짓점에 정확히 맞은 구슬만 잠깐 머문다(그마저 옆 구슬이 밀어낸다).
 
-   팔 길이를 88 / 42 로 가르는 것이 이 물건의 전부다. 대칭 막대 하나는 180° 마다 같은 그림이라
-   "실제로는 돌고 있는데 눈에는 멈춰 보인다"는 예전 제보가 그대로 재발한다(예전 십자 막대가 네
-   날을 다 같은 길이로 뒀다가 겪은 일이다). 갈라 놓으면 회귀 주기가 π 가 아니라 2π(≈2.1초)라,
-   이 구간에 머무는 1~1.5초 안에 같은 그림이 두 번 나오지 않는다.
-
-   긴 팔 끝 표면이 x=6/194 다 — 지름 18 인 구슬은 양옆으로 못 빠져나간다. 즉 이건 관문이고,
-   긴 팔이 향한 쪽이 닫히는 동안 짧은 팔 쪽(벽까지 52)만 열린다.
-
-   끼임 걱정은 계측으로 털었다(6구간 반복 60판: 완주 실패 0, 최장 정체 1.72초 — 예전 십자 2.02초
-   보다 짧다). 마찰이 0 이라 정체는 '접촉 법선들이 중력을 정적으로 떠받치는가'로만 결정되는데,
-   회전체는 그 조건이 회전당 0.2~0.3초만 존재하고, 접촉점 표면속도가 팔에 수직이라 끼인 구슬을
-   위아래로 쓸어낸다. 그래서 벽 쪽에 경사 캡슐을 덧대면 안 된다 — 정적 경사면과 회전 팔 사이에는
-   진짜 정적 쐐기가 생긴다(바로 아래 장애물 배치 규칙과 같은 이야기다).
-
-   각속도 3.4 초과는 최장 정체가 2.15초로 늘고, 2.2 미만은 체류 중 반 바퀴를 못 채운다.
-   축은 가운데 고정이다 — 좌우로 흔들면 긴 팔을 82 이하로 줄여야 해서 크기를 포기하게 된다. */
-function robVane(B, y, h, rnd, arm){
-  const cy=y+h*0.5, r=6;
-  const sp=(rnd()<0.5?1:-1)*(2.2+rnd()*1.2), ph=rnd()*6.283;
-  B.push(rbar(RACE_W/2, cy, (arm||88), r, sp, ph, 42));
+   자리를 식으로 굴리지 않고 표로 적는다. 처음에 인덱스 산술로 뿌렸더니 두 삼각형의 밑변이
+   x 로 2px 겹쳐 그 위에 닫힌 주머니가 생겼고, 세 구슬이 코스 11% 지점에서 4200프레임을
+   버텼다. 검산이 되는 형태로 적어 두면 그 사고가 다시 안 난다 —
+     · 밑변 46(반폭 23) · 높이 34
+     · 같은 줄 이웃: 140-23 - (60+23) = 34 > 지름 18 ✓
+     · 벽 여유: 60-23 = 37 > 18 ✓
+     · 줄 간격: h*0.27 = 92 > 높이 34 ✓ (위아래로도 안 겹친다) */
+function robPyramid(B, y, h, rnd){
+  const w=46, ph=34, r=3;
+  const rows=[[60,140],[100],[60,140]];
+  for(let j=0;j<rows.length;j++){
+    const yy=y+h*(0.28+j*0.27);
+    for(const x of rows[j]) rtri(B, x, yy, w, ph, r);
+  }
 }
 
-// 가운데 물길 — 굵은 기둥이 흐름을 좌우로 가른다. 끝이 반원이라 얹힌 구슬은 굴러 떨어지고,
-// 양옆 통로가 각각 79 이상이라 막히지 않는다.
-function robIsland(B, y, h, rnd){
-  const cx=RACE_W/2+(rnd()-0.5)*26;
-  B.push(rcap(cx, y+h*0.24, cx, y+h*0.76, 12));
+/* ③ 회전 바 — 통로 가운데 축에 걸린 1자형 자유 회전체. 이 판에서 가장 많이 손본 물건이다.
+
+   예전 것의 문제가 둘이었다. 첫째, 팔이 88 이라 회전 지름이 코스 폭의 94% 였다 — 양옆에 8px
+   밖에 안 남아 지름 18 인 구슬이 지나갈 자리가 없었다. 둘째, 등속으로 돌려서(무한 질량) 구슬이
+   때려도 날이 물러나지 않았다. 둘이 겹치면 구슬이 벽과 날 사이에서 짓눌리는 그림이 나온다 —
+   실제로 그렇게 보인다는 제보를 받았다.
+
+   레퍼런스 명세대로 고쳤다. 날개 반지름을 코스 폭의 37%(74)로, 회전 지름을 74% 로 줄여 양옆에
+   26 씩 남긴다 — 지름 18 인 구슬이 지나갈 수 있는 폭이다. 그리고 비동력으로 바꿨다. 구슬이
+   날개 끝을 때리면 그 충격량만큼 바가 돌고, 뒤따르는 구슬은 돌고 있는 날에 맞아 튕겨 나간다.
+   질량은 구슬 5개분이다 — 더 가벼우면 한 번 맞고 팽이처럼 돌아 장애물 구실을 못 하고, 더
+   무거우면 다시 '밀어붙이는 벽'이 된다.
+   두께 3.5 는 구슬 지름의 1/4 이라는 명세를 따랐다. 축에는 구슬만 한 원을 박아 회전 중심을
+   눈에 보이게 한다(명세: 레인 폭의 6~8%). */
+function robSpinner(B, y, h, rnd, arm){
+  const cy=y+h*0.5, hl=(arm||RACE_W*0.37);
+  B.push(rpeg(RACE_W/2, cy, 7));                                  // 중심축
+  B.push(rrotor(RACE_W/2, cy, hl, 3.5, 5, rnd()*6.283, (rnd()<0.5?1:-1)*(0.6+rnd()*0.8)));
 }
 
-// 범퍼 — 큰 원에 반발을 따로 준다(0.78). 여기 들어온 구슬은 몇 번 튕기며 순위가 흔들린다.
-function robBumpers(B, y, h, rnd){
-  const r=16;
-  const P=[[54,0.20],[146,0.20],[100,0.46],[40,0.72],[160,0.72]];
-  for(let k=0;k<P.length;k++){ const b=rpeg(P[k][0], y+h*P[k][1], r); b.e=0.78; B.push(b); }
+/* ④ 대각선 바운서 — 사선 반발 패널을 3단으로 좌우 교대로 건다. 구슬이 지그재그로 튕기며
+   궤적이 크게 꺾인다. 반발 0.55 는 경사로(0.34)와 핀볼 격자(0.88) 사이 — 세기 차례의 가운데다.
+
+   패널의 높은 쪽 끝을 벽 너머(-8 / W+8)까지 밀어 넣는 것이 요점이다. 처음엔 벽에서 14 띄우고
+   한 줄에 둘씩 걸었더니 40판이 전부 정체했다 — 같은 줄의 두 패널이 서로 마주 보며 ∨ 주머니를
+   만들고, 벽과 패널 사이 14 도 지름 18 보다 좁아 구슬이 그 자리에 눌러앉았다. 벽에 박아 두면
+   그쪽에는 애초에 틈이 없고, 열린 쪽 하나만 남아 주머니가 성립하지 않는다. */
+function robDiagBumper(B, y, h, rnd){
+  const rows=2, dy=h/(rows+1), r=5;
+  for(let j=0;j<rows;j++){
+    const yy=y+dy*(j+0.85), left=(j%2===0);
+    const s=left ? rcap(-8, yy, RACE_W*0.66, yy+30, r)
+                 : rcap(RACE_W+8, yy, RACE_W*0.34, yy+30, r);
+    s.e=0.55; B.push(s);
+  }
 }
 
-/* 바람개비 밭 — 작은 날개를 여럿 엇갈려 깐다. 큰 날 하나가 '관문'이라면 이쪽은 '숲'이다.
-   날개마다 회전 방향·속도·위상이 따로라 어느 순간에도 열린 자리와 막힌 자리가 뒤섞이고,
-   구슬이 그 사이를 비집는 동안 순위가 갈린다.
-
-   날개 끝이 그리는 원(반지름 hl+rad = 24)이 배치의 단위다. 같은 줄 이웃끼리 원 사이가 14,
-   벽까지가 14 라 구슬(지름 18)이 그냥은 못 지나간다 — 날개가 비켜 줘야 지나간다. 이게 이
-   장애물의 요점이라 일부러 좁게 뒀다. 정적 쐐기 걱정을 안 해도 되는 이유는 회전체이기 때문이다:
-   마찰이 0 이라 정체는 접촉 법선들이 중력을 정적으로 떠받치느냐로만 결정되는데, 그 배치가
-   회전당 잠깐만 존재하고 접촉점 표면속도가 날개에 수직이라 끼인 구슬을 쓸어낸다.
-   같은 이유로 여기에 고정 지형을 섞으면 안 된다. */
-function robVaneField(B, y, h, rnd, rows){
-  const hl=20, r=4, dy=78, nrow=(rows||3);
-  const y0=y+h*0.5-(nrow-1)*dy/2;
-  for(let j=0;j<nrow;j++){
-    const xs=(j%2===0) ? [38, RACE_W/2, RACE_W-38] : [69, RACE_W-69];
-    for(let k=0;k<xs.length;k++){
-      const sp=(rnd()<0.5?1:-1)*(1.6+rnd()*1.4);      // 1.6~3.0 rad/s — 큰 날보다 느리다(작아서 끝 속도가 비슷해진다)
-      B.push(rbar(xs[k], y0+j*dy, hl, r, sp, rnd()*6.283));
+/* ⑤ 핀볼 격자 — 다이아몬드 핀을 3-2-3-2 로 촘촘히 깐다. 핀볼 기계의 핀 구간과 같은 물건이라
+   튕김이 가장 무작위하다. 반쪽 대각선 13 에 중심 간격 60 이면 표면 사이가 34 로 지름보다 넓다.
+   벽 여유는 40-13=27 이다. 반발 0.88 은 여섯 중 가장 세다 — 세기 차례의 끝자리다.
+   모서리(다이아몬드)가 원보다 나은 이유: 같은 자리에 떨어져도 어느 면을 맞느냐로 방향이 갈린다. */
+function robPinball(B, y, h, rnd){
+  const d=13, r=3.5, e=0.88, s=60, dy=54;
+  const rows=[3,2,3,2];
+  const y0=y+h*0.5-(rows.length-1)*dy/2;
+  for(let j=0;j<rows.length;j++){
+    const cnt=rows[j], yy=y0+j*dy;
+    for(let k=0;k<cnt;k++){
+      const x=RACE_W/2 + (k-(cnt-1)/2)*s;
+      rdia(B, x, yy, d, r, e);
     }
   }
 }
 
-/* 탄성 못밭 — 크고 · 많고 · 세게 튀는 집단. 위로 되돌아가는 장면을 이 하나가 맡는다.
-
-   위로 되돌아가려면 충돌 법선이 위를 향해야 하고, 그러려면 구슬이 못의 '꼭대기'에 떨어져야 한다.
-   3-2-3-2 엇배열(플린코)이 그걸 강제한다 — 윗줄 틈으로 빠진 구슬이 아랫줄 못 꼭대기로 유도된다.
-   e=0.88 이면 첫 반동이 686px/s 라 168px, 구슬 아홉 개 높이를 거슬러 오른다.
-
-   배치는 규칙 하나가 지배한다 — 모든 표면 간격이 구슬 지름(2*RACE_R = 18)보다 넓어야 한다.
-   마찰이 0 이라 순수 기하로 유도된다. 못과 벽이 그보다 좁으면 벽에 붙은 구슬이 못에 동시에 닿아
-   정적 쐐기가 생기고(위 못밭의 edge=18 사고와 같은 것), 못과 못이 그보다 좁으면 둘에 동시에 닿아
-   V 주머니가 된다. 계측이 그대로 확인해 준다 — 벽 여유를 14 로 좁히면 60판이 전부 완주에
-   실패했고, 못 간극 16 은 40판 중 5판이 갇혔다. 여기 값은 둘 다 20 이라 두 접촉이 애초에 동시에
-   성립하지 않는다.
-
-   e 상한이 0.90 인 이유 — 마찰이 없어 수직 반복 튐의 정착 시간이 2ev/g/(1-e) 이고 e=0.96 이면
-   32초다. 못이 '원'이라 두 번째 튐부터 어깨로 흘러 실제로는 3초 안에 끝나지만(계측 3.07초),
-   접촉면이 평평하면 그 탈출로가 사라진다 — 길이 56 짜리 수평 캡슐로 같은 걸 만들어 봤더니 한
-   구슬이 44.5초를 튀었다. 그래서 여기는 원 말고 쓰지 않는다.
-
-   범퍼와는 네 축에서 동시에 갈린다 — 개수 11 대 5 · 반지름 20 대 16 · 반발 0.88 대 0.78 ·
-   플린코 대 흩어놓기. 범퍼의 0.78 은 그대로 둔다(0.90 으로 올리면 최장 정체가 2.22→3.85초).
-   반지름을 더 키우면 간격 규칙에 걸려 한 줄에 두 개밖에 못 들어가고, 그렇게 만든 r=26 후보는
-   현행 범퍼보다도 약했다(구간당 +0.24초). 20 이 '크게'와 '많이'가 만나는 지점이다. */
-function robBounce(B, y, h, rnd, rows){
-  const r=20, e=0.88, s=60, dy=68, nrow=(rows||4);
-  const y0=y+h*0.5-(nrow-1)*dy/2;
-  for(let j=0;j<nrow;j++){
-    const yy=y0+j*dy;
-    const xs=(j%2===0) ? [RACE_W/2-s, RACE_W/2, RACE_W/2+s]    // 40 · 100 · 160
-                       : [RACE_W/2-s/2, RACE_W/2+s/2];         // 70 · 130
-    for(let k=0;k<xs.length;k++){ const b=rpeg(xs[k], yy, r); b.e=e; B.push(b); }
-  }
+/* ⑥ 시소 게이트 — 가운데 축에 걸린 지레. 먼저 온 구슬이 한쪽을 눌러 기울이면 그 뒤 구슬은
+   반대쪽으로 강제로 흘러간다. 회전 바와 달리 각도가 ±0.42 rad(24°)로 묶여 있어 한 바퀴 돌지
+   않고, 되돌리는 힘도 없다 — 다음 구슬이 반대쪽을 누를 때까지 기울어진 채로 있다.
+   그래서 '누가 먼저 왔는가'가 그 뒤 몇 초를 바꾸는, 이 코스에서 유일하게 기억을 갖는 장애물이다. */
+function robSeesaw(B, y, h, rnd, hl){
+  const cy=y+h*0.55, L=(hl||RACE_W*0.36);
+  B.push(rpeg(RACE_W/2, cy, 6));
+  const b=rrotor(RACE_W/2, cy, L, 4, 6, (rnd()<0.5?-1:1)*0.42, 0);
+  b.lim=0.42; B.push(b);
 }
 
-/* 에어샤워(위로 부는 바람)와 분수를 힘장으로 만들어 뒀다가 걷어냈다. 계측에서 둘 다 무력했다 —
-   같은 장애물만 여섯 번 반복한 코스에서 구간당 추가 시간이 에어샤워 +0.003초 · 분수 +0.012초였다
-   (못밭 +0.48 · 범퍼 +0.39 · 탄성 못밭 +0.70 과 비교하면 측정 한계다). 이유가 분명하다 — 구슬은
-   코스 대부분을 RACE_VMAX 클램프에 붙어 내려오므로 중력보다 약한 상승풍은 "더 빨라지지 않게"
-   할 뿐 아무 일도 안 한다. 분수는 바깥으로 미는 힘 때문에 0.09초 만에 제트를 벗어난다.
-   힘장이라는 개념 자체(rfield · 시뮬의 fl 분기 · drawField)를 여기서 함께 지웠다. */
-/* 관문 구간 — 코스를 통째로 쓸고 지나가는 긴 팔 하나. 결승 앞에 쓰던 장치를 코스 중간에도 둔다.
-   계측이 이유다: 무리의 퍼짐이 146 → 2079 로 단조 증가해서, 후반의 선두 교체가 '멀리서 두 점이
-   스치는 것'으로만 보였다. 관문은 먼저 온 구슬을 잠깐 붙잡아 두므로 무리를 다시 모은다.
-   깔때기와 다른 점이 여기다 — 깔때기는 한 줄로 세워 순서를 보존하지만, 관문은 열리는 순간
-   누가 앞에 있었는지와 무관하게 통과 순서가 뒤집힌다.
-   축을 코스 밖에 두는 이유는 결승 관문과 같다: 코스를 지나는 구간이 완만한 호가 되어 같은
-   각속도로도 걸쳐 있는 시간이 길어진다. */
 function rpathGate(B, y, rnd){
   const h=170;
   const gx = rnd()<0.5 ? -70 : RACE_W+70;
@@ -2250,7 +2271,7 @@ function rpathGate(B, y, rnd){
    판마다 초반이 격렬하고 후반이 조용하기도 하고 그 반대이기도 했다 — 설계된 곡선이 없었다.
    코스 진행률에 맞춰 이 순서에서 뽑으면 매 판 같은 기승전결이 나온다. 인접한 한 칸까지
    흔들어(±1) 판마다 같은 그림이 되지는 않게 한다. */
-const RACE_OBS = [robPins, robIsland, robBumpers, robVaneField, robBounce, robVane];
+const RACE_OBS = [robSlope, robPyramid, robSeesaw, robSpinner, robDiagBumper, robPinball];
 
 /* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
    만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
@@ -2273,8 +2294,7 @@ function raceMapBuild(rnd, soft){
   const mix=RACE_SEG_MIX.slice();   // 아래 셔플은 순서만 바꾼다
   for(let i=mix.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=mix[i]; mix[i]=mix[j]; mix[j]=t; }
   // 1자길 한 칸 + 그 안에 들어갈 장애물 하나. 마지막 구간도 같은 것을 쓰므로 함수로 묶는다.
-  // 다섯째 인자는 세기다 — robVane 은 긴 팔 길이, robVaneField·robBounce 는 줄 수.
-  // 나머지 셋(robPins·robIsland·robBumpers)은 안 읽는다.
+  // 다섯째 인자는 세기다 — 팔 길이를 가진 둘(robSpinner·robSeesaw)만 읽고 나머지 넷은 무시한다.
   /* prog 0~1 이 코스 진행률이다. 그 자리에 어울리는 세기의 장애물을 고르고, 그 위에 배경 못을
      깐다. from 을 넘기는 이유는 배경 못이 '이 구간에 방금 놓인 것'만 피하면 되기 때문이다. */
   let straightNo=0;
@@ -2285,7 +2305,7 @@ function raceMapBuild(rnd, soft){
     const ob=RACE_OBS[pick];
     const from=B.length;
     const h=rpathStraight(B, yy, rnd);
-    ob(B, yy, h, rnd, soft ? (ob===robVane ? 78 : 2) : undefined);
+    ob(B, yy, h, rnd, soft ? (ob===robSpinner ? RACE_W*0.30 : ob===robSeesaw ? RACE_W*0.30 : undefined) : undefined);
     robBackPins(B, yy, h, rnd, from);
     straightNo++;
     return h;
@@ -2361,6 +2381,11 @@ function raceMapBuild(rnd, soft){
   const neckY=y+20;                              // 결승 깔때기 벽이 시작되는 자리
   const finishY=y+120+CHAN+34;
   y=finishY+46;
+  /* 회전체를 따로 모아 번호를 매긴다. 자유 회전체는 각도가 시간의 닫힌 식이 아니라 '충돌로
+     쌓인 상태'라, 시뮬이 프레임마다 각도를 적어 두어야 재생이 같은 그림을 그릴 수 있다.
+     등속으로 도는 것(결승 통로의 짧은 날개)도 같은 표에 올린다 — 그리는 쪽이 한 곳만 보면 된다. */
+  const rotors=[];
+  for(let i=0;i<B.length;i++){ if(B[i].sp || B[i].invI){ B[i].ri=rotors.length; rotors.push(i); } else B[i].ri=-1; }
   const cells=Math.ceil(y/RACE_CELL)+1;
   const grid=[]; for(let i=0;i<cells;i++) grid.push([]);
   for(let i=0;i<B.length;i++){
@@ -2368,7 +2393,7 @@ function raceMapBuild(rnd, soft){
     const a=Math.max(0, Math.floor(b.y0/RACE_CELL)), z=Math.min(cells-1, Math.floor(b.y1b/RACE_CELL));
     for(let c=a;c<=z;c++) grid[c].push(i);
   }
-  return { bodies:B, grid, cells, total:y, finishY, neckY };
+  return { bodies:B, grid, cells, rotors, total:y, finishY, neckY };
 }
 
 /* 한 판을 끝까지 돌리고 프레임마다 모든 구슬의 (x,y) 를 Float32Array 에 녹화한다.
@@ -2402,6 +2427,13 @@ function raceSimulate(map, n, rnd){
   }
 
   const path=new Float32Array(RACE_MAXF*n*2);
+  /* 회전체 상태. 자유 회전체는 충돌로 각속도가 바뀌므로 각도가 시간의 함수가 아니다 —
+     프레임마다 적어 두고 재생이 그걸 읽는다. 물체에 직접 쓰지 않고 지역 배열에 두는 이유는
+     같은 맵으로 두 번 돌려도 결과가 같아야 하기 때문이다(재현성 테스트의 전제다). */
+  const RC=map.rotors.length;
+  const rang=new Float64Array(RC), rav=new Float64Array(RC);
+  for(let k=0;k<RC;k++){ const b=map.bodies[map.rotors[k]]; rang[k]=b.ph; rav[k]=b.sp; }
+  const rot=new Float32Array(RACE_MAXF*RC);
   const idx=new Int32Array(n); for(let i=0;i<n;i++) idx[i]=i;
   const B=map.bodies, grid=map.grid, cells=map.cells;
   let frames=0, winner=-1, leadPrev=-1, leadChanges=0;
@@ -2421,11 +2453,25 @@ function raceSimulate(map, n, rnd){
         if(q>RACE_VMAX*RACE_VMAX){ const k=RACE_VMAX/Math.sqrt(q); vx[i]*=k; vy[i]*=k; }
         px[i]+=vx[i]*RACE_DT; py[i]+=vy[i]*RACE_DT;
       }
+      /* 자유 회전체를 굴린다. 각속도 상한은 터널링과 같은 이유다 — 날개 끝이 한 스텝에 구슬
+         반지름보다 많이 움직이면 구슬을 뛰어넘는다. 팔이 가장 긴 것이 74 이므로 상한 8 이면
+         끝 속도 592, 한 스텝 2.5px 로 반지름 9 안에 들어온다.
+         시소는 각도를 ±lim 으로 묶고 거기 닿으면 각속도를 죽인다 — 받침에 부딪힌 것과 같다. */
+      for(let k=0;k<RC;k++){
+        const b=B[map.rotors[k]];
+        if(!b.invI){ rang[k]=b.ph+b.sp*tt; continue; }   // 등속으로 도는 것은 시간의 함수 그대로
+        if(rav[k]>RACE_RAV_MAX) rav[k]=RACE_RAV_MAX; else if(rav[k]<-RACE_RAV_MAX) rav[k]=-RACE_RAV_MAX;
+        rang[k]+=rav[k]*RACE_DT;
+        if(b.lim){
+          if(rang[k]> b.lim){ rang[k]= b.lim; if(rav[k]>0) rav[k]=0; }
+          else if(rang[k]< -b.lim){ rang[k]= -b.lim; if(rav[k]<0) rav[k]=0; }
+        }
+      }
       for(let i=0;i<n;i++){                       // 지형·장애물
         const c=Math.floor(py[i]/RACE_CELL);
         if(c<0||c>=cells) continue;
         const list=grid[c];
-        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, tt, px, py, vx, vy);
+        for(let k=0;k<list.length;k++) raceHit(B[list[k]], i, px, py, vx, vy, rang, rav);
       }
       /* 구슬끼리 — y 로 정렬해 두면 창(지름) 밖은 볼 것도 없이 끊을 수 있다. 24개면 삽입정렬이
          매 스텝 거의 정렬된 배열을 다시 훑는 꼴이라 정렬 비용이 사실상 0 이다.
@@ -2469,6 +2515,7 @@ function raceSimulate(map, n, rnd){
     }
     const base=f*n*2;
     for(let i=0;i<n;i++){ path[base+i*2]=px[i]; path[base+i*2+1]=py[i]; }
+    for(let k=0;k<RC;k++) rot[f*RC+k]=rang[k];
     frames=f+1;
     let lead=0;
     for(let i=1;i<n;i++) if(py[i]>py[lead]) lead=i;
@@ -2489,16 +2536,17 @@ function raceSimulate(map, n, rnd){
     if(py[lead]>=map.finishY) winner=lead;
   }
   return { ok:winner>=0, winner, frames, leadChanges, distinctLeaders, rankChurn,
-           path:path.subarray(0, frames*n*2), n };
+           path:path.subarray(0, frames*n*2), rot:rot.subarray(0, frames*RC), rc:RC, n };
 }
 
 /* 구슬 i 와 캡슐 하나. 위치를 밀어내고 법선 반사 + 반발계수만 적용한다 — 접선은 손대지 않으므로
    마찰이 0 이다. 회전 막대는 접촉점의 표면 속도를 기준계로 삼아 그만큼 되돌려 준다(그래야 날개가
    구슬을 실제로 밀어낸다). */
-function raceHit(b, i, tt, px, py, vx, vy){
-  let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2, sxv=0, syv=0;
-  if(b.sp){
-    const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
+function raceHit(b, i, px, py, vx, vy, rang, rav){
+  let x1=b.x1,y1=b.y1,x2=b.x2,y2=b.y2, sxv=0, syv=0, w=0;
+  if(b.ri>=0){
+    w=rav[b.ri];
+    const a=rang[b.ri], ca=Math.cos(a), sa=Math.sin(a);
     x1=b.cx-b.hl0*ca; y1=b.cy-b.hl0*sa; x2=b.cx+b.hl*ca; y2=b.cy+b.hl*sa;
   }
   const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
@@ -2510,14 +2558,25 @@ function raceHit(b, i, tt, px, py, vx, vy){
   if(d2>=rr*rr) return;
   let d=Math.sqrt(d2);
   if(d<1e-9){ nx=0; ny=-1; d=1e-9; } else { nx/=d; ny/=d; }
+  /* 위치는 구슬만 민다. 회전체는 축이 고정이라 평행이동할 수 없다. */
   px[i]+=nx*(rr-d); py[i]+=ny*(rr-d);
-  if(b.sp){ sxv=-b.sp*(qy-b.cy); syv=b.sp*(qx-b.cx); }
+  if(b.ri>=0){ sxv=-w*(qy-b.cy); syv=w*(qx-b.cx); }
   const rvx=vx[i]-sxv, rvy=vy[i]-syv;
   const vn=rvx*nx+rvy*ny;
   if(vn>=0) return;
   const e=b.e||RACE_E_WALL;
-  vx[i]=rvx-(1+e)*vn*nx+sxv;
-  vy[i]=rvy-(1+e)*vn*ny+syv;
+  if(!b.invI){                       // 무한 질량 — 벽·정적 지형·등속 회전체
+    vx[i]=rvx-(1+e)*vn*nx+sxv;
+    vy[i]=rvy-(1+e)*vn*ny+syv;
+    return;
+  }
+  /* 자유 회전체. 충격량을 구슬과 로터가 나눠 갖는다 — 이것이 '밀어붙이는 벽'과 '맞으면 돌아가는
+     날개'를 가르는 전부다. rn 은 접촉점 지렛대(r × n)이고, 분모의 rn²·invI 가 로터 몫이다.
+     구슬 질량을 1 로 두었으므로 1/m 은 1 이다. 날개 끝을 때릴수록 rn 이 커져 로터가 더 돈다. */
+  const rn=(qx-b.cx)*ny-(qy-b.cy)*nx;
+  const j=-(1+e)*vn/(1 + rn*rn*b.invI);
+  vx[i]+=j*nx; vy[i]+=j*ny;
+  rav[b.ri]=w + rn*j*b.invI;
 }
 
 // 시드 PRNG — 코스와 출발 배치가 판마다 달라진다. 시드 하나로 완전히 재현된다.
@@ -4089,11 +4148,11 @@ function playRace(players, onDone){
         stamp[bi] = stampNo;
         const b = map.bodies[bi];
         ctx.lineWidth = 2*b.rad;
-        if(b.sp){
-          /* 큰 날은 두 팔을 축에서 따로, 다른 색으로 그린다. 길이 비대칭만으로도 회전은 읽히지만
-             색 대비가 훨씬 즉각적이다 — 지나가는 1~1.5초 안에 '돌고 있다'가 보여야 한다.
-             축 점은 그 위에 찍는다. 축이 보여야 도는 물건으로 읽힌다. */
-          const a=b.ph+b.sp*tt, ca=Math.cos(a), sa=Math.sin(a);
+        if(b.ri>=0){
+          /* 회전체 각도는 시뮬이 프레임마다 적어 둔 표에서 읽는다. 자유 회전체는 충돌로 각속도가
+             바뀌므로 ph+sp*t 같은 닫힌 식이 없다 — 그림이 물리와 어긋나지 않으려면 같은 값을 봐야 한다.
+             두 팔을 축에서 따로, 다른 색으로 그려 회전 방향이 색 대비로 즉시 읽히게 한다. */
+          const a=sim.rot[f*sim.rc + b.ri], ca=Math.cos(a), sa=Math.sin(a);
           ctx.strokeStyle="#8a7355";                     // 긴 팔
           ctx.beginPath(); ctx.moveTo(b.cx, b.cy-camY);
           ctx.lineTo(b.cx+b.hl*ca, b.cy+b.hl*sa-camY); ctx.stroke();
