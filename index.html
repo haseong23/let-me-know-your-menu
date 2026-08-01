@@ -638,7 +638,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.92";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.93";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2080,6 +2080,37 @@ function rpathFunnel(B, y, rnd){
 // 못밭 — 바깥 못을 벽에서 26 이상 띄운다. 18 에 두면 벽에 붙은 구슬(중심 x=9)이 못과 벽 사이에
 // 껴서 영원히 안 내려온다(중심 거리 9 < R + 못반지름 14). 벽 쪽에 통로가 생기지만 그대로 둔다 —
 // 출발이 깔때기라 이 구간에 들어올 때의 x 는 출발 위치와 무관하고, 통로를 타는 건 그때그때의 운이다.
+/* 점 하나에서 물체까지의 거리. 회전 막대는 '쓸고 지나가는 원' 전체를 물체로 친다 — 지금
+   각도만 피해도 반 바퀴 뒤에는 그 자리에 팔이 온다. 배경 못을 깔 때만 쓴다. */
+function rdistToBody(b, x, y){
+  if(b.sp) return Math.sqrt((x-b.cx)*(x-b.cx)+(y-b.cy)*(y-b.cy)) - (b.hl + b.rad);
+  const dx=b.x2-b.x1, dy=b.y2-b.y1, L2=dx*dx+dy*dy;
+  let t = L2>0 ? ((x-b.x1)*dx+(y-b.y1)*dy)/L2 : 0;
+  t = t<0?0 : t>1?1 : t;
+  const qx=b.x1+t*dx, qy=b.y1+t*dy;
+  return Math.sqrt((x-qx)*(x-qx)+(y-qy)*(y-qy)) - b.rad;
+}
+
+/* 배경 못 — 어떤 장애물이 뽑히든 그 위에 성기게 깔린다.
+   계측이 이유다: 한 판의 정적 물체가 50개뿐이었고 그중 못은 5개였다(참고한 공개 구현은
+   스테이지당 원만 ~58개다). 못이 없는 1자길은 '가만히 떨어지는 구간'이 되어, 코스 후반으로
+   갈수록 선두 교체가 단조 감소했다.
+   이미 놓인 물체에서 지름(18)+여유만큼 떨어진 자리에만 놓는다 — 정적 물체끼리 붙으면 그 사이가
+   구슬보다 좁아져 낄 자리가 된다. from 은 '이 구간에서 처음 놓인 물체'의 인덱스다. */
+function robBackPins(B, y, h, rnd, from){
+  const dy=66, dx=54, r=4, need=r+2*RACE_R+7;
+  for(let j=0; ; j++){
+    const yy=y+44+j*dy;
+    if(yy > y+h-34) break;
+    const off=(j%2)?dx/2:0;
+    for(let x=32+off; x<=RACE_W-32; x+=dx){
+      let ok=true;
+      for(let i=from;i<B.length;i++){ if(rdistToBody(B[i], x, yy) < need){ ok=false; break; } }
+      if(ok) B.push(rpeg(x, yy, r));
+    }
+  }
+}
+
 function robPins(B, y, h, rnd){
   const dy=46, dx=37, r=5, edge=26;
   const rows=Math.max(2, Math.floor((h-60)/dy));
@@ -2190,7 +2221,26 @@ function robBounce(B, y, h, rnd, rows){
    코스 대부분을 RACE_VMAX 클램프에 붙어 내려오므로 중력보다 약한 상승풍은 "더 빨라지지 않게"
    할 뿐 아무 일도 안 한다. 분수는 바깥으로 미는 힘 때문에 0.09초 만에 제트를 벗어난다.
    힘장이라는 개념 자체(rfield · 시뮬의 fl 분기 · drawField)를 여기서 함께 지웠다. */
-const RACE_OBS = [robPins, robVane, robVaneField, robIsland, robBumpers, robBounce];
+/* 관문 구간 — 코스를 통째로 쓸고 지나가는 긴 팔 하나. 결승 앞에 쓰던 장치를 코스 중간에도 둔다.
+   계측이 이유다: 무리의 퍼짐이 146 → 2079 로 단조 증가해서, 후반의 선두 교체가 '멀리서 두 점이
+   스치는 것'으로만 보였다. 관문은 먼저 온 구슬을 잠깐 붙잡아 두므로 무리를 다시 모은다.
+   깔때기와 다른 점이 여기다 — 깔때기는 한 줄로 세워 순서를 보존하지만, 관문은 열리는 순간
+   누가 앞에 있었는지와 무관하게 통과 순서가 뒤집힌다.
+   축을 코스 밖에 두는 이유는 결승 관문과 같다: 코스를 지나는 구간이 완만한 호가 되어 같은
+   각속도로도 걸쳐 있는 시간이 길어진다. */
+function rpathGate(B, y, rnd){
+  const h=170;
+  const gx = rnd()<0.5 ? -70 : RACE_W+70;
+  B.push(rbar(gx, y+h*0.5, 340, 6, (rnd()<0.5?1:-1)*(0.9+rnd()*0.6), rnd()*6.283, 0));
+  return h;
+}
+
+/* ── ③ 세기 차례 ──
+   약한 것부터 센 것 순으로 늘어놓는다. 예전에는 매 1자길이 여섯 중 하나를 무작위로 뽑아서,
+   판마다 초반이 격렬하고 후반이 조용하기도 하고 그 반대이기도 했다 — 설계된 곡선이 없었다.
+   코스 진행률에 맞춰 이 순서에서 뽑으면 매 판 같은 기승전결이 나온다. 인접한 한 칸까지
+   흔들어(±1) 판마다 같은 그림이 되지는 않게 한다. */
+const RACE_OBS = [robPins, robIsland, robBumpers, robVaneField, robBounce, robVane];
 
 /* 출발 깔때기 — 구슬을 한 곳에 쏟아 문 하나로 내보낸다. 출발선의 좌우 위치가 결과에 남지 않게
    만드는 장치다. 이게 없으면 코스가 특정 레인을 유리하게 만들 때 출발 그리드가 곧 답이 된다 —
@@ -2215,14 +2265,30 @@ function raceMapBuild(rnd, soft){
   // 1자길 한 칸 + 그 안에 들어갈 장애물 하나. 마지막 구간도 같은 것을 쓰므로 함수로 묶는다.
   // 다섯째 인자는 세기다 — robVane 은 긴 팔 길이, robVaneField·robBounce 는 줄 수.
   // 나머지 셋(robPins·robIsland·robBumpers)은 안 읽는다.
-  const straightWithObstacle=(yy)=>{
-    const ob=RACE_OBS[Math.floor(rnd()*RACE_OBS.length)];
+  /* prog 0~1 이 코스 진행률이다. 그 자리에 어울리는 세기의 장애물을 고르고, 그 위에 배경 못을
+     깐다. from 을 넘기는 이유는 배경 못이 '이 구간에 방금 놓인 것'만 피하면 되기 때문이다. */
+  let straightNo=0;
+  const straightWithObstacle=(yy, prog)=>{
+    const L=RACE_OBS.length;
+    const base=Math.floor(prog*(L-1)+0.5);
+    const pick=Math.max(0, Math.min(L-1, base + (rnd()<0.5?0:(rnd()<0.5?-1:1))));
+    const ob=RACE_OBS[pick];
+    const from=B.length;
     const h=rpathStraight(B, yy, rnd);
     ob(B, yy, h, rnd, soft ? (ob===robVane ? 78 : 2) : undefined);
+    robBackPins(B, yy, h, rnd, from);
+    straightNo++;
     return h;
   };
+  /* 관문 두 개를 40%·70% 자리에 끼워 넣는다. 섞지 않고 자리를 고정하는 이유는 이것이 '무리를
+     다시 모으는' 장치라서다 — 어디에 놓이든 상관없는 장식이 아니라, 퍼짐이 벌어지기 시작하는
+     지점에 있어야 일을 한다. */
+  const gateAt = new Set([Math.round(mix.length*0.4), Math.round(mix.length*0.7)]);
+  const nStr = mix.filter(k=>k==="s").length + 1;   // 마지막 1자길까지
+  let strDone=0;
   for(let s=0;s<mix.length;s++){
-    if(mix[s]==="s")      y+=straightWithObstacle(y);
+    if(gateAt.has(s)) y+=rpathGate(B, y, rnd);
+    if(mix[s]==="s"){ y+=straightWithObstacle(y, strDone/(nStr-1)); strDone++; }
     else if(mix[s]==="z") y+=rpathZig(B, y, rnd);
     else                  y+=rpathFunnel(B, y, rnd);
   }
@@ -2232,7 +2298,7 @@ function raceMapBuild(rnd, soft){
      이 자리를 장애물로 바꾸자 59% 가 됐다(200판). 마지막까지 모른다는 게 이 게임의 전부라,
      결승 직전이야말로 가장 흔들려야 하는 자리다.
      좁은 문으로 모으는 그림은 바로 아래 결승 구역 캡슐(틈 68)이 여전히 맡는다. */
-  y+=straightWithObstacle(y);
+  y+=straightWithObstacle(y, 1);       // 마지막 1자길 — 가장 센 장애물이 온다
   /* ── 결승 구역 ── 깔때기 + 좁고 긴 통로 + 그 입구를 쓸고 다니는 관문.
 
      통로를 길게 뽑는 것이 요점이다. 벽 안쪽 사이가 32 라 구슬 지름(18)의 1.8배 — 두 구슬이
@@ -2254,11 +2320,31 @@ function raceMapBuild(rnd, soft){
      결승에 다가가는 몇 초 동안 관문이 한 자세로 서 있다시피 해서 열고 닫는 장면이 안 나오고,
      실제로 3/4 지점 역전이 24명 판에서 58% 로 떨어졌다(지금 62%). 더 빠르면 '느리게 도는
      관문'이라는 성격이 사라지고 역전도 다시 내려간다(57%). */
-  const NECK=20, CHAN=170;                       // 통로 벽 중심의 반간격 · 통로 길이
+  /* 통로를 넓히고 짧게 하고, 양 벽에 짧은 날개를 사다리처럼 세운다.
+     계측이 이유다 — 90~100% 구간의 선두 교체가 코스 전체에서 가장 적었다(104회, 최고점의 28%).
+     통로 안쪽이 24 라 지름 18 인 구슬이 한 줄로만 서고, 길이 170 동안 추월할 자리가 없어서
+     설계상 죽은 구간이었다. 클라이맥스여야 할 자리가 가장 조용했다.
+
+     배치는 참고한 공개 구현(MIT)의 'Pot of greed' 끝 구간을 그대로 옮긴 것이다. 그쪽은 폭 20
+     남짓한 통로의 양 벽에 길이 1~2 짜리 짧은 날개를 3 간격으로 사다리처럼 걸고, 좌우를 서로
+     반대로 ±10 rad/s 로 돌린다. 우리 스케일로 환산하면:
+       · 팔 길이 — 코스 폭 대비 그쪽 5~10% → 우리 폭 200 에 13
+       · 세로 간격 — 그쪽 통로 폭의 0.19배 → 우리 통로 60 에 34
+       · 각속도 — 끝속도가 코스 폭의 약 0.5배/초가 되게. 그쪽 10×1/20 ≈ 0.5 이므로
+                  우리는 ω×13/200 = 0.5 → ω ≈ 7.7. 큰 날(2.2~3.4)보다 훨씬 빠르다.
+     날개가 짧아서 막지는 않는다 — 양쪽에서 13 씩 들어와도 가운데 34 가 남아 지름 18 이 지난다.
+     통로는 60 폭이라 구슬 세 개가 나란히 서고, 길이는 120 으로 줄여 죽은 구간을 짧게 했다. */
+  const NECK=34, CHAN=120;                       // 통로 벽 중심의 반간격 · 통로 길이
   B.push(rcap(-8, y+20, RACE_W/2-NECK, y+120, 4));
   B.push(rcap(RACE_W+8, y+20, RACE_W/2+NECK, y+120, 4));
   B.push(rcap(RACE_W/2-NECK, y+120, RACE_W/2-NECK, y+120+CHAN, 4));
   B.push(rcap(RACE_W/2+NECK, y+120, RACE_W/2+NECK, y+120+CHAN, 4));
+  { const VHL=13, VDY=34, VW=7.7;
+    let k=0;
+    for(let vy=y+120+22; vy<y+120+CHAN-10; vy+=VDY, k++){
+      const left = k%2===0;
+      B.push(rbar(RACE_W/2+(left?-NECK:NECK), vy, VHL, 4, (left?1:-1)*VW, rnd()*6.283));
+    } }
   // 축을 좌우 중 한쪽 바깥에 둔다. 매 판 뒤집어 어느 한쪽이 구조적으로 유리해지지 않게 한다.
   const gx = rnd()<0.5 ? -70 : RACE_W+70;
   B.push(rbar(gx, y+46, 340, 6, (rnd()<0.5?1:-1)*(0.9+rnd()*0.6), rnd()*6.283, 0));
@@ -3852,7 +3938,10 @@ const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pr
    본다. 승자를 보고 다시 뽑으면 그게 거부 표집이고, 그러면 게임 앞에 설명할 수 없는 대기가 붙는다.
    한 판 계산이 24명에서 최대 27ms 라 몇 번 돌려도 사용자는 못 느낀다. */
 const RACE_TRIES = 6;
-const RACE_MIN_S = 13, RACE_MAX_S = 23;
+/* 코스가 길어져(4810 → 5100) 중앙값이 20초대로 올라갔다. 창을 그대로 두면 절반 넘는 시드가
+   문턱에 걸려 재시도로 버려지고, 결국 문턱을 못 넘은 판을 쓰게 된다 — 채택 기준이 사실상
+   사라지는 셈이다. 실측 분포(16.6~33.1초)에 맞춰 넓힌다. */
+const RACE_MIN_S = 15, RACE_MAX_S = 30;
 /* 문턱은 leadChanges 가 아니라 '선두를 잡아 본 구슬 수'로 잡는다. 예전 문턱(역전 3회)은 계측해
    보니 아무것도 안 걸렀다 — 여섯 명 판에서도 하위 10% 가 4회라 첫 판이 거의 그대로 통과했다.
    즉 역동성을 고른 적이 없다. n 이 작을수록 구조적 상한이 낮아서 단을 나눈다(넷을 요구하면
