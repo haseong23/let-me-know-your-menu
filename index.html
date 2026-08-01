@@ -2018,7 +2018,12 @@ const RACE_MAXF = 4200;      // 70초. 이 안에 1등이 안 나오면 그 시�
 const RACE_CELL = 140;       // 정적 물체 y 격자 셀 높이 — 구슬 하나가 훑을 물체를 이 단위로 줄인다
 /* 1자 5 · 지그재그 3 · 깔때기 2. 깔때기를 셋에서 둘로 줄였다 — 한 줄로 세워 통과시키는 구간이라
    들어간 순서가 거의 그대로 나온다(실사용 제보: "깔때기에서는 순위 역전이 안 일어난다").
-   그 자리를 1자길로 돌리면 장애물이 하나 더 들어가고, 순위를 흔드는 건 장애물이다. */
+   그 자리를 1자길로 돌리면 장애물이 하나 더 들어가고, 순위를 흔드는 건 장애물이다.
+
+   남은 둘은 그대로 둔다. 아예 없애는 것도 재봤는데 아무것도 안 바뀌었다 — 24명 판에서 3/4
+   지점 역전 43%→42%, 순위 변동 3.07→3.15 로 오차 안이고, 2인 판만 길어졌다(>23초 2%→5.5%).
+   빼서 얻는 게 없으면 한 줄로 흐르는 그림이라도 남기는 편이 낫다. 정작 문제였던 건 개수가
+   아니라 '마지막이 항상 깔때기'라는 자리였고, 그건 raceMapBuild 아래에서 걷어냈다. */
 const RACE_SEG_MIX = ["s","s","s","s","s","z","z","z","f","f"];
 
 /* 캡슐 하나로 못·벽·경사·기둥을 전부 표현한다 — 원-선분 거리 계산 하나면 넷이 다 풀린다.
@@ -2180,16 +2185,26 @@ function raceMapBuild(rnd, soft){
      비율을 묶으면 길이가 모이고, 다양성은 '어떤 장애물이 어느 순서로 오느냐'가 맡는다. */
   const mix=RACE_SEG_MIX.slice();   // 아래 셔플은 순서만 바꾼다
   for(let i=mix.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=mix[i]; mix[i]=mix[j]; mix[j]=t; }
+  // 1자길 한 칸 + 그 안에 들어갈 장애물 하나. 마지막 구간도 같은 것을 쓰므로 함수로 묶는다.
+  // 다섯째 인자는 세기다 — robVane 은 긴 팔, robBounce 는 줄 수. 나머지 셋은 안 읽는다.
+  const straightWithObstacle=(yy)=>{
+    const ob=RACE_OBS[Math.floor(rnd()*RACE_OBS.length)];
+    const h=rpathStraight(B, yy, rnd);
+    ob(B, yy, h, rnd, soft ? (ob===robVane ? 78 : 2) : undefined);
+    return h;
+  };
   for(let s=0;s<mix.length;s++){
-    if(mix[s]==="s"){
-      const ob=RACE_OBS[Math.floor(rnd()*RACE_OBS.length)];
-      const h=rpathStraight(B, y, rnd);
-      // 다섯째 인자는 세기다 — robVane 은 긴 팔, robBounce 는 줄 수. 나머지 셋은 안 읽는다.
-      ob(B, y, h, rnd, soft ? (ob===robVane ? 78 : 2) : undefined); y+=h;
-    } else if(mix[s]==="z") y+=rpathZig(B, y, rnd);
-    else                    y+=rpathFunnel(B, y, rnd);
+    if(mix[s]==="s")      y+=straightWithObstacle(y);
+    else if(mix[s]==="z") y+=rpathZig(B, y, rnd);
+    else                  y+=rpathFunnel(B, y, rnd);
   }
-  y+=rpathFunnel(B, y, rnd);              // 마지막은 항상 좁은 문 — 결승 직전에 몰린다
+  /* 마지막 구간도 1자길 + 장애물이다. 예전에는 여기가 항상 깔때기였고 "결승 직전에 몰린다"는
+     연출을 노렸는데, 계측해 보니 하는 일이 정반대였다 — 한 줄로 세워 통과시키니 들어간 순서가
+     그대로 결승선까지 갔다. 코스 3/4 지점의 선두가 결국 지는 비율이 24명 판에서 43% 였던 것이
+     이 자리를 장애물로 바꾸자 59% 가 됐다(200판). 마지막까지 모른다는 게 이 게임의 전부라,
+     결승 직전이야말로 가장 흔들려야 하는 자리다.
+     좁은 문으로 모으는 그림은 바로 아래 결승 구역 캡슐(틈 68)이 여전히 맡는다. */
+  y+=straightWithObstacle(y);
   const finishY=y+150;
   B.push(rcap(-8, y+20, RACE_W/2-34, y+130, 4));
   B.push(rcap(RACE_W+8, y+20, RACE_W/2+34, y+130, 4));
