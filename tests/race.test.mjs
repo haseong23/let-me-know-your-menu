@@ -15,7 +15,7 @@ const blocks = [...html.matchAll(/\/\* @test-export:start \*\/([\s\S]*?)\/\* @te
 assert.ok(blocks.length, "index.html 에서 마커 블록을 못 찾았다");
 const pure = blocks.join("\n");
 
-const G = runInContext(pure + "\n;({raceMapBuild,raceSimulate,raceRnd,RACE_W,RACE_R})", createContext({}));
+const G = runInContext(pure + "\n;({raceMapBuild,raceSimulate,raceRnd,raceOrder,RACE_W,RACE_R})", createContext({}));
 
 const SEEDS = 20;
 const CREW = [2, 3, 5, 10, 16, 24];
@@ -96,4 +96,25 @@ test("버블이 실제로 터진다", () => {
   }
   assert.ok(total > 0, "버블이 하나도 없다");
   assert.ok(popped >= total * 0.15, `${total}개 중 ${popped}개만 터졌다 — 지나가는 길이 아니라 벽이 됐다`);
+});
+
+/* 보이는 1등과 발표되는 1등이 같아야 한다. 결승선을 지난 구슬은 그 자리에 얼어붙고 아직
+   달리는 구슬은 선 너머까지 떨어지므로, 순위를 y 로만 매기면 나중에 지나간 쪽이 앞에 선다. */
+test("순위 — 결승선을 지난 구슬이 늘 앞이고, 1등은 실제 승자다", () => {
+  const wrong = [];
+  for (const n of [2, 4, 10, 24]) {
+    for (let s = 1; s <= SEEDS; s++) {
+      const { r } = run(n, s);
+      if (!r.ok) continue;
+      const rank = Array.from({ length: n }, (_, i) => i);
+      const ypos = new Array(n);
+      for (const f of [r.frames - 1, Math.floor(r.frames * 0.9)]) {
+        for (let i = 0; i < n; i++) ypos[i] = r.path[f * n * 2 + i * 2 + 1];
+        const order = G.raceOrder(rank.slice(), r.done, ypos, f);
+        if (r.done[r.winner] <= f && order[0] !== r.winner)
+          wrong.push(`n=${n} seed=${s} f=${f}: 1등이 #${order[0]}, 실제는 #${r.winner}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 5), [], `순위가 틀린 판 ${wrong.length}건`);
 });

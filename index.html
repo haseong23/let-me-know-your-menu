@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v9.98";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v9.99";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2341,6 +2341,21 @@ const RACE_GOAL_H = 2.2;          // 결승 괘선 두 줄 사이 간격(글자�
 const RACE_ZOOM_TRIG = 5, RACE_ZOOM_MAX = 4, RACE_LERP = 1/10, RACE_SNAP = 1/30;
 const RACE_SLOW_MIN = 0.2, RACE_SLOW_NEAR = 1.6;
 
+/* 순위 — 이미 들어온 구슬이 항상 앞이고, 그들끼리는 들어온 순서다.
+   y 로만 매기면 안 된다. 결승선을 지난 구슬은 그 자리에 얼어붙는데(done 이후 적분을 멈춘다)
+   아직 달리는 구슬은 선 너머까지 계속 떨어진다 — 그래서 나중에 지나간 쪽이 화면과 HUD 에서
+   1등 자리를 빼앗는다. 계측으로는 90판 중 64판이 그랬다. 발표되는 승자(sim.winner)는 늘
+   맞았으므로, 보이는 것과 발표가 어긋나는 형태로만 드러났다. */
+function raceOrder(rank, done, ypos, f){
+  return rank.sort((a,b)=>{
+    const fa = done[a]>=0 && done[a]<=f, fb = done[b]>=0 && done[b]<=f;
+    if(fa && fb) return done[a]-done[b];
+    if(fa) return -1;
+    if(fb) return 1;
+    return ypos[b]-ypos[a];
+  });
+}
+
 function raceLerp(cur, tgt){ return Math.abs(tgt-cur) < RACE_SNAP ? tgt : cur + (tgt-cur)*RACE_LERP; }
 
 /* @test-export:end */
@@ -3936,7 +3951,7 @@ function playRace(players, onDone){
   function draw(t){
     const f = frameAt(t), b0 = f*n*2;
     for(let i=0;i<n;i++) ypos[i] = sim.path[b0+i*2+1];
-    rank.sort((a,b)=> ypos[b]-ypos[a]);
+    raceOrder(rank, sim.done, ypos, f);
     const ti = targetIndex(f), tgt = rank[ti];
     const tx = sim.path[b0+tgt*2], ty = ypos[tgt];
 
