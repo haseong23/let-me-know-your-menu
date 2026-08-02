@@ -25,7 +25,21 @@
     posthog.init('phc_vSyb6K3ikrthTTDDHRwKjGVYdJEncX35drPBHuVwuN6P', {
         api_host: 'https://us.i.posthog.com',
         defaults: '2026-05-30',
+        /* 익명 방문자에게는 사람 프로필을 만들지 않는다. 셀에 들어와 본인을 고른 순간에만
+           identify 로 사람이 된다 — 그 전까지는 누구인지 알 방법도 없고 알 필요도 없다. */
         person_profiles: 'identified_only',
+        capture_pageview: true,
+        capture_pageleave: true,      // 체류 시간을 재려면 떠나는 것도 잡아야 한다
+        rageclick: true,              // 같은 자리를 연타하는 것 — '눌리는 줄 알았는데 안 눌린다'의 신호
+        session_recording: {
+            /* 입력값은 전부 가린다. 이 앱의 입력은 이름·메모·직접입력 메뉴라 전부 사람에 관한
+               것이다. 화면에 이미 그려진 이름까지 가리려면 maskTextSelector 를 넓히면 되는데,
+               그러면 리플레이가 회색 상자만 남아 UI 를 보는 목적이 사라진다 — 그래서 입력만
+               가리고, 정말 가려야 하는 자리는 data-pii 를 붙여 지정한다. */
+            maskAllInputs: true,
+            maskTextSelector: '[data-pii]',
+            recordCrossOriginIframes: false,
+        },
     })
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -648,7 +662,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.05";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.06";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1083,9 +1097,75 @@ function finishConfirm(result){ // 버튼으로 닫기: 히스토리 항목 소�
 }
 $cscrim.addEventListener("click",e=>{ if(e.target===$cscrim) finishConfirm(false); });
 let toastT;
+/* ── 계측(PostHog) ──
+   자동수집만으로는 이 앱을 못 읽는다. 자동수집은 DOM 셀렉터에 붙어 있어서 버튼 문구나 구조를
+   바꾸면 그 전후가 끊기고(이번 주에만 게임 UI 를 네 번 갈아엎었다), '무엇을 눌렀나'는 알려줘도
+   '무엇이 일어났나'는 모른다. 그래서 뜻이 있는 사건만 이름을 코드에 고정해 따로 보낸다.
+
+   원칙 셋.
+     ① 이름은 과거형 스네이크다. 사건을 적지 화면을 적지 않는다 — order_submitted 이지
+        'OrderSheet' 가 아니다. 화면 이름은 바뀌지만 사건은 안 바뀐다.
+     ② 사람을 알아볼 수 있는 값은 안 보낸다. 이름·메모·직접입력 문구는 유무와 길이만 보낸다.
+        member id 는 보낸다 — 앱이 만든 가명이고, 이게 있어야 '같은 사람이 다시 왔나'를 잇는다.
+     ③ track 은 절대 던지지 않는다. 계측이 앱을 멈추는 일은 없어야 한다.
+   속성 이름은 어느 사건에서나 같은 뜻으로 쓴다(cafe_id 는 늘 카페, kind 는 늘 게임 종류) —
+   그래야 나중에 사건을 가로질러 묶을 수 있다. */
+function ph(){ try{ return window.posthog || null; }catch(e){ return null; } }
+function trackBase(){
+  const o = { app_version: APP_VERSION };
+  try{
+    if(CELL) { o.cell_id = CELL.id; o.member_count = MEMBERS.length; }
+    if(SESSION){
+      o.serving_state = SESSION.state;
+      if(SESSION.cafeId) o.cafe_id = SESSION.cafeId;
+      o.is_host = !!(ME && SESSION.hostId === ME);
+    }
+    o.is_admin = !!adminMode;
+  }catch(e){}
+  return o;
+}
+function track(name, props){
+  try{ const p = ph(); if(p && p.capture) p.capture(name, Object.assign(trackBase(), props||{})); }catch(e){}
+}
+/* 셀에 들어와 본인을 고른 뒤에만 사람이 된다. 사람 속성에도 이름은 넣지 않는다 —
+   누가 누군지는 앱이 알면 되고 분석 도구는 '같은 사람인지'만 알면 된다. */
+/* 주문에서 남기는 것은 '모양'뿐이다. 메뉴 이름은 셀이 직접 만든 것이라 사람 이름이 섞일 수
+   있고(직접입력), 메모는 그 자체가 사적인 문장이다. 그래서 유무와 길이만 센다.
+   대신 옵션을 몇 개 붙였는지·온도를 바꿨는지는 남긴다 — 옵션 UI 를 손볼 때 필요한 값이다. */
+function trackOrder(o, via){
+  o = o || {};
+  track("order_submitted", {
+    via,
+    is_custom: !o.menuId,
+    temp: o.temp || null,
+    extras_count: (o.extras || []).length,
+    has_note: !!(o.note && o.note.trim()),
+    note_len: (o.note || "").trim().length,
+  });
+}
+/* 마감 시점의 판 크기. 이게 있어야 '주문율이 낮은 판은 무엇이 달랐나'를 물을 수 있다. */
+function trackServingStats(){
+  try{
+    const os = Object.values(ORDERS || {});
+    return { orders: os.length, drinks: os.filter(x=>x && x.type!=="skip").length,
+             skips: os.filter(x=>x && x.type==="skip").length, roster: MEMBERS.length };
+  }catch(e){ return {}; }
+}
+function trackIdentify(){
+  try{
+    const p = ph(); if(!p || !p.identify || !ME) return;
+    p.identify(ME, { cell_id: CELL ? CELL.id : null, member_count: MEMBERS.length });
+  }catch(e){}
+}
+try{ const p0 = ph(); if(p0 && p0.register) p0.register({ app_version: APP_VERSION }); }catch(e){}
+
 function toast(m){ $toast.textContent=m; $toast.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>$toast.classList.remove("show"),1700); }
 // 쓰기 작업 안전 래퍼: 실패 시 토스트, 성공 여부 반환
-async function safeWrite(p, failMsg){ try{ await p; return true; }catch(e){ console.error(e); toast(failMsg||"저장 실패 — 네트워크 확인 후 다시 시도해주세요"); return false; } }
+/* 쓰기 실패는 사용자가 말해 주지 않는다 — 한 번 더 눌러 보고 되면 그냥 넘어간다.
+   그래서 여기서 잡는다. 얼마나 자주 나는지 모르면 고칠지 말지도 못 정한다. */
+async function safeWrite(p, failMsg){ try{ await p; return true; }catch(e){ console.error(e);
+  track("write_failed", { message: String(e && e.message || e).slice(0,120), online: navigator.onLine });
+  toast(failMsg||"저장 실패 — 네트워크 확인 후 다시 시도해주세요"); return false; } }
 // 이중 제출 가드: 비동기 쓰기 진행 중 재진입(빠른 더블탭) 차단 → 중복 요청·토스트 방지
 let busyWrite=false;
 async function guardWrite(fn){ if(busyWrite) return; busyWrite=true; try{ return await fn(); } finally{ busyWrite=false; } }
@@ -1421,13 +1501,13 @@ function renderOpen(){
      '주문함'에서 '안 마심'으로 상태가 통째로 바뀌고, 섬기는 분 화면의 잔 수까지 줄어든다. */
   view().querySelectorAll(".skip-btn").forEach(b=> b.onclick=async()=>{
     if(!(await askConfirm("오늘은 음료를 안 드시는 거죠?\n마음이 바뀌면 아래에서 메뉴를 고르면 돼요.",{ok:"네, 안 마실게요"}))) return;
-    guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
+    guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"idle"}); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
   });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); trackOrder(o,"copy_other"); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
   /* 지난번 주문 → 주문 시트를 채워서 연다. 바로 서버에 쓰지 않는 이유가 둘이다.
      ① 검증. 저장된 옵션이 지금도 유효한지는 시트의 draw() 가 판정한다(온도는 temps 로 조이고
         extras 는 availExtras 로 거른다). 여기서 바로 쓰면 그 판정을 한 벌 더 만들어야 하고,
@@ -1555,9 +1635,9 @@ function openOrderSheet(menuId, existing, prefill){
     document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
       if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
       const ord={type:"drink",menuId,menuName:m.name,temp,extras,note};
-      if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
+      if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); trackOrder(ord, existing?"edit":"sheet"); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
-    const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ closeSheet(); toast("주문을 취소했어요"); render(); } };
+    const co=document.getElementById("cancelOrder"); if(co) co.onclick=async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ track("order_removed"); closeSheet(); toast("주문을 취소했어요"); render(); } };
   }
   draw();
 }
@@ -1620,7 +1700,7 @@ function openCustomSheet(existing, prefillName, prefillNote){
   // 기존 메뉴로 자연스럽게 전환 — 알림창 대신 이미 쓰던 시트 전환(openFullMenuSheet의 메뉴 클릭과 동일한 방식)
   function goToExisting(m){ openOrderSheet(m.id, existing); }
   function goToSkip(){ guardWrite(async()=>{ forceGrid=false;
-    if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }); }
+    if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"sheet"}); closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }); }
   function refreshSuggestions(){
     const qn=norm(nameEl.value);
     isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
@@ -1653,6 +1733,7 @@ function openCustomSheet(existing, prefillName, prefillNote){
     forceGrid=false;
     const cOrd={type:"drink",menuId:"c:"+name,menuName:name,temp,extras:[],note};
     if(!(await safeWrite(Sync.setOrder(ME,cOrd,SESSION.seq)))) return;
+    trackOrder(cOrd,"custom");
     rememberOrder(cOrd);
     bumpFreq("c:"+name);
     // 직접입력 메뉴는 이 셀 주문(menu_name)으로만 저장 — 그날 이 셀 그리드에 표시(customMenusFromOrders).
@@ -1843,7 +1924,7 @@ function renderBottom(){
   bind("takeover",()=>doClaim(SESSION.cafeId||(CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
   bind("gamepickBar",e=>{ gameEnsure(e.currentTarget); openGameSheet(); });   // 하단바 진입도 포커스 복귀 지점을 남긴다
   bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("이 섬김을 취소할까요?\n주문이 있으면 섬김은 그대로 남아요. 다른 분이 이어받으면 지금까지 고른 메뉴도 그대로 돌아옵니다.\n아직 주문이 하나도 없으면 이 섬김은 사라져요.",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
-  bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ viewSeq=seq; render(); } }});
+  bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ track("serving_closed", trackServingStats()); viewSeq=seq; render(); } }});
   bind("reopen",async()=>{ const seq=SESSION.seq; if(await safeWrite(Sync.reopen(seq),"다시 열 수 없어요 — 다른 섬김이 진행 중입니다")){ viewSeq=null; render(); } });
   bind("toOverview",()=>{ viewSeq=null; render(); });
 }
@@ -1854,7 +1935,7 @@ async function doStartServing(cafeId){   // 새 섬김 시작(순차: 열린 섬
   await guardWrite(async()=>{
     toast("시작하는 중…");
     try{ const seq=await Sync.startServing(ME, cafeId);
-      if(seq){ viewSeq=null; toast(hon(meName())+"이 "+seq+"번째 섬김을 시작했어요 🙏"); }
+      if(seq){ viewSeq=null; track("serving_started",{ seq, cafe_id: cafeId||null }); toast(hon(meName())+"이 "+seq+"번째 섬김을 시작했어요 🙏"); }
       else toast("이미 진행 중인 섬김이 있어요");
       render();
     }catch(e){ console.error(e); toast("시작 실패 — 다시 시도해주세요"); render(); }
@@ -2633,6 +2714,12 @@ function setGameFoot(html){ const f=document.getElementById("gvFoot"); if(f) f.i
 // 다시 back() 을 부르면 한 칸을 더 먹어 탭·시트의 뒤로가기가 사라진다.
 function closeGame(opts){
   const fromPop = !!(opts && opts.fromPop);
+  /* 결과가 나오기 전에 닫혔다면 중도 이탈이다 — 판이 길거나 지루하면 여기 숫자가 오른다.
+     '게임을 몇 판 돌렸나'만 세면 이게 안 보이고, 시작 수만 늘어 성공처럼 읽힌다. */
+  if(GS && GS.open && trackGameAt && !trackGameDone){
+    track("game_abandoned", { kind: GS.kind || null, at_ms: Date.now()-trackGameAt, via: fromPop?"back":"button" });
+    trackGameAt = 0;
+  }
   clearGameTimers();
   if(GS && GS.teardown){ try{ GS.teardown(); }catch(e){} GS.teardown=null; }
   const el=$gv(); el.classList.remove("show"); el.innerHTML="";
@@ -2655,7 +2742,12 @@ function clearSubEntry(){
    참가자 고르기에서 돌아올 때는 조회를 다시 걸지 않고 그리기만 다시 불러야 한다(R11-7).
    시트는 블록 단위로 쪼개 그린다. 정책 칩이 참가자 수를 바꾸므로 시트 전체를 다시 그리지 않고
    블록만 갈아끼워야 스크롤이 유지된다(R7-6) — 그래서 각 블록에 감싸는 div 와 HTML 생성 함수가 있다. */
+/* 게임 계측 — 판이 시작한 시각을 들고 있다가 끝날 때 길이를 잰다. 얼마나 걸리는지를 모르면
+   '20초짜리'라는 목표가 지켜지는지 실사용에서 확인할 방법이 없다(헤드리스 계측은 재생 속도와
+   슬로모션을 반영하지 않는다). */
+let trackGameAt = 0, trackGameDone = false;
 function openGameSheet(){
+  track("game_sheet_opened", { roster: (GS && GS.on) ? GS.on.size : null });
   if(!GS) gameEnsure();          // 진입점을 거치지 않고 열리는 경로가 생겨도 상태 없이 돌지 않게
   drawGameSheet();
   // 조회는 시트 렌더를 기다리게 하지 않는다 (R5-10). 위에서 이미 그렸고, 결과가 오면 그 블록만 갈아끼운다.
@@ -3129,6 +3221,9 @@ function startGame(kind){
     return;
   }
   GS.kind=kind;   // [한 판 더]가 같은 게임을 다시 돌릴 수 있게 기억해 둔다 (R6-8)
+  trackGameAt = Date.now(); trackGameDone = false;
+  track("game_started", { kind, players: gamePlayers().length, policy: (GS && GS.policy) || null,
+                          soft_w: (GS && GS.softW != null) ? GS.softW : null, dry_run: !gameCanCommit() });
   // 서명도 여기서 남긴다 — 위 두 가드를 통과한 뒤라야 한다. 가드에 걸려 돌아가는 경우까지 덮어쓰면
   // 화면에 남아 있는 지난 결과의 기준이 '시작하지도 않은 판'의 명단으로 갈려 경고가 사라진다.
   // [한 판 더]도 이 지점을 다시 지나므로 서명이 새로 잡히고, 그러면 경고가 저절로 걷힌다 (R17-1).
@@ -3174,6 +3269,10 @@ function gameStageDone(w){
 
 function showGameResult(w){
   gvibe([28,60,28]);
+  trackGameDone = true;
+  track("game_finished", { kind: (GS && GS.kind) || null, players: gamePlayers().length,
+                           duration_ms: trackGameAt ? Date.now()-trackGameAt : null,
+                           winner_is_me: !!(w && w.id === ME) });
   gameStageDone(w);   // 진행 중 라벨을 결과로 갱신 (R13-6)
   // role="status"(= aria-live polite + atomic)는 이 안에 꽂는 마크업이 아니라 빈 #gvWin 컨테이너에 미리 걸려 있다.
   // 라이브 리전은 '이미 DOM 에 등록된 영역이 바뀔 때' 읽힌다 — 내용과 함께 새로 삽입되면 안 읽히는 리더가 있다 (R13-4).
@@ -3232,7 +3331,7 @@ function showGameResult(w){
       if(b && document.body.contains(b)){ b.disabled=false; b.textContent=okLabel; }
     }
   });
-  bind("gvAgain",()=>{ clearGameTimers(); if(GS && GS.teardown){ try{ GS.teardown(); }catch(e){} GS.teardown=null; } startGame(GS && GS.kind); });
+  bind("gvAgain",()=>{ track("game_replayed",{ kind: GS && GS.kind }); clearGameTimers(); if(GS && GS.teardown){ try{ GS.teardown(); }catch(e){} GS.teardown=null; } startGame(GS && GS.kind); });
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
   // 인원이 많거나 화면이 짧으면 발표가 접힌 아래에 생긴다 — 끝까지 내려서 보여준다.
   // 버튼이 다 들어간 뒤라야 푸터 높이가 확정되므로 반드시 setGameFoot 다음, 레이아웃 한 프레임 뒤에 잰다.
@@ -3251,6 +3350,7 @@ function showGameResult(w){
    그래서 쓰기 바로 앞으로 옮겼다. 인계가 필요 없는 경우(prevHost 없음)엔 unclaim 을 부르지
    않으므로 조건도 걸지 않는다 — 호스트 없는 빈 섬김을 게임으로 가져가는 건 안전하다 (R16-5). */
 async function commitGameWinner(w){
+  track("host_committed", { kind: (GS && GS.kind) || null, winner_is_me: !!(w && w.id === ME) });
   await guardWrite(async()=>{
     /* SESSION 을 함수 진입 시점이 아니라 쓰기 직전에 읽는다 (R17-3). 게임은 몇십 초를 도는 동안
        폴링이 SESSION 을 계속 갈아끼우므로, 미리 잡아둔 prevHost 로 판단하면 두 가지가 어긋난다 —
@@ -4184,7 +4284,8 @@ function copyDone(msg, btn){
   btn.textContent="✅ 복사했어요";
   setTimeout(()=>{ btn.textContent=was; delete btn.dataset.busy; }, 1600);
 }
-function copyText(text,msg,btn){ const ok=()=>copyDone(msg,btn);
+function copyText(text,msg,btn){ track("copy_used",{ chars: (text||"").length });
+  const ok=()=>copyDone(msg,btn);
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok).catch(()=>fb(text,msg)); else fb(text,msg);
   function fb(t,m){ try{ const ta=document.createElement("textarea"); ta.value=t; ta.style.cssText="position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0,t.length); const done=document.execCommand("copy"); document.body.removeChild(ta); if(done){ copyDone(m,btn); return; } }catch(e){}
     // 카톡 등 인앱 브라우저 폴백: 길게 눌러 복사
@@ -4245,6 +4346,8 @@ async function enterCell(id){
   await loadHist();
   await loadCafeMenus(activeCafeId());
   applyCafeGlobals(); render();
+  trackIdentify();
+  track("cell_entered", { has_me: !!ME, cafe_id: activeCafeId(), serving_state: SESSION.state });
 }
 
 // 바 URL 랜딩 — 개발자 메시지 + 앱 안내만(셀 입장/리다이렉트 없음)
@@ -4620,6 +4723,7 @@ function dashCardHtml(c, opts){ opts=opts||{};
 document.addEventListener("click", e=>{
   const pr=e.target.closest("[data-preset]");
   if(pr){ const r=presetRange(pr.dataset.preset); dashFrom=r[0]; dashTo=r[1];
+    track("dash_preset_used", { preset: pr.dataset.preset, span_days: dashSpanDays() });
     if(dashReload) dashReload(); return; }
   const cc=e.target.closest("[data-cell]");
   if(cc){ dashSel=cc.dataset.cell; paintAdminDash(true); return; }
@@ -4669,6 +4773,7 @@ document.addEventListener("input", e=>{
 })();
 // 셀 단위 대시보드 — ?cell=<id>&view=dashboard (관리자 로그인 없이 그 셀만)
 async function renderCellDashboard(cellId){
+  track("dashboard_opened", { scope: "cell" });
   inPicker=false; adminMode=false; curView="celldash"; $bottom.innerHTML=""; document.body.classList.add("no-bottom");
   const cellLink=`${esc(location.pathname)}?cell=${esc(cellId)}`;
   if(!SHARED){
@@ -4923,6 +5028,7 @@ function paintAdminDash(bodyOnly){
   scrollPresetIntoView();
 }
 async function renderAdminDashboard(){
+  track("dashboard_opened", { scope: "admin" });
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
   if(curView!=="admindash") pushSub();
   curView="admindash"; dashReload=renderAdminDashboard; ensureDashRange();
