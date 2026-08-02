@@ -378,7 +378,7 @@
   .kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:9px 4px; text-align:center; }
   .kpi .n { font-size:17px; font-weight:900; color:var(--ink); line-height:1.1; }
   .kpi .l { font-size:var(--fs-xs); color:var(--sub); font-weight:700; margin-top:2px; }
-  /* 기간 프리셋 — 6개를 한 줄에 쭉. 좁은 화면에선 줄바꿈 대신 가로 스크롤(줄이 늘면 컨트롤 바가 화면을 먹는다).
+  /* 기간 프리셋 — 7개를 한 줄에 쭉. 좁은 화면에선 줄바꿈 대신 가로 스크롤(줄이 늘면 컨트롤 바가 화면을 먹는다).
      스크롤바는 숨기되 선택된 버튼은 렌더 후 JS 로 보이는 자리까지 당겨온다.
      320px 폰에서 여섯 개가 밀리지 않고 다 보여야 한다. 가용 폭은
        320 − #app 좌우 12×2 − .dash-ctl 좌우 14×2 = 268px
@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.04";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.05";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -4460,7 +4460,7 @@ async function renderAdminDash(){
    (a) 상태를 색만으로 구분하지 않는다. 마감/진행중은 채움 vs 윤곽 + 라벨 범례.
        (--brand #6f4e37 와 --accent-ink #96631f 는 정상 시야 ΔE 10.2 로 기준 15 미달이었다)
    (b) 값 라벨은 최댓값·마지막만. 모든 막대에 숫자를 붙이지 않는다. */
-let dashFrom = null, dashTo = null;   // 조회 구간 'YYYY-MM-DD' (기본 최근 30일)
+let dashFrom = null, dashTo = null;   // 조회 구간 'YYYY-MM-DD' (비어 있으면 ensureDashRange 가 '오늘'로 채운다)
 let dashRangeRPC = true;             // 기간 지정 RPC 사용 가능 여부(마이그레이션 적용 여부)
 let dashReload = null;               // 기간을 바꿨을 때 다시 부를 렌더 함수(화면마다 다름)
 const DASH_CELLS = {};  // 드릴다운 시트가 참조할 셀 원본. dashCardHtml 이 채운다
@@ -4732,13 +4732,15 @@ function dashSpanDays(){ return Math.round((Date.parse(dashTo)-Date.parse(dashFr
 /* 라벨 '최근3개월'을 '3개월'로 줄인 건 순전히 폭 때문이다 — 6개를 320px 한 줄에 넣으려면
    가장 넓은 라벨을 깎아야 한다(R3). 키(q3)와 계산은 그대로이고, 무슨 기간인지는
    dashPresetsHtml 이 title/aria-label 로 말한다. */
-const DASH_PRESETS=[["이번주","week"],["지난달","lastmon"],["이번달","month"],
+const DASH_PRESETS=[["오늘","today"],["이번주","week"],["지난달","lastmon"],["이번달","month"],
                     ["3개월","q3"],["올해","year"],["작년","lastyear"]];
 function presetRange(key){
   const t=todayKey(), y=+t.slice(0,4), m=+t.slice(5,7);
   const p=(yy,mm,dd)=>`${yy}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
   const lastDay=(yy,mm)=>new Date(Date.UTC(yy,mm,0)).getUTCDate();   // mm 은 1-based — 0일 = 그 달 말일
   switch(key){
+    // 하루짜리 구간. 시작과 끝이 같으면 그날 하루다 — 서버 _dash_range 도 같은 규칙으로 읽는다.
+    case "today":   return [t, t];
     /* 월요일 시작 — 사용자 지시로 정한 값이다. 예전 근거("교회 한 주가 주일부터라 달력과
        감각이 맞는다")는 그 지시로 대체됐다. 끝은 그대로 오늘이다: '이번달'·'올해'가 이미
        오늘로 자르고 있고, 서버 _dash_range 가 미래 종료일을 오늘로 클램프하므로, 화면엔
@@ -4755,7 +4757,10 @@ function presetRange(key){
   }
   return [p(y,m,1), t];
 }
-function ensureDashRange(){ if(!dashFrom || !dashTo){ const r=presetRange("month"); dashFrom=r[0]; dashTo=r[1]; } }
+/* 기본값은 '오늘'이다. 대시보드를 여는 이유가 대개 '지금 이 판이 어떻게 돌아가고 있나'라서,
+   한 달치 합계를 먼저 보여주면 오늘 것을 보려고 매번 한 번 더 눌러야 했다.
+   더 넓은 구간은 프리셋 한 번이면 되고, 고른 구간은 그대로 남는다. */
+function ensureDashRange(){ if(!dashFrom || !dashTo){ const r=presetRange("today"); dashFrom=r[0]; dashTo=r[1]; } }
 // 가로 스크롤 줄이라 선택한 버튼이 화면 밖으로 밀릴 수 있다 — 다시 그린 뒤 가운데로 당겨온다
 function scrollPresetIntoView(){
   const row=document.querySelector(".dash-filter"), on=row&&row.querySelector(".tab.on");
@@ -4789,7 +4794,8 @@ function dashDatesHtml(today){
 /* 라벨을 줄인 칩은 그 기간이 무엇인지 따로 말해준다 (R3-9). 접근성 이름은 보이는 라벨을
    포함해야 하므로(WCAG 2.5.3 Label in Name) 축약형을 앞에 두고 설명을 뒤에 붙인다.
    title 은 모바일에서 안 뜨지만 데스크톱 호버용으로 함께 둔다. */
-const PRESET_HINT={ q3:"3개월 — 이번 달 포함 최근 3개월", week:"이번주 — 이번 주 월요일부터 오늘까지" };
+const PRESET_HINT={ q3:"3개월 — 이번 달 포함 최근 3개월", week:"이번주 — 이번 주 월요일부터 오늘까지",
+                    today:"오늘 하루" };
 function dashPresetsHtml(){
   return `<div class="tabs dash-filter" role="group" aria-label="기간 선택">${DASH_PRESETS.map(([l,k])=>{
     const r=presetRange(k), on=(dashFrom===r[0] && dashTo===r[1]);
