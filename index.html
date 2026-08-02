@@ -729,7 +729,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.12";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.13";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -743,7 +743,9 @@ const CONFIG = {
 // 공용 옵션 그룹 프리셋 — "○○와 동일"인 옵션은 여기 한 곳만 고치면 쓰는 메뉴 전체에 반영.
 // (draw()는 그룹 객체를 읽기만 하므로 여러 메뉴가 참조 공유해도 안전)
 const OPT_SIZE     = { key:"size",     label:"사이즈",   opts:["R","L"], def:"R" };
-const OPT_SHOT     = { key:"shot",     label:"샷",       opts:["기본","1/4샷","1/2샷","1샷 추가","2샷 추가"], def:"기본" };
+// 적게 → 많게 한 방향으로 읽히게 늘어놓는다. 1/4·1/2 는 '기본보다 묽게', 1샷·2샷 은 '샷 개수를
+// 직접 지정', N샷 추가는 '기본에 얹기'다 — 세 가지 뜻이 섞여 있으므로 순서가 곧 설명이 된다.
+const OPT_SHOT     = { key:"shot",     label:"샷",       opts:["기본","1/4샷","1/2샷","1샷","2샷","1샷 추가","2샷 추가"], def:"기본" };
 const OPT_MILKTYPE = { key:"milktype", label:"우유 종류", opts:["기본","오트밀크"], def:"기본" };
 const OPT_MILK     = { key:"milk",     label:"우유",     opts:["기본","우유 1/3","우유 1/2","우유 많이"], def:"기본" };
 const OPT_ICE      = { key:"ice",      label:"얼음",     opts:["기본","얼음 없이","얼음 1/3","얼음 1/2","얼음 가득"], def:"기본", tempOnly:"ICE" };
@@ -1860,9 +1862,16 @@ function openOrderSheet(menuId, existing, prefill){
       </div>
       <div class="sheet-foot">
         <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
-        <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
-        <div style="height:8px"></div>
-        ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>':'<button class="btn btn-ghost btn-close" id="closeSheet">닫기</button>'}
+        <!-- 좌우로 나란히 둔다. 세로로 쌓으면 버튼 하나 + 간격(≈57px)만큼 위 옵션 영역이 짧아지는데,
+             이 시트는 옵션을 고르는 것이 본론이라 그 자리가 아깝다. 전체 메뉴판 시트가 같은 이유로
+             이미 .row-2 를 쓴다.
+             순서는 askConfirm 과 같게 부(좌)·주(우)다 — 이 앱에서 '진행'은 늘 오른쪽에 있다.
+             라벨이 모두 네 글자 이하라 320px 반쪽 폭(≈130px)에서도 접히지 않는다. -->
+        <div class="row-2">
+          ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>'
+                    :'<button class="btn btn-ghost btn-close" id="closeSheet">닫기</button>'}
+          <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
+        </div>
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>{ const n=document.getElementById("note").value; openFullMenuSheet(menuId, n); }; } else if(t.dataset.custom){ t.onclick=()=>{ const n=document.getElementById("note").value; openCustomSheet(existing, null, n); }; } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
@@ -4879,8 +4888,8 @@ function openCreateCellSheet(){
     <div class="label">홈 카페 (기본 카페)</div>
     <div class="chips" id="newCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
     <div style="height:16px"></div>
-    <button class="btn btn-brand" id="createCell">만들기</button>
-    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="createClose">닫기</button>`);
+    <div class="row-2"><button class="btn btn-ghost btn-close" id="createClose">닫기</button>
+      <button class="btn btn-brand" id="createCell">만들기</button></div>`);
   const chips=document.getElementById("newCafe");
   chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
   document.getElementById("createClose").onclick=closeSheet;
@@ -4920,8 +4929,8 @@ function openEditCellSheet(cell){
       <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
       <p class="muted" style="margin-top:10px">초대 링크(코드)는 그대로예요: <b>${esc(cell.id)}</b></p>
       <div style="height:14px"></div>
-      <button class="btn btn-brand" id="ecSave">저장</button>
-      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="ecClose">닫기</button>`);
+      <div class="row-2"><button class="btn btn-ghost btn-close" id="ecClose">닫기</button>
+        <button class="btn btn-brand" id="ecSave">저장</button></div>`);
     document.getElementById("ecName").oninput=e=>{ nameVal=e.target.value; };
     $sheet.querySelectorAll(".ecm").forEach(inp=> inp.oninput=()=>{ mlist[+inp.dataset.i].name=inp.value; });   // 이름만 갱신(id 보존)
     $sheet.querySelectorAll(".ecmdel").forEach(b=> b.onclick=()=>{ mlist.splice(+b.dataset.i,1); draw(); });
@@ -5702,8 +5711,8 @@ function openMenuEditSheet(cafeId, existing){
     <select id="mcat" aria-labelledby="lbl-mcat" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:16px;background:#fff">${CAT_ORDER.map(c=>`<option value="${c}" ${c===cat?'selected':''}>${CAT_LABEL[c]}</option>`).join("")}</select>
     <div class="label">온도</div><div class="chips" id="mtemps">${tchip("ICE")}${tchip("HOT")}</div>
     <div style="height:14px"></div>
-    <button class="btn btn-brand" id="msave">${existing?'수정':'추가'}</button>
-    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="mcancel">닫기</button>`);
+    <div class="row-2"><button class="btn btn-ghost btn-close" id="mcancel">닫기</button>
+      <button class="btn btn-brand" id="msave">${existing?'수정':'추가'}</button></div>`);
   document.getElementById("mtemps").querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ const t=c.dataset.t,i=temps.indexOf(t); i>=0?temps.splice(i,1):temps.push(t); c.classList.toggle("sel"); });
   document.getElementById("mcancel").onclick=closeSheet;
   document.getElementById("msave").onclick=async()=>{
@@ -5725,8 +5734,8 @@ function openMembersSheet(){
       <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input autocomplete="off" type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
       <div class="inline-form" style="margin-top:10px"><input autocomplete="off" type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가" aria-label="구성원 이름 추가"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
       <div style="height:14px"></div>
-      <button class="btn btn-brand" id="saveM">저장</button>
-      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="closeM">닫기</button>`);
+      <div class="row-2"><button class="btn btn-ghost btn-close" id="closeM">닫기</button>
+        <button class="btn btn-brand" id="saveM">저장</button></div>`);
     $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
     $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
     document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
