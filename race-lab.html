@@ -228,7 +228,7 @@ function buildStage(rnd){
      통로를 막는 문이 된다 — 레퍼런스도 이 자리에는 작은 것을 여럿 둔다. */
   [109, 113].forEach((yy,k)=>{
     const [xl,xr]=bnd(yy);
-    E.push(bar((xl+xr)/2, yy, (xr-xl)/2-2*R-0.3, 0.14, (k?1:-1)*3.0, rnd()*6.283));
+    E.push(bar((xl+xr)/2, yy, ((xr-xl)/2-2*R-0.3)*1.2, 0.14, (k?1:-1)*3.0, rnd()*6.283));
   });
 
   const goalY = 117, zoomY = 113;
@@ -367,6 +367,7 @@ function hit(b, i, tt, px, py, vx, vy){
      · 줌 배율 — max(1, (1 - goalDist/ZOOM_TRIG) * ZOOM_MAX).
      · 보간 — 목표를 바로 쓰지 않고 매 프레임 차이의 1/10 만 좁힌다. 오차가 아주 작으면 스냅.
      · 슬로모션 — 결승 직전이고 바로 앞뒤에 경쟁자가 붙어 있을 때만 시간을 늦춘다. */
+const GOAL_H = 2.2;          // 결승 괘선 두 줄 사이 간격(글자가 들어갈 만큼)
 const ZOOM_TRIG = 5, ZOOM_MAX = 4, LERP = 1/10, SNAP = 1/30;
 const SLOW_MIN = 0.2, SLOW_NEAR = 1.6;
 
@@ -505,13 +506,13 @@ function race(players){
       ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
       if(b.spin){ ctx.fillStyle="#7a6a52"; ctx.beginPath(); ctx.arc(b.cx,b.cy,0.16,0,6.284); ctx.fill(); }
     }
-    // 결승선 — 체커 두 줄
-    if(st.goalY > vTop-2 && st.goalY < vBot+2){
-      const c=0.7;
-      for(let r0=0;r0<2;r0++) for(let x=0;x<W;x+=c){
-        ctx.fillStyle = ((x/c + r0)%2) ? "#2b2118" : "#ffffff";
-        ctx.fillRect(x, st.goalY + r0*c, c, c);
-      }
+    /* 결승선 — 괘선 두 줄 사이에 글자를 넣는다. 체커 무늬는 줌이 4배까지 들어가면 칸이
+       커져 '무슨 무늬'로만 보이고 어디가 선인지 안 읽힌다. 괘선은 배율과 무관하게 선이다.
+       글자는 화면 좌표에 그린다(아래) — 세계 좌표에 그리면 줌 따라 같이 커진다. */
+    if(st.goalY > vTop-3 && st.goalY < vBot+3){
+      ctx.fillStyle="#2b2118";
+      ctx.fillRect(0, st.goalY - GOAL_H/2, W, 0.16);
+      ctx.fillRect(0, st.goalY + GOAL_H/2, W, 0.16);
     }
     // 구슬 — 뒤에서부터 그려 선두가 맨 위에
     for(let k=n-1;k>=0;k--){
@@ -525,6 +526,14 @@ function race(players){
       ctx.stroke();
     }
     ctx.restore();
+
+    // 결승선 글자 — 줌과 무관하게 같은 크기
+    if(st.goalY > vTop-3 && st.goalY < vBot+3){
+      const gy = CH*0.42 + (st.goalY-camY)*z;
+      ctx.font = "800 11px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillStyle="#2b2118"; ctx.fillText("결승선", CW/2, gy);
+    }
 
     // 이름표 — 화면 좌표로 그린다(줌과 무관하게 같은 크기)
     ctx.font = "800 10px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";

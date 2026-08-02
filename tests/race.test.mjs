@@ -1,6 +1,5 @@
-/* race-lab.html — 레퍼런스 방식 구슬 레이스의 물리·맵 회귀 테스트.
-   index.html 과 달리 마커 블록이 아니라 <script> 앞부분(화면 배선 전까지)을 통째로 평가한다.
-   그 앞부분은 DOM 을 건드리지 않는 순수 계산이라 그대로 vm 에서 돈다.
+/* 구슬 레이스 — 물리·맵 회귀 테스트. 배포되는 index.html 의 마커 블록을 본다.
+   race-lab.html 은 같은 코드를 떼어 둔 실험판이고, 지켜야 하는 것은 본체다.
 
    지키는 것은 하나다 — '어떤 인원수 · 어떤 시드로도 1등이 나온다'.
    이 판정이 없으면 장애물 하나가 판 전체를 막아도 눈으로는 안 보인다. 실제로 축이 코스에서
@@ -11,22 +10,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 
-const html = readFileSync(new URL("../race-lab.html", import.meta.url), "utf8");
-const script = html.match(/<script>([\s\S]*?)<\/script>/);
-assert.ok(script, "race-lab.html 에서 <script> 를 못 찾았다");
+const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const blocks = [...html.matchAll(/\/\* @test-export:start \*\/([\s\S]*?)\/\* @test-export:end \*\//g)].map((m) => m[1]);
+assert.ok(blocks.length, "index.html 에서 마커 블록을 못 찾았다");
+const pure = blocks.join("\n");
 
-const SPLIT = "/* ── 화면 배선 ── */";
-const pure = script[1].split(SPLIT)[0];
-assert.ok(script[1].includes(SPLIT), `순수 계산부와 화면 배선을 가르는 '${SPLIT}' 표시가 사라졌다`);
-
-const G = runInContext(pure + "\n;({buildStage,simulate,rnd32,W,R})", createContext({}));
+const G = runInContext(pure + "\n;({raceMapBuild,raceSimulate,raceRnd,RACE_W,RACE_R})", createContext({}));
 
 const SEEDS = 20;
 const CREW = [2, 3, 5, 10, 16, 24];
 const run = (n, s) => {
-  const rnd = G.rnd32((s * 7919 + n) >>> 0);
-  const st = G.buildStage(rnd);
-  return { st, r: G.simulate(st, n, rnd) };
+  const rnd = G.raceRnd((s * 7919 + n) >>> 0);
+  const st = G.raceMapBuild(rnd);
+  return { st, r: G.raceSimulate(st, n, rnd) };
 };
 
 test("어떤 인원수 · 어떤 시드로도 1등이 나온다", () => {
