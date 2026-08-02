@@ -82,22 +82,28 @@
        .mx-name 78px 같은 고정 치수가 전부 끌려 들어온다. 뷰포트 메타(7행)에 user-scalable=no 도
        maximum-scale 도 없어 WCAG 1.4.4 는 이미 충족이므로 급하지 않다.
        vw/vh/vmin 은 쓰지 않는다 — 확대가 뷰포트 단위를 바꾸지 않아 1.4.4 가 즉시 깨진다. */
-    --fs-xs: 11px;      /* 배지 · 축 라벨 · 표 헤더 (숫자 위주) */
-    --fs-sm: 12px;      /* 보조문구 · 메타 · 칩 수치 */
-    --fs-md: 13px;      /* 라벨 · 이름 행 · 캡션 */
-    --fs-base: 14px;    /* 본문 · 탭 · 칩 · 소형 버튼 */
-    --fs-lg: 15px;      /* 사람 이름 · 다이얼로그 본문 · 온도 토글 */
-    /* 16px 미만이면 iOS 가 포커스 시 화면을 확대한다 — 폼과 주 버튼의 하한이다. 줄이지 말 것. */
-    --fs-input: 16px;
-    --fs-title: 18px;   /* 화면·시트 제목 — 아래 두 티어에서 램프된다 */
+    /* 단위가 rem 인 이유 — px 로 박아 두면 사용자가 OS·브라우저에서 이미 해 둔 글자 크기 설정이
+       이 앱에만 안 먹는다(루트를 130% 로 올려도 본문이 13px 그대로임을 실측했다). 노안이 있는
+       분이 폰 설정에서 키워 둔 값을 무시하는 셈이라 rem 으로 바꿨다.
+       값은 1rem=16px 기준으로 지금 픽셀과 '똑같게' 환산했다 — 이 교체로 화면은 한 픽셀도 안 바뀐다.
+       바꾸려면 아래 값을 고치는 게 아니라 :root 의 font-size 를 건드릴 것. */
+    --fs-xs: 0.6875rem;   /* 11px — 배지 · 축 라벨 · 표 헤더 (숫자 위주) */
+    --fs-sm: 0.75rem;     /* 12px — 보조문구 · 메타 · 칩 수치 */
+    --fs-md: 0.8125rem;   /* 13px — 라벨 · 이름 행 · 캡션 */
+    --fs-base: 0.875rem;  /* 14px — 본문 · 탭 · 칩 · 소형 버튼 */
+    --fs-lg: 0.9375rem;   /* 15px — 사람 이름 · 다이얼로그 본문 · 온도 토글 */
+    /* 16px 미만이면 iOS 가 포커스 시 화면을 확대한다 — 폼과 주 버튼의 하한이다. 줄이지 말 것.
+       rem 이라 사용자가 글자를 키우면 함께 커지므로 하한은 그대로 지켜진다. */
+    --fs-input: 1rem;     /* 16px */
+    --fs-title: 1.125rem; /* 18px — 화면·시트 제목. 아래 두 티어에서 램프된다 */
     /* 차트 마크 전용. --brand 는 채도 0.057 이라 데이터 막대로 쓰면 회색으로 읽힌다(UI 색으로는 문제없음).
        #94520c 는 채도 0.104 로 floor 통과 + 흰 배경 대비 3:1 이상. */
     --data-1: #94520c;
   }
   /* --fs-title 만 티어마다 다시 정의한다 — 이 한 줄이 .room-name 과 .sheet h3 의 축소 계단을
      흡수해서 아래 미디어쿼리의 개별 override 를 없앤다 (R13-7). */
-  @media (max-width: 440px){ :root{ --fs-title: 17px; } }
-  @media (max-width: 330px){ :root{ --fs-title: 16px; } }
+  @media (max-width: 440px){ :root{ --fs-title: 1.0625rem; } }   /* 17px */
+  @media (max-width: 330px){ :root{ --fs-title: 1rem; } }        /* 16px */
   /* 움직임 최소화 설정을 켠 사용자에게는 전환을 끈다 */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
@@ -113,11 +119,22 @@
   body.no-bottom #app { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }   /* 하단바 없는 화면의 빈 여백 제거 */
   header { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 14px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .h-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .room-name { margin: 0; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .title-wrap { min-width:0; overflow:hidden; }
+  /* 배지를 h1 밖으로 뺀 뒤에도 예전과 같은 한 줄로 보이게 한다. 셀 이름만 줄어들고(min-width:0)
+     배지는 안 찌그러진다(flex:none) — 예전 인라인 <span> 배치와 결과가 같다. */
+  .title-row { display:flex; align-items:center; gap:6px; min-width:0; }
+  .title-row .demo-badge { flex:none; }
+  .room-name { margin: 0; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   .date { font-size: var(--fs-sm); color: var(--sub); margin-top: 1px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
   .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
   .dot.off { background: var(--accent); }
-  .me-chip { font-size: var(--fs-md); font-weight: 600; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  /* 탭 타겟 44px (B9). 여기는 .nav-link 처럼 음수 마진으로 줄높이를 되돌릴 필요가 없다 —
+     .h-row 는 왼쪽의 두 줄(셀 이름 + 날짜) 때문에 이미 45px 이고, ⚙️ 도 44px 이다.
+     실측으로 헤더 높이(68px)와 본문 시작 위치(84px)가 그대로임을 확인했다. */
+  .me-chip { font-size: var(--fs-md); font-weight: 600; color: var(--brand); background: var(--brand-soft); border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+             display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+  /* gap 은 장식이 아니다 — flex 는 자식 사이의 공백 텍스트를 렌더하지 않으므로,
+     마크업의 `이름 <small>· 변경</small>` 사이 띄어쓰기가 사라져 `한사랑· 변경` 이 된다. */
   .me-chip small { color: var(--sub); font-weight: 500; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
   .muted { color: var(--sub); font-size: var(--fs-md); } .center { text-align: center; }
@@ -176,7 +193,7 @@
   /* 이름만 줄인다 — '님이 섬깁니다!'까지 잘리면 무슨 말인지 알 수 없다 */
   .open-hero .host-name { display:inline-block; max-width:52%; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
-  .open-hero p { margin:0; color:var(--sub); font-size:var(--fs-md); line-height:1.4;
+  .open-hero p { margin:0; color:var(--sub); font-size:var(--fs-lg); line-height:1.5;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
   .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: var(--fs-base); }
   .host-name { color: var(--brand); font-weight: 800; }
@@ -245,7 +262,18 @@
   .chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-base); font-weight: 600; background: #faf6f0; border: 1.5px solid var(--line); color: var(--ink); cursor: pointer; transition: transform .06s, background .12s, border-color .12s; }
   .chip:active { transform: scale(.94); }
   .chip.sel { background: var(--brand); color: #fff; border-color: var(--brand); }
-  .label { font-size: var(--fs-md); font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
+  /* .label 과 .sec-div 는 이제 <h3>·<h2> 다. 스크린리더가 구역을 건너뛸 수 있어야 하는데
+     예전에는 화면 전체의 제목이 h1·h2 둘뿐이라(둘 다 머리말 카드) 본문에 이정표가 없었다.
+     리셋 규칙은 두지 않는다 — 아래 두 클래스가 UA 의 제목 스타일(font-size·font-weight·margin)을
+     이미 전부 덮으므로 태그만 바뀌고 보이는 모양은 그대로다. `h2.sec-div{all:unset}` 같은 리셋을
+     넣으면 오히려 specificity(0,1,1)가 .sec-div(0,1,0)를 이겨 구분선이 통째로 사라진다. */
+  /* 구역 제목은 '무엇을 하라'는 지시문이다 — 13px 로 두면 화면에서 가장 안 읽히는 축에 든다.
+     15px 로 올리고, 늘어난 높이는 아래 .open-hero 의 장식(호스트 이름 24→20px)에서 돌려받는다.
+     DB 권고는 본문 16px 이지만 320px 화면을 지켜야 하므로 15px 를 현실적 하한으로 잡았다. */
+  .label { display:block; font-size: var(--fs-lg); font-weight: 700; color: var(--sub); margin: 16px 0 6px; }
+  /* 시트 맨 위 한 줄 안내 — 제목 바로 밑에 붙어야 옵션을 훑기 '전에' 읽힌다 */
+  .sheet-hint { margin:-4px 0 12px; font-size:var(--fs-md); line-height:1.5; color:var(--sub); }
+  .sheet-hint b { color:var(--brand); }
   /* 구역 구분선 — '내 주문'과 '현황'을 한 화면에 합친 뒤(R12) 둘이 이어 붙어 보이던 걸 끊는다.
      .label 보다 한 단계 위의 구분이라 선을 함께 그린다. 제목을 선 가운데 얹어 "여기서부터
      다른 이야기"를 한 번에 읽히게 한다. 글자는 짧게 유지할 것 — 좌우 선이 flex:1 이라
@@ -277,7 +305,7 @@
   .logchip.add { background: #e6f4ea; color: #1e7a37; }
   .logchip.rem { background: #fdeaea; color: #b3261e; }
   .logchip.ren { background: #eaeef6; color: #33415c; }
-  .pill { margin-left: auto; flex: none; font-size: var(--fs-sm); font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill { margin-left: auto; flex: none; font-size: var(--fs-md); font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
   .pill.ordered { background: #e7f4ec; color: #1e7a37; } .pill.skip { background: #f1eee9; color: var(--sub); } .pill.pending { background: #fbecdf; color: #8a5a1f; }
   .person.picksel { background: var(--brand-soft); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--brand); }
   .stats { display: flex; gap: 8px; margin-bottom: 6px; }
@@ -309,6 +337,26 @@
   .menu-switch > summary::after { content: "▾"; color: var(--sub); font-size: var(--fs-sm); transition: transform .15s; }
   .menu-switch[open] > summary::after { transform: rotate(180deg); }
   .menu-switch > .grid { padding: 2px 12px 12px; }
+  /* 참가자 화면에서 접히는 '다른 분들' 목록. 요약 줄 자체가 탭 타겟이라 44px 을 지킨다.
+     .menu-switch 와 같은 시각 언어를 쓴다 — 같은 일(접기)에 새 모양을 만들지 않는다. */
+  .roster-fold { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 14px; }
+  .roster-fold > summary { list-style: none; cursor: pointer; min-height: 44px; padding: 11px 16px; font-size: var(--fs-base);
+    font-weight: 700; color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .roster-fold > summary::-webkit-details-marker { display: none; }
+  .roster-fold > summary .rf-more { color: var(--brand); font-weight: 700; font-size: var(--fs-md); }
+  .roster-fold > summary .rf-more::after { content: " ▾"; }
+  .roster-fold[open] > summary .rf-more::after { content: " ▴"; }
+  .roster-fold > .card { border: none; box-shadow: none; margin: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
+  /* 주문 시트의 옵션 서랍 — 위 둘과 같은 시각 언어 */
+  .opt-fold { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin: 10px 0 4px; }
+  .opt-fold > summary { list-style: none; cursor: pointer; min-height: 44px; padding: 10px 14px; font-size: var(--fs-base);
+    font-weight: 700; color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .opt-fold > summary::-webkit-details-marker { display: none; }
+  .opt-fold > summary .rf-more { color: var(--sub); font-weight: 600; font-size: var(--fs-md); }
+  .opt-fold > summary .rf-more::after { content: " ▾"; }
+  .opt-fold[open] > summary .rf-more::after { content: " ▴"; }
+  .opt-fold-body { padding: 0 14px 12px; border-top: 1px solid var(--line); }
+  .opt-fold-body .label:first-child { margin-top: 10px; }
   /* 주문 옵션 영역만 간격 촘촘화(온도~메모) — 옵션 그룹이 많은 메뉴도 스크롤 덜 하고 한눈에 */
   .order-opts .label { margin: 10px 0 5px; }
   .order-opts .chips { gap: 6px; margin-top: 5px; }
@@ -620,22 +668,14 @@
     border-radius:10px; min-height:44px; background:var(--brand); color:#fff; font-weight:700; }
   .fp-cnt { font-size:62px; font-weight:900; color:var(--brand); letter-spacing:-3px; line-height:1; }
   /* 돌림판 */
-  /* 라벨 역회전은 시간에 따라 변해야 한다 — 정지 상태에서 고정 0, 멈출 때 −spin 이어야
-     당첨자가 기울기로 새지 않는다(근거는 wheelSimulate 주석). 회전축은 판 중심이 아니라 글자
-     자신이어야 하고(중심 기준으로 돌리면 라벨이 조각을 벗어나 역방향으로 궤도를 돈다),
-     그래서 transform-box:fill-box 가 필요하다 — 기본값 view-box 는 축이 viewBox 좌상단이다.
-     @supports 로 감싼 이유: 미지원 브라우저에서 이 규칙이 살아 있으면 축이 viewBox 좌상단이
-     되어 라벨이 판 밖으로 날아간다. 그 경로에서도 누출은 막는다 — playWheel 이 라벨을
-     rotate(0) 으로 그려 두고(정지 상태에서 새는 것이 없다) 회전이 한창일 때 최종 역회전을
-     한 번에 넣는다. 자세한 근거는 playWheel 의 폴백 주석에 있다. */
-  @supports (transform-box: fill-box) {
-    .wlab { transform-box:fill-box; transform-origin:center; transform:rotate(0deg); }
-  }
-  /* [그만]을 누를 때까지 도는 등속 회전. 판과 라벨이 같은 주기로 반대 방향이라 글자는 계속
-     똑바로 선다. 전역 reduced-motion 블록이 animation-duration 을 .01ms 로 끄지만, 그 경로는
-     애초에 이 애니메이션을 걸지 않는다(playWheel 의 lessMotion 갈래). */
-  @keyframes wspin { to { transform: rotate(360deg); } }
-  @keyframes wlabspin { to { transform: rotate(-360deg); } }
+  /* .wlab 에 CSS transform 을 걸지 않는다 — 여기 규칙을 하나라도 두면 라벨 역회전이 통째로 죽는다.
+     playWheel 의 paint() 는 매 프레임 setAttribute("transform","rotate(-deg cx cy)") 로 라벨을
+     되돌리는데, 그건 presentation attribute 라서 같은 요소의 CSS transform 속성에 진다.
+     예전에 여기 있던 `transform:rotate(0deg)` 는 v10.08 의 CSS 애니메이션 경로(@keyframes
+     wspin/wlabspin)를 위한 것이었고, v10.09 에서 rAF 재생으로 바뀌며 쓸모가 없어졌는데 규칙만
+     남아 라벨이 판과 같이 돌았다(멈춘 뒤 이름이 거꾸로 섰다 — QA F-1).
+     transform-box:fill-box 도 필요 없다. 그건 CSS transform 의 회전축 이야기이고, SVG 의
+     rotate(a cx cy) 는 회전축을 인자로 직접 받는다. */
   /* overflow:hidden 이 필요한 이유 — #wRot 은 정사각 div 이고, 돌리면 그 경계 상자가 √2 배로
      커진다(모서리가 좌우로 삐져나온다). 그러면 .game-body 에 가로 넘침이 생겨 화면이 좌우로
      밀리고, 회전하는 동안 상자 크기가 매 프레임 바뀌어 덜컹거린다(실사용 제보).
@@ -689,7 +729,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.09";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.12";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1030,6 +1070,10 @@ const LocalSync = () => {
     async resubscribe(){ apply(read()); },
     pause(){},
     async startServing(me,cafeId){ const d=read(); if(d.servings.some(s=>s.state==="open")){ apply(d); return 0; } const ns=nextSeq(d); d.servings.push({seq:ns,state:"open",hostId:me,cafeId:cafeId||null,closeAt:null,orders:{}}); write(d); return ns; },
+    // 섬기실 분을 정하지 않고 주문만 먼저 받는다. 이미 열린 섬김이 있으면 그것을 쓴다.
+    async openNoHost(cafeId){ const d=read(); const o=d.servings.find(s=>s.state==="open");
+      if(o){ if(!o.cafeId) o.cafeId=cafeId||null; write(d); return o.seq; }
+      const ns=nextSeq(d); d.servings.push({seq:ns,state:"open",hostId:null,cafeId:cafeId||null,closeAt:null,orders:{}}); write(d); return ns; },
     async claim(me,cafeId){ const d=read(); const o=d.servings.find(s=>s.state==="open"); if(o){ if(o.hostId){ apply(d); return false; } o.hostId=me; if(!o.cafeId) o.cafeId=cafeId||null; write(d); return true; } const ns=nextSeq(d); d.servings.push({seq:ns,state:"open",hostId:me,cafeId:cafeId||null,closeAt:null,orders:{}}); write(d); return true; },
     async unclaim(seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq); if(!s){ apply(d); return; } if(!s.orders||!Object.keys(s.orders).length){ d.servings=d.servings.filter(x=>x.seq!==seq); } else { s.hostId=null; } write(d); }, // 빈 섬김 삭제/주문 있으면 인계
     async close(seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq); if(s){ s.state="closed"; s.closeAt=Date.now(); } write(d); },
@@ -1038,6 +1082,11 @@ const LocalSync = () => {
     async removeOrder(me,seq){ const d=read(); const s=d.servings.find(x=>x.seq===seq)||d.servings.find(x=>x.state==="open"); if(s&&s.orders){ delete s.orders[me]; } write(d); },
   };
 };
+
+/* 이 서버에 open_serving 이 있는가 (db-migration-order-first.sql 적용 여부).
+   처음에는 있다고 보고, 없다는 응답을 한 번 받으면 그 뒤로는 안 부른다 — dashRangeRPC 와 같은 방식.
+   로컬 모드는 항상 true 다(LocalSync 가 직접 구현한다). */
+let orderFirstRPC = true;
 
 /* ---- Supabase(공유) 모드 ---- */
 const SupabaseSync = () => {
@@ -1071,6 +1120,15 @@ const SupabaseSync = () => {
     async startServing(me,cafeId){   // 새 섬김 시작 → 새 seq 반환(0=이미 열린 섬김 있음)
       const { data, error } = await client.rpc("start_serving",{p_room:ROOM,p_date:date(),p_me:me,p_cafe:cafeId||null});
       if(error) throw error; await reload(); return data|0;
+    },
+    /* 호스트 없는 열린 섬김을 연다 (db-migration-order-first.sql).
+       마이그레이션 전 프로젝트에서는 함수가 없다(PGRST202) — 그때는 null 을 돌려주고,
+       부르는 쪽이 진입점을 안 그린다. 오류 토스트를 띄우지 않는 이유는 이게 '실패'가 아니라
+       '이 서버에는 아직 없는 기능'이라서다. get_day → get_room_day 폴백과 같은 정신이다. */
+    async openNoHost(cafeId){
+      const { data, error } = await client.rpc("open_serving",{p_room:ROOM,p_date:date(),p_me:ME,p_cafe:cafeId||null});
+      if(error){ if(error.code==="PGRST202"){ orderFirstRPC=false; return null; } throw error; }
+      await reload(); return data|0;
     },
     async claim(me,cafeId){          // 열린(호스트 없는) 섬김 인계
       const { data, error } = await client.rpc("claim_host",{p_room:ROOM,p_date:date(),p_me:me,p_cafe:cafeId||null});
@@ -1393,11 +1451,20 @@ function render(){
 }
 function view(){ return document.getElementById("view"); }
 
+/* 배지를 h1 '밖'에 둔다. 안에 넣으면 페이지 제목이 "☕ ㅇ-ㅇ셀데모·공용1번째 섬김" 으로 읽혀,
+   스크린리더가 처음 알려주는 한 줄이 잡음이 된다. 보이는 모양은 같다(.title-row 가 같은 줄·같은 칩).
+   'N번째 섬김' 은 2회차부터만 — 하루에 한 번만 마시는 날에는 사용자가 만든 적 없는 번호이고,
+   카페 주문서 화면에까지 따라 붙어 카페 직원이 볼 화면에 우리 내부 번호가 남는다.
+   ⚠️ 이 설명을 아래 템플릿 리터럴 안의 HTML 주석으로 옮기지 말 것 — 백틱이 리터럴을 끊는다. */
 function renderHeader(){
   const connHtml = SHARED ? "" : `<span class="dot off"></span>이 기기 전용`;   // 정상 상태는 조용히, 이 기기 전용 경고만 표시
   $app.innerHTML = `
     <header><div class="h-row">
-      <div style="min-width:0;overflow:hidden"><h1 class="room-name">☕ ${esc(ROOM_NAME)}${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}${SESSION.seq?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}</h1>
+      <div class="title-wrap"><div class="title-row">
+          <h1 class="room-name">☕ ${esc(ROOM_NAME)}</h1>
+          ${CELL&&CELL.id==="demo"?'<span class="demo-badge">데모·공용</span>':''}
+          ${SESSION.seq>1?`<span class="demo-badge" style="background:var(--brand);color:#fff">${SESSION.seq}번째 섬김</span>`:''}
+        </div>
         <div class="date">${prettyDate()}${connHtml ? ` · ${connHtml}` : ""}</div></div>
       <div class="header-actions">
         <div class="me-chip" id="meChip" role="button" tabindex="0" aria-label="내 이름 변경">${esc(meName())} <small>· 변경</small></div>
@@ -1469,11 +1536,16 @@ function renderIdle(){
   view().innerHTML=`
     <div class="idle-wrap">
       <div class="card banner"><div class="emoji">🫧</div>
-        <h2>${past.length?"지금은 열린 섬김이 없어요":"오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
-        <p>오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘 섬기기 시작]</b>을 눌러주세요</p></div>
+        <h2>${past.length ? "지금은 열린 주문이 없어요"
+             : orderFirstRPC ? "오늘 음료,<br>뭐 드실래요?"
+                             : "오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
+        <p>${orderFirstRPC ? "먼저 <b>메뉴부터</b> 골라도 돼요.<br>섬기실 분은 나중에 정해도 됩니다." : "오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘은 제가 섬길게요]</b>를 눌러주세요"}</p></div>
       ${list}
-      <p class="muted center" style="margin-top:10px"><b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.<br>
-        섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.</p>
+      <!-- 안내는 화면에서 실제로 가능한 것만 말해야 한다. 주문 먼저 받기가 열려 있으면
+           '누가 시작해야 열린다'는 말은 더 이상 사실이 아니다(아무나 [메뉴 고르기]로 연다). -->
+      <p class="muted center" style="margin-top:10px">${orderFirstRPC
+        ? `<b>[📝 메뉴 고르기]</b>를 누르면 바로 주문할 수 있어요.<br>섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.`
+        : `<b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.<br>섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.`}</p>
     </div>`;
   view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
@@ -1502,7 +1574,7 @@ function renderOpen(){
      그리드 밑에 회색 ghost 버튼으로 붙여두니 아무도 못 봤다 — .label 로 구역을 떼서
      '메뉴 선택'과 같은 급의 섹션으로 올리고, 버튼도 흰 카드(누를 수 있는 것)로 바꾼다. */
   const skipHtml = isSkip ? "" : `
-      <div class="label">음료를 안 드신다면</div>
+      <h3 class="label">음료를 안 드신다면</h3>
       <button class="btn btn-skip skip-btn">🙅 안 마실게요, 감사합니다</button>`;
   /* 지난번 주문 다시 담기.
      새 시각 언어를 만들지 않는다 — 아래 '다른 분들' 로스터의 [나도] 행과 같은 .person 마크업을
@@ -1524,7 +1596,7 @@ function renderOpen(){
     const bits = (lastOrd.extras||[]).slice();
     if(lastOrd.note) bits.push("📝 "+lastOrd.note);
     againHtml = `
-      <div class="label">지난번엔 이렇게 드셨어요</div>
+      <h3 class="label">지난번엔 이렇게 드셨어요</h3>
       <div class="card" style="padding:6px 14px">
         <div class="person">
           <div class="avatar" style="background:var(--brand-soft);color:var(--brand)">↺</div>
@@ -1536,7 +1608,7 @@ function renderOpen(){
   }
   const gridHtml = showGrid ? `
       ${againHtml}
-      <div class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</div>
+      <h3 class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</h3>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
       ${skipHtml}` : "";
   // 주문 후에도 '안 마실게요'를 실제 버튼으로 바로 옆에 둔다 — 기존 13px 텍스트 링크는 탭 타겟이 너무 작았음
@@ -1575,17 +1647,22 @@ function renderOpen(){
   const canGame = gameEligible();
   const amHostNow = SESSION.hostId===ME;
   const canCommit = gameCanCommit();
-  const gameLabel = !canCommit ? "게임이 궁금하면 (연습)"
-                  : amHostNow  ? "섬길 사람을 다시 정하려면"
-                               : "누가 섬길지 아직 안 정했다면";
-  const gameBtnText = !canCommit ? "🎲 게임 연습으로 돌려보기"
-                    : amHostNow  ? "🎲 어떤 분이 섬겨주실지 게임으로 정하기"
-                                 : "🎲 게임으로 섬길 사람 정하기";
+  /* 연습(dry-run) 진입점은 본문에서 뺐다 (검토 C-2).
+     이 화면은 "내가 뭘 마실지 고르는 곳"인데, 아무것도 확정하지 않는 연습 버튼이 메뉴 그리드 바로
+     아래·첫 화면 안에 본질과 같은 시각 무게(전폭 흰 카드)로 앉아 있었다. 실측으로 이 화면에서
+     본질이 차지하는 세로가 26%였고 그중 8%가 이 버튼 구역이다.
+     기능을 없애지는 않는다 — ⚙️ 설정에 두어 궁금한 사람이 찾아갈 수 있게 했다.
+     남기는 것은 '결정이 필요한 자리'뿐이다: 호스트가 없어서 정해야 하거나(canCommit && !amHostNow),
+     내가 호스트라 다시 정할 수 있는 경우(amHostNow). 남의 결정을 구경하는 자리에는 안 둔다. */
+  const showGame = canGame && canCommit;
+  const gameLabel = amHostNow ? "섬길 사람을 다시 정하려면" : "누가 섬길지 아직 안 정했다면";
+  const gameBtnText = amHostNow ? "🎲 어떤 분이 섬겨주실지 게임으로 정하기"
+                                : "🎲 게임으로 섬길 사람 정하기";
   // '안 마실게요'와 같은 처방 — .label 로 구역을 떼고 흰 카드 버튼으로.
   // 자리는 로스터 '위'다 (R12-11). 아래에 두면 버튼이 ~1,200px 지점으로 밀려, 예전에 탭 문제로
   // 나타났던 G9("기본 탭에 없어서 아무도 못 봤다")가 스크롤 깊이 문제로 되돌아온다.
-  const gameHtml = canGame ? `
-      <div class="label">${gameLabel}</div>
+  const gameHtml = showGame ? `
+      <h3 class="label">${gameLabel}</h3>
       <button class="btn btn-choice" id="gamepick">${gameBtnText}</button>` : "";
   /* 버튼이 숨는 자리에 사유 한 줄. 호스트 없는 섬김에서만 남긴다 — 그 화면은 '누가 섬길까'가
      본론이라 게임을 기다리는 사람이 있고, 호스트가 나인 화면은 이미 결정이 끝난 자리다 (R16-2, R16-4).
@@ -1594,6 +1671,19 @@ function renderOpen(){
   const gameWhyHtml = (!canGame && !SESSION.hostId)
     ? `<p class="muted center" style="margin-top:10px">🎲 ${esc(gameShortReason().why)} — 참가할 분이 2명 이상 모이면 게임으로 정할 수 있어요.</p>` : "";
 
+  /* '현황' 구역을 사람에 따라 다르게 쌓는다.
+     호스트 — KPI 3칸 + 펼친 로스터. "다 걷혔나"를 확인하는 것이 이 사람의 일이다.
+     참가자 — 접힌 로스터 한 장뿐이다. KPI 는 접힌 요약이 이미 같은 말을 하고 있어 지웠고(R12-5의
+       '한 화면에서 같은 숫자를 두 번 말하지 않는다'), 그러고 나니 구분선(👀 현황) 아래에 제목만
+       두 겹으로 남아 접힌 카드 한 장에 머리가 셋 달린 꼴이 됐다. 그래서 참가자 화면에서는
+       구분선을 빼고 `다른 분들` 한 층으로 간다 — 위의 `☕ 내 주문`과 짝을 이루는 두 층이 된다. */
+  const iAmWatcher = SESSION.state==="open" && SESSION.hostId && SESSION.hostId!==ME;
+  const statusHtml = iAmWatcher
+    ? `<h2 class="sec-div">👀 다른 분들</h2>${dashPeopleHtml()}`
+    : `<h2 class="sec-div">👀 ${SESSION.seq>1?SESSION.seq+"번째 섬김 · ":""}현황</h2>
+      ${dashStatsHtml()}
+      <h3 class="label">다른 분들 · [나도] 누르면 같은 걸로</h3>
+      ${dashPeopleHtml()}`;
   if(openTab==="order"){
     /* 합친 화면의 순서 (R12-11, R12-6).
          배너 → 탭 → 내 주문(액션 카드) → 주문 바꾸기 → 메뉴 그리드 → 게임 → 현황 KPI → 다른 분들
@@ -1610,23 +1700,20 @@ function renderOpen(){
                              : "주문 완료 · 아래에서 바꿀 수 있어요";
     view().innerHTML=`
       <div class="card open-hero"><div class="emoji">${host?"🎉":"☕"}</div>
-        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요`}</h2>
+        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`아직 섬기실 분이 안 정해졌어요`}</h2>
         <p>${heroSub}</p></div>
       ${tabs}
-      <div class="sec-div">☕ 내 주문</div>
+      <h2 class="sec-div">☕ 내 주문</h2>
       ${myStatus}${changeLink}${gridHtml}${gameHtml}${gameWhyHtml}
-      <div class="sec-div">👀 ${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}현황</div>
-      ${dashStatsHtml()}
-      <div class="label">다른 분들 · [나도] 누르면 같은 걸로</div>
-      ${dashPeopleHtml()}`;
+      ${statusHtml}`;
   } else {
     view().innerHTML=`
       <!-- 합친 화면과 '똑같은' 머리말을 쓴다. 예전엔 여기만 muted 한 줄이라 카드 높이가 달랐고,
            탭을 오갈 때마다 탭 줄이 위아래로 움직였다(실사용 제보). 높이를 맞추는 게 아니라
            같은 컴포넌트를 쓰는 쪽을 골랐다 — 값을 맞춰 두면 한쪽만 고칠 때 다시 어긋난다. -->
       <div class="card open-hero"><div class="emoji">${host?"🎉":"☕"}</div>
-        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`오늘 음료, 함께 섬겨요`}</h2>
-        <p>${SESSION.seq?SESSION.seq+"번째 섬김 · ":""}카페에 그대로 보여주세요</p></div>
+        <h2>${host?`<span class="host-name">${esc(host.name)}</span>${nimSfx(host.name)}이 섬깁니다!`:`아직 섬기실 분이 안 정해졌어요`}</h2>
+        <p>${SESSION.seq>1?SESSION.seq+"번째 섬김 · ":""}카페에 그대로 보여주세요</p></div>
       ${tabs}${dashCafeHtml()}`;
   }
   view().querySelectorAll("#openTabs .tab").forEach(el=> el.onclick=()=>setOpenTab(el.dataset.t));
@@ -1709,6 +1796,10 @@ function openOrderSheet(menuId, existing, prefill){
   let temp = src&&src.temp ? src.temp : null;
   let extras = src&&src.extras ? [...src.extras] : [];
   let note = src&&src.note ? src.note : "";
+  /* 옵션 접힘 상태. 이미 고른 옵션이 있으면 펼친 채로 연다 — 수정하러 들어온 사람에게
+     자기가 고른 것이 안 보이면 '지워졌나' 로 읽힌다. draw() 는 온도 전환 등으로 여러 번 도는데
+     그때마다 이 값을 다시 계산하면 열어 둔 서랍이 저절로 닫힌다. */
+  let optOpen = !!(src && src.extras && src.extras.length);
   function draw(keepScroll){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
@@ -1741,16 +1832,30 @@ function openOrderSheet(menuId, existing, prefill){
       : m.temps.length===1
       ? `<div class="seg-temp"><button class="tbtn ${m.temps[0]==='ICE'?'ice on':'hot on'}" disabled>${m.temps[0]==='ICE'?'🧊 ICE 전용':'🔥 HOT 전용'}</button></div>`
       : "";
+    /* 옵션을 서랍에 넣는다 (검토 C-5). 아메리카노는 그룹 5개·칩 17개가 한 번에 펼쳐져서
+       "이걸 다 골라야 하나"로 읽혔다 — 실제로는 기본값 그대로 두 번 탭이면 끝나는데도.
+       온도는 서랍 밖에 둔다: 거의 항상 고르고, ICE/HOT 은 옵션이 아니라 주문의 일부다. */
+    const optsHtml = optionsHtml ? `<details class="opt-fold"${optOpen?" open":""} id="optFold">
+        <summary><span>옵션 고르기</span><span class="rf-more" id="optCount">${extras.length?esc(extras.length+"개 선택됨"):"기본 그대로"}</span></summary>
+        <div class="opt-fold-body">${optionsHtml}</div></details>` : "";
     // 하단 고정 바에 보여줄 현재 선택 요약(온도·옵션) — 스크롤 없이 무엇을 골랐는지 확인
     const summaryText = ()=>{ const parts=[]; if(temp && m.temps.length>1) parts.push(temp==="ICE"?"🧊 ICE":"🔥 HOT"); availExtras.forEach(x=>{ if(extras.includes(x)) parts.push(x); }); return parts.length?parts.join(" · "):"기본 그대로"; };
-    const refreshSum = ()=>{ const s=document.getElementById("ordSum"); if(s) s.textContent=summaryText(); };
+    /* 옵션 칩은 일부러 리렌더하지 않고 .sel 만 제자리에서 바꾼다(모바일에서 화면이 위로 튀지 않게).
+       그래서 서랍이 접혀 있을 때 보이는 요약도 여기서 함께 갱신해야 한다 — 안 그러면 접힌 서랍이
+       '기본 그대로'라고 말하는데 안에는 옵션이 골라져 있는 상태가 된다. */
+    const refreshSum = ()=>{ const s=document.getElementById("ordSum"); if(s) s.textContent=summaryText();
+      const c=document.getElementById("optCount"); if(c) c.textContent = extras.length ? extras.length+"개 선택됨" : "기본 그대로"; };
     const prevScroll = keepScroll && sheetOpen ? $sheet.scrollTop : 0;   // 온도 전환 등 리렌더 시 스크롤 위치 유지
     openSheet(`
       <h3>${esc(m.emoji)} ${esc(m.name)}</h3>
+      <!-- 옵션이 여럿이면 "이걸 다 골라야 하나"로 읽힌다. 실제로는 기본값 그대로 담을 수 있고
+           [이걸로 주문]도 스크롤 없이 보인다 — 동작은 옳은데 표시가 그걸 감추고 있었다.
+           옵션이 하나도 없는 메뉴에는 이 줄이 거짓말이 되므로 있을 때만 적는다. -->
+      ${(optionsHtml||tempHtml)?`<p class="sheet-hint">고르실 게 없으면 그대로 <b>[${existing?'주문 수정':'이걸로 주문'}]</b>을 누르시면 돼요.</p>`:""}
       <details class="menu-switch"><summary>🔄 다른 메뉴로 바꾸기</summary><div class="grid">${gridTilesHtml(menuId)}</div></details>
       <div class="order-opts">
         ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
-        ${optionsHtml}
+        ${optsHtml}
         <div class="label" id="lbl-note">메모 (선택)</div><input autocomplete="off" type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" aria-labelledby="lbl-note" />
       </div>
       <div class="sheet-foot">
@@ -1761,6 +1866,7 @@ function openOrderSheet(menuId, existing, prefill){
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
     $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>{ const n=document.getElementById("note").value; openFullMenuSheet(menuId, n); }; } else if(t.dataset.custom){ t.onclick=()=>{ const n=document.getElementById("note").value; openCustomSheet(existing, null, n); }; } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
+    const of_=document.getElementById("optFold"); if(of_) of_.addEventListener("toggle",()=>{ optOpen=of_.open; });
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(true); }; });
     // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
     // 제자리에서 .sel만 갱신 — 전체 리렌더/스크롤 리셋 없이(카톡·모바일에서 위로 튐 방지)
@@ -1848,10 +1954,36 @@ function openCustomSheet(existing, prefillName, prefillNote){
   function goToExisting(m){ openOrderSheet(m.id, existing); }
   function goToSkip(btn){ guardWrite(async()=>{ forceGrid=false;
     if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"sheet"}); closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }, btn, "저장 중…"); }
+  /* '이미 있는 메뉴예요'는 주 버튼을 통째로 바꿔 커스텀으로 담을 길을 없애는 판정이라,
+     검색보다 훨씬 좁아야 한다. 두 가지를 지킨다.
+     ① 오타 허용은 3글자부터 — matchesName 이 이미 정한 규칙이고 근거도 그 주석에 있다.
+        이 경로만 2글자에서 허용했더니 `우유→우도땅콩라떼`·`생수→홍삼생강차`처럼 절반이 틀려도
+        통과했다 (QA F-2).
+     ② 비교는 '이름 전체 대 이름 전체'다. fuzzyDist 는 긴 이름 안을 질의 길이만큼 슬라이딩하므로
+        `밀크티`가 `콜드브루 밀크 블렌디드`의 한 조각과 닮았다는 이유로 걸린다 — 그건 부분 일치가
+        옳은 검색의 규칙이지 '같은 메뉴인가'의 규칙이 아니다. 길이 차 1 이내로 묶어 두면
+        오타(한 글자 틀림·빠짐)만 남고 '남의 이름 속 조각'은 빠진다.
+     느슨한 후보는 아래 matches 가 제안 목록으로 계속 보여 준다 — 막는 게 아니라 옮기는 것이다.
+     ③ 완전 일치를 먼저 훑고, 오타 후보 중에서는 가장 가까운 것을 고른다. pool.find 로 한 번에
+        훑으면 '메뉴판에 먼저 적힌 것'이 이긴다 — `돌체라떼`를 쳤을 때 이름이 똑같은 메뉴를 두고
+        앞줄의 `카페라떼`(거리 2)가 잡혔고, `바닐라라때`는 거리 1인 `바닐라라떼` 대신 거리 2인
+        `바닐라빈라떼`가 잡혔다. 메뉴 배열 순서가 판정을 바꾸면 안 된다. */
+  function bestExisting(qn){
+    const exact = pool.find(m=>norm(m.name)===qn);
+    if(exact || qn.length<3) return exact || null;
+    let best=null, bd=Infinity;
+    for(const m of pool){
+      const mn=norm(m.name);
+      if(Math.abs(mn.length-qn.length)>1) continue;   // 오타는 길이가 비슷하다. 남의 이름 속 조각은 여기서 빠진다
+      const d=editDistance(qn,mn);
+      if(d<=typoThreshold(qn.length) && d<bd){ bd=d; best=m; }
+    }
+    return best;
+  }
   function refreshSuggestions(){
     const qn=norm(nameEl.value);
     isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
-    exactMatch = (!isDecline && qn.length>=2) ? pool.find(m=>{ const mn=norm(m.name); return mn===qn || fuzzyDist(qn,mn)<=typoThreshold(qn.length); }) : null;
+    exactMatch = (!isDecline && qn.length>=2) ? bestExisting(qn) : null;
     const matches = (!isDecline && qn && !exactMatch) ? pool.filter(m=>matchesName(norm(m.name),qn)).slice(0,4) : [];
     sugEl.innerHTML = matches.length ? `<div class="card" style="padding:2px 12px;margin:6px 0 0">${
       matches.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" style="cursor:pointer;padding:9px 2px" role="button" tabindex="0" aria-label="${esc(m.name)}로 전환">
@@ -1998,10 +2130,32 @@ function dashPeopleHtml(){ const {ordered,skipped,pending}=dashSplit();
   let body = rows
     ? `<div class="card" style="padding:6px 18px">${rows}</div>`
     : `<div class="card center muted">${openNow?"아직 다른 분이 없어요":"구성원이 없어요"}</div>`;   // 혼자인 셀 — 빈 카드만 남지 않게
-  if(pending.length && SESSION.state==="open") body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
+  /* 열린 화면에서 내가 호스트가 아니면 이 목록을 접는다 (검토 C-2).
+     "다 걷혔나"를 확인하는 건 섬기는 분의 일이고, 참가자에게는 구경거리다. 실측으로 이 블록이
+     화면 세로의 35%(470px)를 먹고 있었다 — 내 할 일이 끝난 뒤에도 화면이 계속 이어지니
+     '아직 뭔가 더 해야 하나'를 묻게 된다.
+     <details> 를 쓰는 이유: 접힘 상태가 DOM 에 남아 폴링 재렌더에도 브라우저가 복원해 주고,
+     키보드·스크린리더 동작이 공짜다. 마감 화면(openNow=false)은 손대지 않는다 — 그 화면은
+     받아온 음료를 나눠 주는 자리라 전원이 펼쳐져 있어야 한다. */
+  const fold = openNow && SESSION.hostId && SESSION.hostId!==ME && rows;
+  if(fold){
+    const n = ordered.filter(m=>!mine(m)).length, s = skipped.filter(m=>!mine(m)).length, p = pending.filter(m=>!mine(m)).length;
+    const sum = [n?`${n}명 주문`:"", s?`${s}명 안 마심`:"", p?`${p}명 대기`:""].filter(Boolean).join(" · ");
+    body = `<details class="roster-fold"><summary><span>${esc(sum)}</span><span class="rf-more">자세히</span></summary>${body}</details>`;
+  }
+  /* 재촉은 섬기는 분의 일이다 — 게임 진입점과 같은 규칙을 쓴다(내가 호스트이거나, 아직 호스트가
+     없어 누구나 나설 수 있는 판일 때만). 남이 사는 판에서 참가자에게 전폭 버튼으로 남아 있으면
+     '내가 뭔가 더 해야 하나'를 묻게 된다. */
+  if(pending.length && SESSION.state==="open" && (!SESSION.hostId || SESSION.hostId===ME))
+    body+=`<button class="btn btn-soft" id="nudge">📢 미응답 ${pending.length}명 안내 문구 복사</button>`;
   return body; }
+/* 섬기실 분이 안 정해진 채로 주문서만 나가면, 실제로 다녀오신 분이 기록에 안 남는다 —
+   대시보드의 섬김 랭킹에서 통째로 빠진다. 그런데 화면 어디에도 그 사실을 말하는 곳이 없었다.
+   막지는 않는다: 먼저 다녀오고 나중에 정하는 순서가 실제로 있다. 알려만 준다. */
 function dashCafeHtml(){
-  return `<div class="card"><div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
+  const noHost = SESSION.state==="open" && !SESSION.hostId;
+  return `<div class="card">${noHost?`<div class="banner-warn" style="margin:0 0 12px">⚠️ 아직 <b>섬기실 분</b>이 안 정해졌어요 — 다녀오신 뒤에도 <b>[주문 마감]</b>에서 정할 수 있어요.</div>`:""}
+      <div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
       <div class="order-box" id="orderBox">${esc(cafeText())}</div><div style="height:12px"></div>
       <button class="btn btn-brand" id="copyCafe">📋 주문서 복사</button></div>`; }
 function dashboardHtml(){   // 마감 화면 전용 — 안쪽 탭 그대로
@@ -2048,16 +2202,29 @@ function cafeText(){
 function renderBottom(){
   const s=SESSION; const amHost=s.hostId===ME; let html="";
   if(!s.seq){                                   // 열린 섬김 없음(개요) → 새 섬김 시작
-    html=`<button class="btn btn-brand" id="startserv">☕ 오늘 섬기기 시작</button>`;
+    /* 갈림길을 두 개로 연다 (검토 C-1).
+       예전에는 이 화면에서 누를 수 있는 것이 [오늘 섬기기 시작] 하나뿐이라, "뭐 마실래?"에
+       답하러 온 사람에게 앱이 먼저 묻는 것이 "누가 섬길래?"였다. 이제 주문부터 할 수 있다.
+       무게를 뒤집어 놨다 — 대부분의 사람이 할 일(주문)이 진한 버튼이고, 섬기겠다는 선언은
+       그 옆의 흰 버튼이다. 확인창은 섬기겠다는 쪽에만 붙는다(되돌리기 어려운 쪽).
+       서버에 open_serving 이 없으면(마이그레이션 전) 예전처럼 한 갈래만 그린다. */
+    html = orderFirstRPC
+      ? `<div class="row-2"><button class="btn btn-soft" id="startserv">☕ 제가 섬길게요</button>
+         <button class="btn btn-brand" id="orderonly">📝 메뉴 고르기</button></div>`
+      : `<button class="btn btn-brand" id="startserv">☕ 오늘은 제가 섬길게요</button>`;
   } else if(s.state==="open"){
     // 현황은 탭으로 올라갔으므로 하단바에서 뺀다 — 화면마다 버튼이 바뀌지 않아 예측 가능해진다.
-    if(!s.hostId){                              // 호스트 없는(인계 대기) 열린 섬김 → 누구나 이어받기 / 게임으로 정하기
-      // 탭 안 진입점과 같은 판정을 쓴다 — 예전엔 검사가 없어서, 눌러 시트를 열고서야
-      // "참가자가 2명 이상이어야 돌릴 수 있어요"를 읽었다 (R16-3, R16-4).
-      // 이 분기는 !s.hostId 가 이미 확정이라 canGame 의 나머지 항은 참이고 gameEligible() 만 남는다.
-      const canGame = gameEligible();
-      html=(canGame?`<button class="btn btn-soft" id="gamepickBar">🎲 게임으로 정하기</button>`:"")
-         + `<button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
+    if(!s.hostId){
+      /* 호스트 없는 열린 판. 예전에는 여기에 출구가 없었다 — 마감 버튼이 amHost 분기에만 있어서,
+         아무도 안 나서면 그 판을 닫을 수 없고 `sessions_one_open` 때문에 그날 다음 판도 못 열었다.
+         주문 먼저 받기가 생기면서 이 상태가 기본 진입 경로가 됐으므로 출구를 낸다.
+         게임 진입점은 여기서 뺐다 — 본문 #gamepick 이 같은 조건(canCommit)으로 이미 첫 화면에
+         있어 하단바의 것은 같은 자리를 두 번 차지할 뿐이다.
+         두 칸 구성(부 · 주)은 호스트 화면과 같아서 하단바가 상황에 따라 흔들리지 않는다 (N2). */
+      const hasOrders = Object.keys(ORDERS).length > 0;
+      html = (hasOrders ? `<button class="btn btn-soft" id="closeNoHost">✅ 주문 마감</button>`
+                        : `<button class="btn btn-ghost btn-close" id="dropEmpty">이 섬김 접기</button>`)
+           + `<button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
     } else if(amHost){
       html=`<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`;
     }                                           // 호스트가 아니면 하단 액션 없음 — 할 일은 화면 안(메뉴 고르기)에 있다
@@ -2067,10 +2234,21 @@ function renderBottom(){
   }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
   document.body.classList.toggle("no-bottom", !html);   // 하단바가 없으면 본문 아래 여백도 걷는다
-  bind("startserv",()=>{ if(CAFE_LIST.length<=1) doStartServing((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet(); });
+  /* 되돌리기 어려운 자리에는 확인이 있어야 한다. 이 버튼은 "오늘 음료는 내가 섬긴다"는 약속이고,
+     섬김이 시작되기 전 화면에서는 이것이 **유일하게 크고 진한 버튼**이라 '다음'으로 읽힌다.
+     되돌리려면 [섬김 취소]라는 다른 말을 찾아야 한다.
+     반대로 [안 마실게요]는 되돌리기 쉬운데 확인창이 있었다 — 위험도 순서가 뒤집혀 있었다. */
+  bind("startserv",async()=>{
+    if(!(await askConfirm("오늘 음료로 섬기시는 거죠?\n주문이 모이면 카페에 낼 주문서를 만들어 드려요.",{ok:"네, 제가 섬길게요"}))) return;
+    if(CAFE_LIST.length<=1) doStartServing((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id); else openClaimCafeSheet();
+  });
+  bind("orderonly",()=>doOpenWithoutHost((CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
   bind("takeover",()=>doClaim(SESSION.cafeId||(CELL&&CELL.homeCafeId)||CAFE_LIST[0].id));
-  bind("gamepickBar",e=>{ gameEnsure(e.currentTarget); openGameSheet(); });   // 하단바 진입도 포커스 복귀 지점을 남긴다
-  bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("이 섬김을 취소할까요?\n주문이 있으면 섬김은 그대로 남아요. 다른 분이 이어받으면 지금까지 고른 메뉴도 그대로 돌아옵니다.\n아직 주문이 하나도 없으면 이 섬김은 사라져요.",{ok:"섬김 취소",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
+  bind("closeNoHost",()=>openWhoBoughtSheet(SESSION.seq));
+  bind("dropEmpty",async()=>{ const seq=SESSION.seq;
+    if(await askConfirm("주문이 하나도 없어요.\n이 섬김을 접을까요?",{ok:"네, 접을게요"})){
+      if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; toast("섬김을 접었어요"); render(); } }});
+  bind("unclaim",async()=>{ const seq=SESSION.seq; if(await askConfirm("오늘은 안 섬기시는 걸로 할까요?\n주문이 있으면 섬김은 그대로 남고, 다른 분이 이어받으면 메뉴도 그대로 돌아옵니다.\n아직 주문이 하나도 없으면 이 섬김은 사라져요.",{ok:"네, 안 섬길게요",danger:true})){ if(await safeWrite(Sync.unclaim(seq))){ viewSeq=null; render(); } }});
   bind("close",async()=>{ const seq=SESSION.seq; if(await askConfirm("주문을 마감할까요?\n마감 후에도 '마감 취소'로 다시 열 수 있어요.",{ok:"마감하기"})){ if(await safeWrite(Sync.close(seq))){ track("serving_closed", trackServingStats()); viewSeq=seq; render(); } }});
   bind("reopen",async()=>{ const seq=SESSION.seq; if(await safeWrite(Sync.reopen(seq),"다시 열 수 없어요 — 다른 섬김이 진행 중입니다")){ viewSeq=null; render(); } });
   bind("toOverview",()=>{ viewSeq=null; render(); });
@@ -2087,6 +2265,57 @@ async function doStartServing(cafeId){   // 새 섬김 시작(순차: 열린 섬
       render();
     }catch(e){ console.error(e); toast("시작 실패 — 다시 시도해주세요"); render(); }
   });
+}
+/* 주문만 먼저 받는다 — 섬기실 분은 나중에 (검토 C-1-③).
+   호스트 없는 열린 섬김을 만들 뿐이라 새 상태를 들이지 않는다. 그 상태는 이미
+   unclaim_serving 이 만들고 claim_host 가 이어받는, 앱이 오래 다뤄 온 상태다.
+   여기서 track 하지 않는 이유: 아직 아무 결정도 안 났고, 이어서 들어올 order_submitted 가
+   실제 사건이다. 서버에 함수가 없으면(마이그레이션 전) 진입점 자체가 안 그려지므로
+   여기까지 오지 않지만, 폴링 사이에 상태가 바뀌는 경우를 위해 null 도 받아 둔다. */
+async function doOpenWithoutHost(cafeId){
+  await guardWrite(async()=>{
+    toast("여는 중…");
+    try{ const seq = await Sync.openNoHost(cafeId);
+      if(seq){ viewSeq=null; toast("메뉴부터 골라주세요 — 섬기실 분은 나중에 정하면 돼요 ☕"); }
+      else toast("지금은 열 수 없어요 — 잠시 후 다시 시도해주세요");
+      render();
+    }catch(e){ console.error(e); toast("열기 실패 — 다시 시도해주세요"); render(); }
+  });
+}
+/* 마감 = 섬기신 분 확정 + 닫기 (호스트 없는 섬김 전용).
+   누락을 '알려서' 막는 게 아니라 '구조로' 막는 지점이다. 주문서만 뽑아 다녀오고 아무도 안 나서면
+   기록에 host_id 가 null 로 남아 대시보드 섬김 랭킹에서 통째로 빠지는데, 마감이 유일한 종료
+   지점이므로 여기서 한 번만 물으면 그 경로가 사라진다.
+   claim → close 순서인 이유: 닫힌 섬김은 claim_host 가 안 잡는다(열린 것만 본다). 그리고 claim 이
+   실패하면 아직 열린 상태라 되돌릴 것이 없다 — 닫아 놓고 호스트를 못 채우는 경우를 만들지 않는다. */
+function openWhoBoughtSheet(seq){
+  const drank = MEMBERS.filter(m=>ORDERS[m.id] && ORDERS[m.id].type==="drink");
+  const rest  = MEMBERS.filter(m=>!drank.some(x=>x.id===m.id));
+  const row = m => { const o=ORDERS[m.id];
+    const sub = o && o.type==="drink" ? esc(orderDisplay(o).emoji+" "+orderDisplay(o).name)
+              : o && o.type==="skip"  ? "안 마심" : "주문 안 함";
+    return `<div class="person who-pick" data-id="${esc(m.id)}" role="button" tabindex="0" aria-label="${esc(m.name)}님이 섬기셨어요">
+      <div class="avatar">${esc(initials(m.name))}</div>
+      <div style="min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${sub}</div></div></div>`; };
+  openSheet(`
+    <h3>☕ 누가 섬기셨어요?</h3>
+    <p class="sheet-hint">고르면 그분으로 기록하고 주문을 마감해요. 마감 뒤에도 <b>[마감 취소]</b>로 되돌릴 수 있어요.</p>
+    <div class="card" style="padding:6px 14px">${drank.map(row).join("")}${rest.map(row).join("")}</div>
+    <div style="height:10px"></div>
+    <button class="btn btn-ghost btn-close" id="whoCancel">아직 못 정했어요</button>`);
+  document.getElementById("whoCancel").onclick=closeSheet;
+  $sheet.querySelectorAll(".who-pick").forEach(el=> el.onclick=()=>guardWrite(async()=>{
+    const id=el.dataset.id, m=memberById(id); if(!m) return;
+    const cafeId=SESSION.cafeId||activeCafeId();
+    toast("기록하는 중…");
+    try{
+      const ok=await Sync.claim(id, cafeId);
+      if(!ok){ toast("앗, 그 사이 다른 분이 먼저 이어받으셨어요"); closeSheet(); render(); return; }
+      if(!(await safeWrite(Sync.close(seq)))) { render(); return; }
+      track("serving_closed", Object.assign(trackServingStats(), { via:"who_bought" }));
+      closeSheet(); viewSeq=seq; toast(hon(m.name)+"이 섬기신 걸로 기록했어요 🙏"); render();
+    }catch(e){ console.error(e); toast("기록 실패 — 다시 시도해주세요"); render(); }
+  }, el, "기록 중…"));
 }
 async function doClaim(cafeId){   // 호스트 없는 열린 섬김 이어받기(인계)
   await guardWrite(async()=>{
@@ -2707,9 +2936,11 @@ function shortName(n,k){ n=String(n||""); return n.length>k ? n.slice(0,k) : n; 
    n <= GAME_LABEL_MAX 면 빈 문자열을 돌려준다 — 호출부에 같은 조건을 두 번 쓰지 않기 위해서다.
    색은 그림이 쓴 gcolor(i, n) 을 그대로 부른다. 여기서 따로 계산하면 언젠가 그림과 어긋난다.
    n 은 인자로 받는다(players.length 를 쓰지 않는다) — 그리는 시점의 인원과 같은 값이어야 하고,
-   호출부가 이미 그 값을 쥐고 있다. */
-function gameLegendHtml(players, n){
-  if(n <= GAME_LABEL_MAX) return "";
+   호출부가 이미 그 값을 쥐고 있다.
+   always 는 구슬 레이스용이다. 그 게임은 인원과 무관하게 라벨이 늘 번호라서(근거는 playRace 의
+   주석) 범례가 없으면 번호를 이름으로 옮길 자리가 사라진다. */
+function gameLegendHtml(players, n, always){
+  if(!always && n <= GAME_LABEL_MAX) return "";
   return `<div class="game-legend" role="list" aria-label="번호와 이름">${players.map((m,i)=>
     `<span class="gl-it" role="listitem"><i class="gl-sw" style="background:${gcolor(i, n)}"></i><span class="gl-no">${i+1}</span><span class="gl-nm">${esc(m.name)}</span></span>`).join("")}</div>`;
 }
@@ -3158,7 +3389,7 @@ function gamePickBlockHtml(){
      제목만으로 갈라 두면 스크롤하다 놓치므로 구분선(.sec-div)을 쓴다. */
   return `<div class="sec-div" style="margin-top:18px">🎯 확률 조정 가능</div>
       <button class="game-pick" data-g="ladder"${gamePickOff("ladder",n)}><span class="gp-em">🪜</span><span><b>사다리타기</b><small>${gamePickSub("ladder",n,"한 폰을 다 같이 보며 · 제일 두근거려요")}</small></span></button>
-      <button class="game-pick" data-g="wheel"${gamePickOff("wheel",n)}><span class="gp-em">🎡</span><span><b>돌림판</b><small>${gamePickSub("wheel",n,"가장 빠르게 · 한 번에 끝")}</small></span></button>
+      <button class="game-pick" data-g="wheel"${gamePickOff("wheel",n)}><span class="gp-em">🎡</span><span><b>돌림판</b><small>${gamePickSub("wheel",n,"직접 멈춰서 정해요 · 조각이 곧 확률")}</small></span></button>
       <div class="sec-div">🎲 완전 랜덤</div>
       <div class="muted" style="margin:-6px 0 8px;font-size:12px">이 둘은 위에 적힌 확률이 적용되지 않아요 — 모두 같은 확률입니다.</div>
       <button class="game-pick" data-g="finger"${gamePickOff("finger",n)}><span class="gp-em">☝️</span><span><b>손가락 룰렛</b><small>${gamePickSub("finger",n,"폰 하나에 다 같이 손가락을 올려요")}</small></span></button>
@@ -3813,10 +4044,11 @@ function playWheel(roster, weights){
   }).join("");
   // 이름은 판과 같이 돌면 멈췄을 때 거꾸로 선다. 판이 도는 만큼 글자를 제자리에서 되돌려 놔
   // 멈춘 순간 항상 똑바로 읽히게 한다(폰에서는 가로로 놓인 2~4글자가 제일 잘 읽힌다).
-  // 다만 그 되돌림을 '상수'로 박아 두면 정지 상태의 기울기가 곧 당첨 조각의 각도가 되어
-  // 산수로 답이 샌다 (R6). 그래서 라벨은 어느 경로에서든 rotate(0) 으로 그려 두고, 되돌림은
-  // 나중에 넣는다 — 판과 같은 이징으로 0 → labelEnd 로 보간하거나(주 경로), 회전이 한창일 때
-  // 한 번에 바꾸거나(폴백). 최종 역회전 값은 data-rot 에 실어 둔다.
+  // 되돌림은 마크업에 박지 않고 paint() 가 매 프레임 넣는다 — 상수로 박아 두면 출발 화면의
+  // 기울기가 곧 당첨 조각의 각도가 되어 산수로 답이 샌다 (R6). 여기서는 rotate(0), 즉
+  // transform 을 아예 안 건 상태로 그린다.
+  // ⚠️ .wlab 에 CSS transform 규칙을 두면 이 되돌림이 통째로 죽는다(CSS 가 presentation
+  //    attribute 를 이긴다). 근거는 스타일시트의 '돌림판' 주석에 있다 — QA F-1.
   // 11명부터는 조각 라벨도 번호만 넣는다 — 조각 각도가 15°(24명)까지 좁아지면 2글자 이름조차
   // 이웃 조각으로 넘어간다. 역회전은 번호에도 그대로 걸어야 멈춘 순간 똑바로 선다 (R14-4, R6-4).
   // 글자 크기는 기존 식(n>8?11:13)을 건드리지 않는다. 번호 경로는 항상 n>10 이라 그 식이 이미
@@ -3842,17 +4074,27 @@ function playWheel(roster, weights){
     return `<circle cx="${(pr*Math.cos(t)).toFixed(2)}" cy="${(pr*Math.sin(t)).toFixed(2)}" r="2.6" fill="#fffdf9" stroke="#6f6253" stroke-width="1"/>`;
   }).join("");
   openGameOv("🎡 돌림판", `
-    <div class="game-say" id="gvSay" aria-live="polite">돌고 있어요 — [그만 돌리기]를 누르면 멈춰요</div>
+    <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 이름을 찾아두세요</div>
     <div class="wheel-wrap"><div class="wheel-pin" id="wPin">🔻</div>
       <div id="wRot" style="transform:rotate(0deg)"><svg viewBox="-108 -108 216 216" role="img" aria-label="돌림판 회전 중">
         ${sectors}${labels}${pegs}<circle cx="0" cy="0" r="13" fill="#fff" stroke="#e7ddcf" stroke-width="2"/></svg></div></div>
     ${gameLegendHtml(roster, n)}
     <div id="gvWin" role="status"></div>`);
-  /* [⏹ 그만 돌리기] — 기다리기 싫을 때 회전을 끊는다. 이름을 '여기서 멈추기'로 하지 않은 이유가
+  /* 푸터가 두 단계다 — 사다리·구슬 레이스와 같은 출발 게이트다 (QA X-1).
+     열자마자 돌면 자기 조각을 찾기도 전에 판이 흐려져, 멈춘 뒤 발표 텍스트를 읽기 전까지
+     아무것도 따라갈 수 없다. 조각이 24명에서 15°까지 좁아지는 이 게임이 셋 중 그 이유가 가장
+     강한데 혼자 게이트가 없었다. 멈춰 있는 동안 이름을 찾아 두면 그 뒤로는 그 조각만 좇으면 된다.
+     [⏹ 그만 돌리기] — 기다리기 싫을 때 회전을 끊는다. 이름을 '여기서 멈추기'로 하지 않은 이유가
      있다. 누른 순간의 각도는 출발점일 뿐이고, 거기서 감속하며 더 도는 양(5~23 바퀴)이 얹혀야
      최종 각도가 나온다. 그 양은 판이 시작할 때 이미 뽑혀 있지만 아무 데도 안 보이므로,
      누르는 순간을 완벽히 맞춰도 결과를 고를 수 없다 — 반응 속도 시합이 되지 않는 이유다. */
-  setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvStop">⏹ 그만 돌리기</button>
+  const runFoot = ()=>{
+    setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvStop">⏹ 그만 돌리기</button>
+      <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
+    bind("gvStop", stopSpin);
+    bind("gvCancel",()=>closeGame());
+  };
+  setGameFoot(`<div class="row-2"><button class="btn btn-brand" id="gvGo">▶ 돌리기!</button>
     <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
@@ -3911,9 +4153,20 @@ function playWheel(roster, weights){
     const b=document.getElementById("gvStop"); if(b) b.disabled = true;
   }
   if(GS) GS.teardown = ()=>{ done = true; if(GS && GS.raf) cancelAnimationFrame(GS.raf); };
-  bind("gvStop", stopSpin);
-  if(lessMotion()){ done = true; settle(); }        // 연출을 건너뛰고 결과로 간다
-  else { paint(0, 0); if(GS) GS.raf = requestAnimationFrame(step); }
+  paint(0, 0);   // 정지 화면. 라벨은 rotate(0) 이라 어떤 각도도 답을 말하지 않는다 (R6)
+  /* [▶ 돌리기!] 를 누른 뒤에 굴린다. 동작 줄이기도 이 문을 지나게 둔 것이 중요하다 —
+     예전에는 lessMotion 갈래가 열자마자 settle() 을 불러, 아무것도 안 눌렀는데 결과가 떠 있고
+     그 사이 [⏹ 그만 돌리기] 가 300ms 깜빡였다 (QA X-3). 이제 셋 다 '누르면 시작'으로 같다. */
+  let started = false;
+  const startSpin = ()=>{
+    if(started || done) return;
+    started = true;
+    if(lessMotion()){ done = true; settle(); return; }   // 연출을 건너뛰고 결과로 간다
+    const say=document.getElementById("gvSay"); if(say) say.textContent="돌고 있어요 — [그만 돌리기]를 누르면 멈춰요";
+    runFoot();
+    if(GS) GS.raf = requestAnimationFrame(step);
+  };
+  bind("gvGo", startSpin);
 }
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
@@ -4113,8 +4366,9 @@ function playFinger(){
    그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
 /* 캔버스 크기는 화면 논리 px 다. 세계 단위(RACE_W=26)와 다른 축이라 섞으면 안 된다. */
 const RACE_VIEW_W = 340, RACE_VIEW_H = 391;
-/* 미니맵이 차지하는 폭(화면 논리 px). 코스는 그 왼쪽에만 그린다. */
-const RACE_MINI_W = 46;
+/* 미니맵이 차지하는 폭과 여백(화면 논리 px). 코스는 그 왼쪽에만 그린다 —
+   COURSE_W 가 그 약속을 실제로 지키는 값이고, 미니맵의 왼쪽 모서리(mmX)와 같아야 한다. */
+const RACE_MINI_W = 46, RACE_MINI_PAD = 8;
 const RACE_HUD_MS = 200;         // HUD 갱신 간격
 const RACE_DPR_MAX = 3;
 // 캔버스는 CSS 를 상속받지 않으므로 폰트 스택을 여기 한 번 더 적는다 — body(51행) 스택과 같은 순서다.
@@ -4160,7 +4414,6 @@ function raceBuild(n){
 function playRace(players, onDone){
   const n = players.length;
   const built = raceBuild(n);
-
   openGameOv("🏁 구슬 레이스", `
     <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 번호를 찾아두세요</div>
     <div class="game-hint" style="margin-bottom:8px">부딪히고 튕기며 내려가요 — 결과는 아무도 몰라요</div>
@@ -4171,7 +4424,7 @@ function playRace(players, onDone){
         ${players.slice(0, 3).map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}</b><i class="rc-sw"></i><span class="rc-no"></span><span class="rc-nm"></span></div>`).join("")}
       </div>
     </div>
-    ${gameLegendHtml(players, n)}
+    ${gameLegendHtml(players, n, true)}
     <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
@@ -4180,10 +4433,15 @@ function playRace(players, onDone){
   const ctx = cv.getContext("2d");
   const dpr = Math.max(1, Math.min(RACE_DPR_MAX, window.devicePixelRatio || 1));
   /* 캔버스 크기는 화면 논리 px 다. 코스 폭(RACE_W=26)은 세계 단위라 여기에 쓰면 안 된다 —
-     세계 → 화면 변환은 base 하나가 맡는다(줌 1 일 때 코스 폭이 화면에 꽉 찬다). */
+     세계 → 화면 변환은 base 하나가 맡는다(줌 1 일 때 코스 폭이 COURSE_W 에 꽉 찬다). */
   const CW = RACE_VIEW_W, CH = RACE_VIEW_H;
   cv.width = Math.round(CW*dpr); cv.height = Math.round(CH*dpr);
-  const base = CW / RACE_W;
+  /* 코스가 쓰는 폭은 캔버스 전체가 아니라 미니맵 왼쪽까지다. 예전엔 base 를 CW 로 잡아 코스가
+     캔버스를 꽉 채웠고, 그 위에 미니맵을 덮어 그려서 오른쪽 벽 근처 구슬이 미니맵 뒤로 들어갔다
+     (QA F-3). 화면 좌표를 쓰는 곳(카메라 중심·이름표·결승선 글자)은 전부 CW/2 가 아니라
+     COURSE_W/2 를 기준으로 삼아야 코스와 라벨이 같은 곳을 가리킨다. */
+  const COURSE_W = CW - RACE_MINI_W - RACE_MINI_PAD;
+  const base = COURSE_W / RACE_W;
 
   /* 시뮬레이션이 실패할 자리는 사실상 없지만(계측에서 360판 정체 0), 없다고 단정하지 않는다 —
      맵이나 물리를 고치다 한 번이라도 어긋나면 여기로 떨어진다. */
@@ -4230,7 +4488,7 @@ function playRace(players, onDone){
   /* ══ 미니맵 ══ 코스 전체를 오른쪽에 세로로 세운다. 줌이 들어가면 화면에 두어 명밖에 안 남아
      '지금 어디쯤이고 남은 길이 얼마인지' 볼 곳이 사라진다.
      지형은 판마다 고정이므로 한 번만 오프스크린에 굽고, 매 프레임에는 구슬과 시야 틀만 덧그린다. */
-  const MM_W = RACE_MINI_W, MM_PAD = 8, MM_TOP = -32, MM_BOT = map.total + 6;
+  const MM_W = RACE_MINI_W, MM_PAD = RACE_MINI_PAD, MM_TOP = -32, MM_BOT = map.total + 6;
   const mmH = Math.min(CH - MM_PAD*2, MM_W * (MM_BOT-MM_TOP) / RACE_W);
   const mmS = mmH / (MM_BOT - MM_TOP);
   const mmX = CW - MM_W - MM_PAD, mmY = MM_PAD;
@@ -4298,8 +4556,13 @@ function playRace(players, onDone){
     const z = base*camZ;
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle="#f1ebe1"; ctx.fillRect(0,0,CW,CH);
+    /* 코스와 라벨을 미니맵 왼쪽으로 잘라 둔다. base 를 COURSE_W 로 잡는 것만으로는 부족하다 —
+       결승 줌(camZ>1)이 들어가면 코스 사각형이 화면 좌우로 COURSE_W 를 넘어 그려지고, 그러면
+       미니맵 밑으로 다시 비집고 들어간다. 여기서 한 번 자르면 배율과 무관하게 약속이 지켜진다. */
     ctx.save();
-    ctx.translate(CW/2, CH*0.42);
+    ctx.beginPath(); ctx.rect(0, 0, COURSE_W, CH); ctx.clip();
+    ctx.save();
+    ctx.translate(COURSE_W/2, CH*0.42);
     ctx.scale(z, z);
     ctx.translate(-camX, -camY);
 
@@ -4342,19 +4605,30 @@ function playRace(players, onDone){
     if(map.finishY > vTop-3 && map.finishY < vBot+3){
       ctx.font = "800 11px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
       ctx.textAlign="center"; ctx.textBaseline="middle";
-      ctx.fillStyle="#2b2118"; ctx.fillText("결승선", CW/2, CH*0.42 + (map.finishY-camY)*z);
+      ctx.fillStyle="#2b2118"; ctx.fillText("결승선", COURSE_W/2, CH*0.42 + (map.finishY-camY)*z);
     }
+    /* 구슬을 누구로 읽을 것인가 — 인원과 무관하게 '번호' 하나로 간다.
+       구슬 자체는 지름 5.5px 라 그 안에 글자를 넣을 자리가 없다(반지름은 물리 상수 RACE_R 이라
+       화면 사정으로 못 키운다). 그래서 식별은 구슬 아래 라벨이 진다.
+       사다리·돌림판처럼 GAME_LABEL_MAX 로 이름/번호를 가르지 않는 이유는, 이 게임만 출발선에서
+       구슬이 한 덩어리로 모여 있어서다 — 자기 것을 찾아야 하는 바로 그 순간에 이름표가 가장
+       심하게 겹친다(네 명에서도 `이다니김요셉박사무최에스` 로 뭉갰다). 번호는 한두 글자라
+       그 자리에서도 갈라지고, HUD 상위 3명과 아래 범례가 이미 번호로 말하므로 세 표시가
+       같은 표를 쓰게 된다. 전체 이름은 범례에 잘리지 않고 그대로 있다.
+       (예전엔 인원과 무관하게 이름을 그리면서 shortName 의 두 번째 인자를 빠뜨려
+        `길이 > undefined` = false → 절삭이 죽어 있었다 — QA F-3.) */
     ctx.font = "800 10px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
     ctx.textAlign="center"; ctx.textBaseline="top"; ctx.lineWidth=3; ctx.lineJoin="round";
     for(let k=n-1;k>=0;k--){
       const i=rank[k];
       if(sim.done[i]>=0 && sim.done[i]<f) continue;
-      const sx = CW/2 + (sim.path[b0+i*2]-camX)*z, sy = CH*0.42 + (ypos[i]-camY)*z;
-      if(sy<-14||sy>CH+8||sx<-20||sx>CW+20) continue;
-      const nm = shortName(players[i].name);
+      const sx = COURSE_W/2 + (sim.path[b0+i*2]-camX)*z, sy = CH*0.42 + (ypos[i]-camY)*z;
+      if(sy<-14||sy>CH+8||sx<-20||sx>COURSE_W+20) continue;
+      const nm = String(i+1);
       ctx.strokeStyle="rgba(255,253,249,.95)"; ctx.strokeText(nm, sx, sy + RACE_R*z + 1);
       ctx.fillStyle=gcolor(i,n);                ctx.fillText(nm, sx, sy + RACE_R*z + 1);
     }
+    ctx.restore();   // 코스 클립 해제 — 미니맵은 그 바깥에 그린다
     drawMini(f, b0, vTop, vBot);
     return rank;
   }
@@ -4476,9 +4750,17 @@ function openSettings(){
     <button class="btn btn-soft" id="changeMe">🙋 내 이름 다시 선택  <span style="opacity:.7">(현재: ${esc(meName()||'-')})</span></button>
     <div style="height:8px"></div>
     <button class="btn btn-soft" id="editMembers">👥 구성원 편집 (추가·수정·삭제)</button>
+    ${gameEligible() && !gameCanCommit() ? `<div style="height:8px"></div>
+    <button class="btn btn-soft" id="gameTry">🎲 게임 구경하기 (연습)</button>
+    <p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm);line-height:1.5">돌려보기만 하는 판이에요 — 오늘 섬기실 분은 안 바뀝니다.</p>` : ""}
     <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 구성원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>`);
   document.getElementById("changeMe").onclick=()=>{ closeSheet(); renderPickMe(); };
   document.getElementById("editMembers").onclick=()=>{ closeSheet(); openMembersSheet(); };
+  /* 연습 진입점의 새 집 (검토 C-2). 본문에서는 뺐지만 기능을 없애지는 않았다 —
+     궁금한 사람은 여기서 연다. 시트를 닫지 않고 그 위에 게임 시트를 여는 이유: closeSheet() 가
+     히스토리 항목을 정리하는 것과 openGameSheet() 가 새로 여는 것이 같은 프레임에서 부딪힌다. */
+  const gt=document.getElementById("gameTry");
+  if(gt) gt.onclick=e=>{ gameEnsure(e.currentTarget); openGameSheet(); };
 }
 
 /* ---------- 클립보드 ---------- */
