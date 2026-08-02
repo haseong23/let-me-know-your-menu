@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.02";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.03";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2197,13 +2197,19 @@ function raceMapBuild(rnd){
        '움직이는 선반'이 되므로 나머지 10% 는 반드시 남긴다. */
     const RACE_VANE_COVER = 0.90, ay = 110;
     const [gxl, gxr] = bnd(ay), gw = gxr - gxl;
-    const left = rnd() < 0.5;
-    const ax = left ? -5 : RACE_W + 5;
-    const hl = left ? (gxl + gw*RACE_VANE_COVER) - ax : ax - (gxr - gw*RACE_VANE_COVER);
+    /* 축은 왼쪽 바깥에 고정한다. 좌우를 판마다 뒤집으면 마지막 장면의 그림이 판마다 달라져
+       '어느 쪽에서 쓸어 오는지'를 매번 다시 읽어야 한다 — 여기는 판의 결말이라 같은 그림이 낫다.
+       구슬이 어느 레인에서 출발했는지와 무관한 값이므로 이걸 고정해도 누출은 생기지 않는다. */
+    const ax = -5;
+    const hl = (gxl + gw*RACE_VANE_COVER) - ax;
     /* 회전 속도는 1.2 다. 1.6 으로 두면 통로 안에서 최대 소요가 34 → 66 초로 뛴다 —
        날이 도는 주기와 구슬이 통로를 지나는 시간이 맞물려, 열린 틈이 올 때마다 번번이
        놓치는 판이 생긴다. 0.8 은 한 번 닫히면 너무 오래 닫혀 있다(최대 40초). */
-    E.push(rbar(ax, ay, hl, 0.22, (rnd()<0.5?1:-1)*1.2, rnd()*6.283));
+    /* 회전 부호는 축을 왼쪽으로 옮긴 것과 한 몸이다. 축이 왼쪽에 있으면 팔이 통로를 지날 때
+       오른쪽을 향하고, 그때 +1.2 는 팔 끝이 아래로 내려가는 방향이다 — 통로를 쓸어 내린다.
+       부호를 뒤집으면 같은 자리에서 구슬을 밀어 올려 버티므로, 완주는 다 하지만 최대 소요가
+       20 → 54 초로 뛴다. 좌우를 뒤집었으면 회전도 함께 뒤집어야 같은 그림이 나온다. */
+    E.push(rbar(ax, ay, hl, 0.22, 1.2, rnd()*6.283));
   }
 
   const goalY = 117, zoomY = 113;
@@ -2242,15 +2248,15 @@ function raceSimulate(st, n, rnd){
   const E=st.E, grid=st.grid, cells=st.cells;
   let frames=0, order=[], winner=-1, tail=-1;
 
-  /* 끝내는 조건이 '전원 완주'가 아니라 '1등 + 꼬리'다. 전원을 기다리면 어딘가에 걸린 한 명
-     때문에 판 전체가 상한(90초)까지 돌아가고, 실제로 40판 중 17판이 그렇게 됐다.
-     1등이 들어와도 화면은 멈추지 않는다 — 꼴등이 궁금한 사람이 있다. 그래서 12초를 더 돌린다.
-     전원 완주까지 기다리지는 않는다: 1등 이후 꼴등까지가 중앙 9~32초에 꼬리가 68초까지 가고,
-     그 끝은 이미 아무도 안 본다. 12초면 대부분의 판에서 뒤엉킨 무리가 정리되는 것까지 보인다 —
-     그동안 들어온 만큼만 순위가 확정되고, 남은 구슬은 그 자리에서 화면을 뜬다. */
-  const TAIL = 720;
+  /* 1등이 들어와도 화면은 멈추지 않는다 — 꼴등이 궁금한 사람이 있다.
+     멈추는 조건은 둘 중 먼저 오는 것이다: 모든 구슬이 들어왔거나, 1등 이후 30초가 지났거나.
+     '전원 완주'만으로는 안 된다. 어딘가에 얹혀 끝내 안 내려오는 구슬이 판의 2~8% 에서 나오고,
+     그것만 기다리면 그 판은 상한(90초)까지 돌아간다 — 랩 첫 판에서 60판 중 37판이 그렇게 됐다.
+     그래서 상한을 함께 둔다. 30초면 대부분의 판이 전원 완주로 먼저 끝난다. */
+  const TAIL = 1800;
+  let landed = 0;
   for(let f=0; f<RACE_MAXF; f++){
-    if(tail>=0 && f-tail>=TAIL) break;
+    if(tail>=0 && (landed>=n || f-tail>=TAIL)) break;
     for(let s=0;s<RACE_SUB;s++){
       const tt=(f*RACE_SUB+s)*RACE_DT;
       for(let i=0;i<n;i++){
@@ -2305,7 +2311,7 @@ function raceSimulate(st, n, rnd){
     for(let i=0;i<n;i++){ path[base+i*2]=px[i]; path[base+i*2+1]=py[i]; }
     frames=f+1;
     for(let i=0;i<n;i++){
-      if(done[i]<0 && py[i]>=st.goalY){ done[i]=f; order.push(i); if(winner<0){ winner=i; tail=f; } }
+      if(done[i]<0 && py[i]>=st.goalY){ done[i]=f; order.push(i); landed++; if(winner<0){ winner=i; tail=f; } }
     }
   }
   /* winAt — 승자가 결승선을 지난 프레임. 판이 얼마나 걸렸는지는 frames 가 아니라 이것으로
@@ -3801,9 +3807,9 @@ const RACE_FONT = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pr
    본다. 승자를 보고 다시 뽑으면 그게 거부 표집이고, 그러면 게임 앞에 설명할 수 없는 대기가 붙는다.
    한 판 계산이 24명에서 최대 27ms 라 몇 번 돌려도 사용자는 못 느낀다. */
 const RACE_TRIES = 6;
-/* 실측 분포(16.2~33.5초, 중앙 22.3)에 맞춘 창이다. 창을 좁게 잡으면 절반 넘는 시드가 문턱에
+/* 실측 분포(11.6~20.1초, 중앙 14.9)에 맞춘 창이다. 창을 좁게 잡으면 절반 넘는 시드가 문턱에
    걸려 재시도로 버려지고, 결국 문턱을 못 넘은 판을 쓰게 된다 — 채택 기준이 사실상 사라진다. */
-const RACE_MIN_S = 15, RACE_MAX_S = 30;
+const RACE_MIN_S = 12, RACE_MAX_S = 25;
 /* 문턱은 leadChanges 가 아니라 '선두를 잡아 본 구슬 수'로 잡는다. 예전 문턱(역전 3회)은 계측해
    보니 아무것도 안 걸렀다 — 여섯 명 판에서도 하위 10% 가 4회라 첫 판이 거의 그대로 통과했다.
    즉 역동성을 고른 적이 없다. n 이 작을수록 구조적 상한이 낮아서 단을 나눈다(넷을 요구하면
