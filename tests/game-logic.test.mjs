@@ -26,8 +26,10 @@ const REQUIRED = [
   "ladderRungs",
   "GS_SOFT_W",
   "GAME_MAX",
-  "wheelSpin",
   "wheelSlices",
+  "wheelSimulate",
+  "wheelWinner",
+  "WHEEL_PEGS",
   // 아래 둘은 두 번째 마커 블록(대시보드 기간)에 있다. 여기 적어두면 그 블록이 통째로
   // 사라졌을 때 "조용한 통과" 대신 심볼 누락으로 터진다.
   "weekBackDays",
@@ -660,7 +662,7 @@ test("q3Start — 시작일은 항상 1일이고 길이는 92일 이하다 (R2-5
 // ===================== 돌림판 정보 누출 (R6) =====================
 // 이 회귀는 조용히 돌아올 수 있는 종류다 — labelStart 를 상수 −spin 으로 되돌리면 화면은
 // 멀쩡해 보이는데 정지 상태의 기울기가 곧 당첨자다. 그래서 값 자체를 못 박아 둔다.
-const { wheelSpin, wheelSlices } = gameLogic;
+const { wheelSlices, wheelSimulate, wheelWinner, WHEEL_PEGS } = gameLogic;
 
 /* 돌림판의 확률은 조각 각도다. 예전에는 조각을 n 등분해 놓고 당첨자를 가중 추첨으로 먼저
    뽑았는데, 결과는 맞아도 화면이 거짓말을 했다 — 조각이 다 같은 크기인데 확률은 다르다고
@@ -687,49 +689,64 @@ test("wheelSlices — 가중치가 모두 0 이면 균등하게 나눈다 (0 으
   sl.forEach((s) => assert.ok(Math.abs(s.deg - 90) < 1e-9, "0 뿐이면 균등이어야 한다"));
 });
 
-/* 이 판정이 이 파일에서 제일 중요하다. 각도만 맞고 뽑기가 딴 데를 보면 화면과 결과가
-   어긋나고, 그건 확률을 글로만 적던 옛 구조로 되돌아가는 것이다. */
-test("wheelSpin — 당첨 분포가 조각 각도와 일치한다 (각도가 곧 확률이다)", () => {
-  const w = [1, 1, 1, 1 / 3];                  // 네 번째가 '직전 섬긴 분'
-  const sl = wheelSlices(w);
-  const N = 60000, hit = new Array(w.length).fill(0);
-  for (let i = 0; i < N; i++) hit[wheelSpin(sl, () => (i + 0.5) / N).wi]++;
-  const sum = w.reduce((a, b) => a + b, 0);
+/* 이 판정이 이 파일에서 제일 중요하다. 각도만 맞고 실제로 멈추는 자리가 딴 데를 보면
+   화면과 결과가 어긋나고, 그건 확률을 글로만 적던 옛 구조로 되돌아가는 것이다.
+   돌림판은 이제 진짜로 돈다 — 초기 각속도만 무작위고 마찰과 압정이 세운다. 그래서 균등성은
+   설계로 보장되는 게 아니라 계측으로 확인해야 하는 성질이다. */
+test("wheelSimulate — 멈추는 각도가 360 도에 고르게 흩어진다", () => {
+  const B = 36, bin = new Array(B).fill(0), N = 30000;
+  for (let i = 0; i < N; i++) {
+    const r = wheelSimulate(Math.random);
+    assert.ok(r.hit >= 0 && r.hit < 360, `멈춘 각도 ${r.hit} 가 0~360 밖이다`);
+    bin[Math.floor(r.hit / (360 / B))]++;
+  }
+  const exp = N / B;
+  const dev = Math.max(...bin.map((c) => Math.abs(c - exp) / N * 100));
+  assert.ok(dev < 0.6, `${B}칸 최대 편차 ${dev.toFixed(3)}%p — 특정 각도가 잘 나온다`);
+});
+
+test("wheelSimulate — 당첨률이 조각 각도와 맞는다 (각도가 곧 확률이다)", () => {
+  const w = [1, 1, 1, 1 / 3];
+  const sl = wheelSlices(w), sum = w.reduce((a, b) => a + b, 0);
+  const N = 30000, hit = new Array(w.length).fill(0);
+  for (let i = 0; i < N; i++) hit[wheelWinner(sl, wheelSimulate(Math.random).hit)]++;
   w.forEach((_, i) => {
     const want = w[i] / sum, got = hit[i] / N;
-    assert.ok(Math.abs(got - want) < 0.005, `${i}번 당첨률 ${(got * 100).toFixed(2)}% ≠ 각도 ${(want * 100).toFixed(2)}%`);
+    assert.ok(Math.abs(got - want) < 0.012, `${i}번 당첨률 ${(got * 100).toFixed(2)}% ≠ 각도 ${(want * 100).toFixed(2)}%`);
   });
 });
 
-test("wheelSpin — 멈춘 각도가 당첨 조각 안에 들어온다 (핀 아래가 곧 결과다)", () => {
+test("wheelWinner — 멈춘 각도가 그 조각 안에 들어온다", () => {
   const sl = wheelSlices([1, 1, 1, 1 / 3, 2]);
-  for (let k = 0; k <= 200; k++) {
-    const { wi, hit, spin } = wheelSpin(sl, () => k / 201);
-    assert.ok(hit >= sl[wi].start && hit < sl[wi].end + 1e-9, `hit ${hit} 이 ${wi}번 조각 밖이다`);
-    // 판을 spin 만큼 돌리면 판의 각도 hit 이 핀(12시) 아래로 온다
-    const under = ((-spin % 360) + 360) % 360;
-    assert.ok(Math.abs(under - hit) < 1e-6, `핀 아래 각도 ${under} 가 hit ${hit} 과 다르다`);
+  for (let k = 0; k < 400; k++) {
+    const hit = k / 400 * 360, wi = wheelWinner(sl, hit);
+    assert.ok(hit >= sl[wi].start && hit < sl[wi].end + 1e-9, `${hit} 가 ${wi}번 조각 밖이다`);
   }
 });
 
-/* 누출 차단 (R6). 시작 화면이 답을 말하면 안 된다 — 라벨은 어느 판에서든 0 도에서 출발한다. */
-test("wheelSpin — 시작 시점 라벨 각도가 결과와 무관하게 항상 0 이다 (R6-1, R6-2)", () => {
-  const sl = wheelSlices([1, 1, 1, 1 / 3]);
-  const seen = new Set();
-  for (let k = 0; k <= 100; k++) seen.add(wheelSpin(sl, () => k / 101).labelStart);
-  assert.deepEqual([...seen], [0], "시작 라벨 각도가 판마다 다르면 그게 곧 답이다");
-});
-
-test("wheelSpin — 멈춘 뒤 글자의 절대 각도가 0 이라 똑바로 읽힌다 (R6-3)", () => {
-  const sl = wheelSlices([1, 1, 1, 1 / 3]);
-  for (let k = 0; k <= 100; k++) {
-    const { spin, labelEnd } = wheelSpin(sl, () => k / 101);
-    assert.ok(Math.abs(((spin + labelEnd) % 360 + 360) % 360) < 1e-9, "판 회전과 글자 역회전의 합이 0 이 아니다");
+/* 압정이 판을 세우는 주역이 되면 감쇠가 지수라 총 회전량이 초기 속도의 로그로만 늘어나고,
+   회전량이 좁게 모여 360 으로 접은 분포가 편향된다. 마찰이 지배해야 회전량이 ω²/2α 로
+   제곱만큼 벌어진다 — 위 균등성 판정이 이 성질에 얹혀 있다. */
+test("wheelSimulate — 총 회전량이 넓게 흩어지고, 판이 오래 끌지 않는다", () => {
+  let tmin = Infinity, tmax = 0, fmax = 0;
+  for (let i = 0; i < 3000; i++) {
+    const r = wheelSimulate(Math.random);
+    const turns = r.turn / 360;
+    tmin = Math.min(tmin, turns); tmax = Math.max(tmax, turns); fmax = Math.max(fmax, r.frames);
   }
+  assert.ok(tmin >= 3, `가장 적게 돈 판이 ${tmin.toFixed(1)}바퀴 — 추첨처럼 안 보인다`);
+  assert.ok(tmax - tmin >= 10, `회전량 폭이 ${(tmax - tmin).toFixed(1)}바퀴뿐 — 접은 분포가 편향된다`);
+  assert.ok(fmax / 60 <= 7, `가장 긴 판이 ${(fmax / 60).toFixed(1)}초 — 기다리다 지친다`);
 });
 
-test("wheelSpin — 최소 네 바퀴는 돈다 (한 바퀴만 돌면 추첨처럼 안 보인다)", () => {
-  const sl = wheelSlices([1, 1, 1]);
-  for (let k = 0; k <= 100; k++) assert.ok(wheelSpin(sl, () => k / 101).spin >= 360 * 4, "회전이 너무 짧다");
+test("wheelSimulate — 압정을 실제로 지나고, 기록 길이가 프레임 수와 맞는다", () => {
+  let ticks = 0;
+  for (let i = 0; i < 200; i++) {
+    const r = wheelSimulate(Math.random);
+    assert.ok(r.frames > 0 && r.frames === r.angles.length, "기록 길이가 프레임 수와 다르다");
+    ticks += Array.from(r.ticks).reduce((a, b) => a + b, 0);
+  }
+  assert.ok(WHEEL_PEGS >= 12, "압정이 너무 적으면 저항이 눈에 안 보인다");
+  assert.ok(ticks > 200 * WHEEL_PEGS * 3, "압정을 지난 횟수가 회전량에 비해 너무 적다");
 });
 
