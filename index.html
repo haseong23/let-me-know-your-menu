@@ -648,7 +648,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.01";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.02";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2244,9 +2244,11 @@ function raceSimulate(st, n, rnd){
 
   /* 끝내는 조건이 '전원 완주'가 아니라 '1등 + 꼬리'다. 전원을 기다리면 어딘가에 걸린 한 명
      때문에 판 전체가 상한(90초)까지 돌아가고, 실제로 40판 중 17판이 그렇게 됐다.
-     카메라가 뒷 순위를 중계하려면 1등 이후 장면이 있어야 하므로 6초는 더 돌린다 —
+     1등이 들어와도 화면은 멈추지 않는다 — 꼴등이 궁금한 사람이 있다. 그래서 12초를 더 돌린다.
+     전원 완주까지 기다리지는 않는다: 1등 이후 꼴등까지가 중앙 9~32초에 꼬리가 68초까지 가고,
+     그 끝은 이미 아무도 안 본다. 12초면 대부분의 판에서 뒤엉킨 무리가 정리되는 것까지 보인다 —
      그동안 들어온 만큼만 순위가 확정되고, 남은 구슬은 그 자리에서 화면을 뜬다. */
-  const TAIL = 360;
+  const TAIL = 720;
   for(let f=0; f<RACE_MAXF; f++){
     if(tail>=0 && f-tail>=TAIL) break;
     for(let s=0;s<RACE_SUB;s++){
@@ -2306,7 +2308,11 @@ function raceSimulate(st, n, rnd){
       if(done[i]<0 && py[i]>=st.goalY){ done[i]=f; order.push(i); if(winner<0){ winner=i; tail=f; } }
     }
   }
-  return { ok:winner>=0, winner, order, done, frames, path:path.subarray(0, frames*n*2), n };
+  /* winAt — 승자가 결승선을 지난 프레임. 판이 얼마나 걸렸는지는 frames 가 아니라 이것으로
+     재야 한다. frames 에는 1등 이후의 꼬리가 붙어 있어서, 꼬리를 늘리면 '판이 길어졌다'고
+     잘못 읽힌다(시드 채택 창과 테스트가 둘 다 그렇게 속는다). */
+  return { ok:winner>=0, winner, order, done, frames, winAt: winner>=0 ? done[winner] : frames,
+           path:path.subarray(0, frames*n*2), n };
 }
 
 /* 구슬 i 와 캡슐 하나. 닿았으면 true — 버블을 터뜨릴지 판정하는 데 쓴다. */
@@ -3818,7 +3824,7 @@ function raceBuild(n){
     const sim = raceSimulate(map, n, rnd);
     if(!sim.ok) continue;
     if(!fallback) fallback = { map, sim };
-    const secs = sim.frames/60;
+    const secs = sim.winAt/60;      // 꼬리를 뺀 '판의 길이'
     if(secs >= RACE_MIN_S && secs <= RACE_MAX_S) return { map, sim };
   }
   return fallback;
@@ -4047,7 +4053,7 @@ function playRace(players, onDone){
       if(ctl.raf) cancelAnimationFrame(ctl.raf);
       ctl.raf = 0;
       drawHud(END, draw(END), true);
-      if(typeof onDone === "function") onDone();
+      announce();
     },
     canvas: cv
   };
@@ -4064,6 +4070,17 @@ function playRace(players, onDone){
     if(!near) return 1;
     return Math.max(RACE_SLOW_MIN, Math.max(0, goalDist)/RACE_ZOOM_TRIG);
   }
+  /* 결과 발표는 '1등이 결승선을 지난 순간'이다. 그때 이미 누가 섬기는지는 정해졌으므로 더 끌
+     이유가 없다. 다만 화면은 멈추지 않는다 — 꼴등이 궁금한 사람이 있고, 뒤엉킨 무리가 정리되는
+     것이 이 게임에서 제일 볼만한 장면일 때가 있다.
+     showGameResult 는 캔버스를 건드리지 않고 그 아래 #gvWin 과 푸터만 갈아 끼우므로, 발표한
+     뒤에도 레이스는 그대로 돌아간다. 한 번만 부르면 되니 announced 로 잠근다. */
+  let announced = false;
+  function announce(){
+    if(announced) return;
+    announced = true;
+    if(typeof onDone === "function") onDone();
+  }
   function frame(now){
     ctl.raf = 0;
     if(!cv.isConnected){ ctl.stop(); return; }   // 오버레이가 닫힌 뒤 이미 예약돼 있던 프레임 방어
@@ -4071,6 +4088,7 @@ function playRace(players, onDone){
     last = now; t += dt;
     if(t >= END){ ctl.finish(); return; }
     drawHud(t, draw(t), false);
+    if(frameAt(t) >= sim.winAt) announce();
     ctl.raf = requestAnimationFrame(frame);
   }
   drawHud(0, draw(0), true);          // 첫 프레임은 즉시 — rAF 를 기다리면 빈 캔버스가 한 번 보인다

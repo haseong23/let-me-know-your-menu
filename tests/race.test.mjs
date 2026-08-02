@@ -33,9 +33,11 @@ test("어떤 인원수 · 어떤 시드로도 1등이 나온다", () => {
   assert.deepEqual(stuck, [], `1등이 안 나온 판: ${stuck.join(", ")}`);
 });
 
+/* 판의 길이는 winAt(승자 도착)으로 잰다. frames 에는 1등 이후의 꼬리가 붙어 있어서,
+   꼬리 길이를 바꾸면 판이 길어진 것처럼 잘못 읽힌다. */
 test("소요 시간이 볼 만한 구간에 들어온다", () => {
   const ds = [];
-  for (const n of CREW) for (let s = 1; s <= SEEDS; s++) ds.push(run(n, s).r.frames / 60);
+  for (const n of CREW) for (let s = 1; s <= SEEDS; s++) ds.push(run(n, s).r.winAt / 60);
   ds.sort((a, b) => a - b);
   const med = ds[Math.floor(ds.length / 2)];
   assert.ok(ds[0] >= 8, `가장 짧은 판이 ${ds[0].toFixed(1)}초 — 너무 빨리 끝나 볼 게 없다`);
