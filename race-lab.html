@@ -120,67 +120,116 @@ function rnd32(seed){
    구역을 y 로 적어 두면 어디를 고칠지 한눈에 보인다. */
 function buildStage(rnd){
   const E = [];
-  const WT = 0.18;                                     // 벽 두께 절반
+  const WT = 0.5;                                      /* 벽 두께 절반. 구슬 반지름(0.25)의 두 배다.
+        얇게 뒀더니 축이 코스 밖에 있는 큰 날과 반발 1.5 범퍼가 구슬을 벽 너머로 밀어냈다. */
 
   /* ① 바깥 벽. 위쪽은 코스 밖까지 길게 뽑아 출발 순간 구슬이 위로 새지 못하게 막는다.
         좌우가 같은 y 에서 함께 좁아졌다 넓어지며 방을 만든다. */
-  const LW = [[3,-30],[3,10],[7,17],[7,25],[3,32],[3,47],[8,54],[8,62],[3,69],[3,86],
-              [6,92],[6,99],[10.4,106],[10.4,118]];
-  const RW = [[23,-30],[23,10],[19,17],[19,25],[23,32],[23,47],[18,54],[18,62],[23,69],[23,86],
-              [20,92],[20,99],[15.6,106],[15.6,118]];
+  /* 장애물 구간 사이마다 '문'을 둔다(y 46~49, y 62~65). 문이 없을 때는 구슬이 바람개비·범퍼
+     사이를 무작위로 휘저으며 아주 천천히만 빠져나갔다 — 성공한 판도 중앙 16초에 꼬리가 75초까지
+     늘어졌고, 상한에 걸린 판이 3할이었다. 문을 지난 구슬은 위로 되돌아갈 수 없으므로 휘젓기가
+     한 방에 갇히고, 방마다 끝이 난다. 폭 3(지름의 여섯 배)이면 막히지 않으면서 줄은 세운다. */
+  /* 기울기 하한이 벽에도 걸린다 — |Δx|/Δy ≤ 1.4(수평에서 35° 이상). 문을 처음 넣을 때
+     8 칸을 3 줄 만에 좁혀 2.67 이 나왔고, 그 완만한 면이 그대로 선반이 됐다. 장애물을 전부
+     치우고 벽만 남겨도 실패 판 열한 개가 똑같이 그 자리에 멈춰 있었다 — 범인은 벽이었다.
+     이제 문 하나를 좁히는 데 6 칸을 쓴다. */
+  const LW = [[3,-30],[3,10],[7,17],[7,25],[3,32],[3,42],[11,48],[11,50],[4,55],[4,61],
+              [11,67],[11,69],[4,74],[3,79],[3,88],[6,92],[6,101],[10.4,107],[10.4,119]];
+  const RW = [[23,-30],[23,10],[19,17],[19,25],[23,32],[23,42],[15,48],[15,50],[22,55],[22,61],
+              [15,67],[15,69],[22,74],[23,79],[23,88],[20,92],[20,101],[15.6,107],[15.6,119]];
   poly(E, LW, WT); poly(E, RW, WT);
+
+  /* 벽 안쪽 경계를 y 로 조회한다. 두 군데서 쓴다 — 구슬을 가두는 클램프와, 장애물이 자기
+     자리를 벽에 맞추는 것. 장애물을 고정 좌표로 깔았더니 벽이 좁아지는 y 에서 벽과 못 사이가
+     지름보다 좁아져 사방에 낀다(계측: 60판 중 23판이 그렇게 멈췄다). */
+  const lerpAt = (arr, y) => {
+    if(y <= arr[0][1]) return arr[0][0];
+    for(let i=1;i<arr.length;i++){
+      const a=arr[i-1], b=arr[i];
+      if(y <= b[1]) return a[0] + (b[0]-a[0])*(y-a[1])/(b[1]-a[1] || 1);
+    }
+    return arr[arr.length-1][0];
+  };
+  const bnd = y => [lerpAt(LW,y)+WT, lerpAt(RW,y)-WT];
 
   /* ② y 11~24 · 못밭(static circle). 가장 싼 장치이자 이 장르의 기본기다.
         가로 간격 3.4 는 구슬 지름(0.5)의 여섯 배가 넘어 낄 자리가 없다. */
   for(let j=0;j<5;j++){
-    const y = 11.5 + j*2.6, off = (j%2)?1.7:0;
-    for(let x=5.2+off; x<=W-5.2; x+=3.4) E.push(circle(x, y, 0.34));
+    const y = 11.5 + j*2.6, off = (j%2)?1.7:0, r=0.34;
+    const [xl,xr] = bnd(y), m = r + 2*R + 0.35;         // 벽과 못 사이에 지름 넘는 틈을 남긴다
+    for(let x=xl+m+off; x<=xr-m; x+=3.4) E.push(circle(x, y, r));
   }
 
   /* ③ y 26~31 · 고정 사선 막대(static box, 각속도 0). 흐름을 한쪽으로 몰아 준다.
         레퍼런스에도 같은 자리에 같은 물건이 있다. */
-  E.push(slab(9.5, 27.4, 4.6, 0.30, 0.22));
-  E.push(slab(17.0, 30.2, 4.2, -0.28, 0.22));
+  /* 기울기 하한이 있다. 완만한 면은 '선반'이 되어 구슬이 얹힌 채 안 내려온다 —
+     0.30 rad(17°)로 뒀다가 그렇게 됐다. 0.7 rad = 40° 면 무엇도 얹히지 않는다. */
+  [[27.4, 0.72, -1], [30.2, -0.70, 1]].forEach(([y, ang, side])=>{
+    const [xl,xr]=bnd(y), w=xr-xl;
+    const hl=Math.min(4.6, w*0.34);                     // 길이를 방 폭에 맞춘다
+    const cx=(xl+xr)/2 + side*(w*0.5 - hl*Math.cos(ang) - 2*R - 0.5);
+    E.push(slab(cx, y, hl, ang, 0.22));
+  });
 
   /* ④ y 34~45 · 바람개비 밭(kinematic box). 나란히 놓고 서로 반대로 돌린다 —
         레퍼런스가 ±3.5 로 쓰는 그 구성이다. 이웃이 반대로 돌아야 구슬이 한쪽으로만
         쏠리지 않고, 어느 날에 맞느냐로 결과가 갈린다. */
-  for(let j=0;j<3;j++){
-    const y = 35.5 + j*3.6;
-    const xs = (j%2===0) ? [8, 13, 18] : [10.5, 15.5];
-    xs.forEach((x,k)=> E.push(bar(x, y, 1.9, 0.16, ((k+j)%2?1:-1)*3.5, rnd()*6.283)));
+  /* 세로 간격은 날이 그리는 원의 지름(2*(1.9+0.16))보다 넉넉히 커야 한다. 3.6 으로 뒀더니
+     위아래 원이 겹쳐, 반대로 도는 두 날 사이에 구슬이 물린 채 안 빠졌다. */
+  for(let j=0;j<2;j++){
+    const y = 35.5 + j*5.0;
+    const [xl,xr]=bnd(y), c=(j%2===0)?3:2, hl=1.9;
+    const span=(xr-xl) - 2*(hl + 2*R + 0.4);
+    for(let k=0;k<c;k++){
+      const x = xl + hl + 2*R + 0.4 + (c===1 ? span/2 : span*k/(c-1));
+      E.push(bar(x, y, hl, 0.16, ((k+j)%2?1:-1)*2.4, rnd()*6.283));
+    }
   }
 
   /* ⑤ y 49~61 · 범퍼 핀(static circle, restitution 1.5).
-        1 을 넘는 반발은 충돌마다 에너지를 '만든다'. 그래서 여기 들어온 구슬은 튕겨 올라가고
+        1 을 넘는 반발은 충돌마다 에너지를 '만든다'. 레퍼런스의 1.5 를 그대로 썼더니 주머니에
+        갇힌 구슬이 튈수록 빨라져 영영 안 나왔다 — 1.22 면 순위는 흔들리되 빠져나온다. 그래서 여기 들어온 구슬은 튕겨 올라가고
         순위가 크게 흔들린다. 속도 상한(VMAX)이 있어 발산하지는 않는다 — 상한이 없으면
         몇 번 튕기다 화면 밖으로 날아간다. */
-  const bump = [[8,50.5],[18,50.5],[13,54.5],[7.5,58.5],[18.5,58.5]];
-  bump.forEach(p=> E.push(circle(p[0], p[1], 0.75, 1.5)));
+  [[0.12,56.8],[0.5,56.8],[0.88,56.8],[0.28,59.8],[0.72,59.8]].forEach(([t,y])=>{
+    const [xl,xr]=bnd(y), r=0.75, m=r+2*R+0.4;
+    E.push(circle(xl+m + (xr-xl-2*m)*t, y, r, 1.1));
+  });
 
   /* ⑥ y 65~76 · 버블(circle + life). 닿으면 사라진다.
         간격을 지름보다 좁게(0.35) 깔아 그냥은 못 지나가게 한다 — 반드시 하나는 터뜨려야 하고,
         터진 자리가 그대로 길이 되어 뒤 구슬이 더 빨리 온다. 이 코스에서 판 중에 지형이 변하는
         유일한 자리다. 막힐 걱정은 없다: 닿기만 하면 사라지므로 눌릴수록 빨리 열린다. */
   for(let j=0;j<2;j++){
-    const y = 66.5 + j*4.2, off = (j%2)?0.68:0;
-    for(let x=5+off; x<=W-5; x+=1.35) E.push(bubble(x, y, 0.5));
+    const y = 77 + j*4, off = (j%2)?0.68:0, r=0.5;
+    const [xl,xr]=bnd(y), m=r+0.1;                      // 버블은 닿으면 사라지니 벽에 붙여도 안 낀다
+    for(let x=xl+m+off; x<=xr-m; x+=1.35) E.push(bubble(x, y, r));
   }
 
-  /* ⑦ y 79~85 · 큰 회전 날 하나. 축을 코스 바깥 멀리 두면 코스를 지나는 구간이 완만한 호가
-        되어 '천천히 쓸고 지나가는' 그림이 된다. 팔이 코스 반대쪽 끝까지 닿는다. */
-  E.push(bar(rnd()<0.5 ? -14 : W+14, 82, 44, 0.22, (rnd()<0.5?1:-1)*1.1, rnd()*6.283));
+  /* ⑦ y 79~85 · 큰 회전 날 하나. 축을 코스 바깥에 두면 코스를 지나는 구간이 완만한 호가
+        되어 '천천히 쓸고 지나가는' 그림이 된다. 다만 팔이 코스를 가로질러 다 덮으면 안 된다 —
+        축 14, 팔 44 로 뒀더니 팔이 거의 수평인 채 오래 머무는 '움직이는 선반'이 되어 구슬을
+        태우고 안 놔줬다. 실패 판 열한 개의 원인이 정확히 이 하나였다(이분 탐색으로 좁혔다).
+        폭의 3분의 2 만 훑게 하면 반대쪽이 늘 열려 있어 태울 수 없다. */
+  E.push(bar(rnd()<0.5 ? -5 : W+5, 85, 18, 0.22, (rnd()<0.5?1:-1)*1.6, rnd()*6.283));
 
   /* ⑧ y 88~100 · 못밭 + 사선 한 장. 결승 앞 마지막 흩기. */
   for(let j=0;j<3;j++){
-    const y = 88.5 + j*2.8, off = (j%2)?1.5:0;
-    for(let x=6+off; x<=W-6; x+=3.0) E.push(circle(x, y, 0.3));
+    const y = 90.5 + j*2.8, off = (j%2)?1.5:0, r=0.3;
+    const [xl,xr]=bnd(y), m=r+2*R+0.35;
+    for(let x=xl+m+off; x<=xr-m; x+=3.0) E.push(circle(x, y, r));
   }
-  E.push(slab(13, 97.5, 3.4, rnd()<0.5?0.24:-0.24, 0.2));
+  { const [xl,xr]=bnd(99), w=xr-xl, hl=Math.min(3.4, w*0.3);
+    E.push(slab((xl+xr)/2, 99, hl, rnd()<0.5?0.68:-0.68, 0.2)); }
 
   /* ⑨ y 106~118 · 결승 통로. 폭 5.2(구슬 지름의 열 배)라 서넛이 나란히 서고, 그 입구를
         큰 날이 쓸어 마지막 순위를 흔든다. */
-  E.push(bar(rnd()<0.5 ? -12 : W+12, 104.5, 40, 0.22, (rnd()<0.5?1:-1)*1.5, rnd()*6.283));
+  /* 통로 안에는 작은 바람개비 둘을 세운다. 큰 날 하나로 통로를 가로지르면 같은 이유로
+     통로를 막는 문이 된다 — 레퍼런스도 이 자리에는 작은 것을 여럿 둔다. */
+  [109, 113].forEach((yy,k)=>{
+    const [xl,xr]=bnd(yy);
+    E.push(bar((xl+xr)/2, yy, (xr-xl)/2-2*R-0.3, 0.14, (k?1:-1)*3.0, rnd()*6.283));
+  });
 
   const goalY = 117, zoomY = 113;
   const total = 120;
@@ -192,7 +241,7 @@ function buildStage(rnd){
     const a = Math.max(0, Math.floor((b.y0+30)/CELL)), z = Math.min(cells-1, Math.floor((b.y1b+30)/CELL));
     for(let c=a;c<=z;c++) grid[c].push(i);
   });
-  return { E, grid, cells, goalY, zoomY, total };
+  return { E, grid, cells, goalY, zoomY, total, bnd };
 }
 
 /* ══ 시뮬레이션 ══
@@ -228,7 +277,9 @@ function simulate(st, n, rnd){
       const tt=(f*SUB+s)*DT;
       for(let i=0;i<n;i++){
         if(done[i]>=0) continue;
-        vy[i]+=G*DT;
+        /* 아주 약한 감쇠. 초당 5% 만 깎으므로 자유낙하에는 영향이 없고, 벽·장애물 사이에서
+           오래 튀는 구슬의 에너지만 서서히 빼앗는다. */
+        vy[i]+=G*DT; vx[i]*=0.99995; vy[i]*=0.99995;
         const q=vx[i]*vx[i]+vy[i]*vy[i];
         if(q>VMAX*VMAX){ const k=VMAX/Math.sqrt(q); vx[i]*=k; vy[i]*=k; }
         px[i]+=vx[i]*DT; py[i]+=vy[i]*DT;
@@ -264,8 +315,12 @@ function simulate(st, n, rnd){
         }
       }
       for(let i=0;i<n;i++){                        // 좌우 최후 안전망(벽이 먼저 막는다)
-        if(px[i]<R){ px[i]=R; if(vx[i]<0) vx[i]=-vx[i]*E_WALL; }
-        else if(px[i]>W-R){ px[i]=W-R; if(vx[i]>0) vx[i]=-vx[i]*E_WALL; }
+        /* 가두는 선은 코스 테두리(0~W)가 아니라 '그 y 의 벽 안쪽'이다. 테두리에 걸어 뒀더니
+           벽 밖으로 밀려난 구슬이 x=0.25 에 붙들린 채, 밖에서 위를 향한 벽 사면에 얹혀
+           영원히 안 내려왔다 — 멈춘 구슬의 좌표가 전부 벽 바깥이었다. */
+        const [bl,br] = st.bnd(py[i]);
+        if(px[i]<bl+R){ px[i]=bl+R; if(vx[i]<0) vx[i]=-vx[i]*E_WALL; }
+        else if(px[i]>br-R){ px[i]=br-R; if(vx[i]>0) vx[i]=-vx[i]*E_WALL; }
       }
     }
     const base=f*n*2;
@@ -358,6 +413,61 @@ function race(players){
     return Math.min(n-1, settled);                  // rank 배열에서 몇 번째를 볼지
   }
 
+  /* ══ 미니맵 ══ 코스 전체를 오른쪽에 세로로 세운다. 줌이 들어가면 화면에 두어 명밖에
+     안 남아, '지금 내가 어디쯤이고 남은 길이 얼마인지'를 볼 곳이 사라진다.
+     지형은 판마다 고정이므로 한 번만 오프스크린에 굽고, 매 프레임에는 구슬과 시야 틀만 덧그린다. */
+  const MM_W = 46, MM_PAD = 8, MM_TOP = -32, MM_BOT = st.total + 6;
+  const mmH = Math.min(CH - MM_PAD*2, MM_W * (MM_BOT-MM_TOP) / W);
+  const mmS = mmH / (MM_BOT - MM_TOP);                    // 세계 → 미니맵 배율
+  const mmX = CW - MM_W - MM_PAD, mmY = MM_PAD;
+  const mm2 = (x,y) => [mmX + (MM_W - W*mmS)/2 + x*mmS, mmY + (y-MM_TOP)*mmS];
+
+  const miniBg = document.createElement("canvas");
+  miniBg.width = Math.round(MM_W*dpr); miniBg.height = Math.round(mmH*dpr);
+  (function bake(){
+    const g = miniBg.getContext("2d");
+    g.setTransform(dpr,0,0,dpr,0,0);
+    g.fillStyle="rgba(255,253,249,.94)"; g.fillRect(0,0,MM_W,mmH);
+    g.translate((MM_W - W*mmS)/2, -MM_TOP*mmS); g.scale(mmS, mmS);
+    g.lineCap="round";
+    for(const b of st.E){
+      // 도는 것은 자리를 알 수 있게 자기가 훑는 원으로, 나머지는 생긴 대로 그린다
+      if(b.spin){ g.strokeStyle="rgba(160,138,106,.5)"; g.lineWidth=1.2/mmS;
+        g.beginPath(); g.arc(b.cx,b.cy,b.hl,0,6.284); g.stroke(); continue; }
+      g.strokeStyle = b.life ? "#e0b479" : b.e>1 ? "#d98a6a" : b.rad>0.4 ? "#b9a889" : "#ddd0bc";
+      g.lineWidth = Math.max(2*b.rad, 1.1/mmS);
+      g.beginPath(); g.moveTo(b.x1,b.y1); g.lineTo(b.x2,b.y2); g.stroke();
+    }
+    g.strokeStyle="#2b2118"; g.lineWidth=1.6/mmS;
+    g.beginPath(); g.moveTo(0,st.goalY); g.lineTo(W,st.goalY); g.stroke();
+  })();
+
+  function drawMini(f, b0, vTop, vBot){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.save();
+    ctx.shadowColor="rgba(43,33,24,.18)"; ctx.shadowBlur=6; ctx.shadowOffsetY=1;
+    ctx.fillStyle="rgba(255,253,249,.94)";
+    ctx.beginPath(); ctx.roundRect(mmX, mmY, MM_W, mmH, 7); ctx.fill();
+    ctx.restore();
+    ctx.drawImage(miniBg, mmX, mmY, MM_W, mmH);
+
+    // 지금 화면이 코스의 어디인지
+    const [ , y1] = mm2(0, vTop), [ , y2] = mm2(0, vBot);
+    ctx.strokeStyle="rgba(43,33,24,.5)"; ctx.lineWidth=1;
+    ctx.strokeRect(mmX+1.5, Math.max(mmY, y1), MM_W-3, Math.max(2, Math.min(y2,mmY+mmH)-Math.max(mmY,y1)));
+
+    for(let k=n-1;k>=0;k--){
+      const i=rank[k];
+      if(sim.done[i]>=0 && sim.done[i]<f) continue;
+      const [sx,sy] = mm2(sim.path[b0+i*2], ypos[i]);
+      ctx.beginPath(); ctx.arc(sx, sy, k===0?2.6:1.9, 0, 6.284);
+      ctx.fillStyle=colorOf(i); ctx.fill();
+      if(k===0){ ctx.lineWidth=1; ctx.strokeStyle="#2b2118"; ctx.stroke(); }
+    }
+    ctx.strokeStyle="rgba(43,33,24,.22)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(mmX+.5, mmY+.5, MM_W-1, mmH-1, 7); ctx.stroke();
+  }
+
   function draw(t){
     const f = frameAt(t), b0 = f*n*2;
     for(let i=0;i<n;i++) ypos[i] = sim.path[b0+i*2+1];
@@ -428,6 +538,8 @@ function race(players){
       ctx.strokeStyle="rgba(255,253,249,.95)"; ctx.strokeText(nm, sx, sy + R*z + 1);
       ctx.fillStyle=colorOf(i);                 ctx.fillText(nm, sx, sy + R*z + 1);
     }
+
+    drawMini(f, b0, vTop, vBot);
 
     // HUD — 상위 네 명
     rows.forEach((row,k)=>{
