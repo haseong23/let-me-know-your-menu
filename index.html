@@ -45,6 +45,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
+    /* 이 앱에 다크 팔레트는 없다. 그 사실을 브라우저에 말해 두지 않으면 OS 가 다크일 때 UA 가
+       폼 컨트롤만 제 마음대로 어둡게 그린다 — 흰 카드 위에 검은 <input type=date> 두 개가 뜨는
+       대시보드 날짜 필터가 그 자리다. 한 줄로 그 갈림을 막는다.
+       다크 팔레트를 만들 생각이면 이 값을 'light dark' 로 바꾸고 아래 토큰 전부에 짝을 지어야 한다. */
+    color-scheme: light;
     --bg: #f6f1ea; --card: #ffffff; --ink: #2b2118; --sub: #6f6253; --line: #e7ddcf;
     --brand: #6f4e37; --brand-soft: #efe6da; --accent: #c98a3a; --green: #3f9d6b;
     --red: #c2552f; --gray: #b6a99a; --radius: 16px; --shadow: 0 6px 20px rgba(80,55,30,.08);
@@ -119,6 +124,16 @@
   button { font-family: inherit; cursor: pointer; border: none; }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px; border-radius: 14px; font-size: var(--fs-input); font-weight: 700; transition: transform .05s ease, filter .15s; }
   .btn:active { transform: scale(.985); }
+  /* 쓰기가 도는 동안의 버튼 (R20-3). disabled 를 opacity 로 흐리게 하는 흔한 처방을 쓰지 않는다 —
+     이건 '못 누르는 것'이 아니라 '지금 일하는 중'이고, 흐려 놓으면 --brand 위 흰 글자 7.36:1 이
+     같이 무너진다(.game-pick:disabled 에 적어 둔 것과 같은 계산). 색은 손대지 않고 돌아가는 고리
+     하나를 앞에 세워 상태를 말한다. currentColor 라 btn-brand(흰 고리)·btn-danger(붉은 고리)가
+     알아서 갈린다. reduced-motion 이면 위 전역 블록이 회전을 끄는데, 그때도 고리와 바뀐 글자가
+     남으므로 상태는 여전히 읽힌다. */
+  .btn[aria-busy="true"] { cursor: default; }
+  .btn[aria-busy="true"]:active { transform: none; }
+  .btn-spin { width: 15px; height: 15px; flex: none; border-radius: 50%; border: 2px solid currentColor;
+    border-top-color: transparent; opacity: .9; animation: spin .7s linear infinite; }
   .btn-brand { background: var(--brand); color: #fff; } .btn-soft { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--line); }
   .btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); } .btn-danger { background: #fff; color: var(--red-ink); border: 1px solid #f0d4c8; }
   /* '고를 수 있는 것' 전용 — 이 앱에서 누를 수 있는 건 전부 흰 카드다(메뉴 타일·사람 행).
@@ -674,7 +689,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.08";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.09";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1205,7 +1220,28 @@ async function safeWrite(p, failMsg){ try{ await p; return true; }catch(e){ cons
   toast(failMsg||"저장 실패 — 네트워크 확인 후 다시 시도해주세요"); return false; } }
 // 이중 제출 가드: 비동기 쓰기 진행 중 재진입(빠른 더블탭) 차단 → 중복 요청·토스트 방지
 let busyWrite=false;
-async function guardWrite(fn){ if(busyWrite) return; busyWrite=true; try{ return await fn(); } finally{ busyWrite=false; } }
+/* 가드가 재진입만 막고 화면은 그대로였다 (R20-3). 느린 망에서는 누른 뒤 아무 일도 일어나지 않은
+   것처럼 보여 사용자가 다시 누르는데, 그 두 번째를 가드가 조용히 삼키니 '씹혔다'는 인상만 남았다.
+   btn 을 넘기면 그동안 그 버튼이 자기가 일하는 중임을 말한다.
+   되돌리기를 finally 가 아니라 '살아 있을 때만' 하는 것이 요점이다 — 성공 경로는 대개 render() 나
+   closeSheet() 로 이 버튼을 통째로 지우고, 그때 innerHTML 을 되돌리면 이미 문서에서 떨어져 나간
+   노드를 만지는 셈이 된다(무해하지만 의도가 흐려진다). 실패 경로에서는 버튼이 그대로 남아 있으므로
+   원래 글자로 돌아와 다시 누를 수 있다. */
+async function guardWrite(fn, btn, busyLabel){
+  if(busyWrite) return;
+  busyWrite=true;
+  let prev=null;
+  if(btn){
+    prev=btn.innerHTML;
+    btn.setAttribute("aria-busy","true"); btn.disabled=true;
+    btn.innerHTML='<span class="btn-spin"></span>'+esc(busyLabel||"저장 중…");
+  }
+  try{ return await fn(); }
+  finally{
+    busyWrite=false;
+    if(btn && document.body.contains(btn)){ btn.removeAttribute("aria-busy"); btn.disabled=false; btn.innerHTML=prev; }
+  }
+}
 // 오프라인 표시
 function updateOffline(){ const el=document.getElementById("offline"); if(el) el.classList.toggle("show", !navigator.onLine); }
 window.addEventListener("online", updateOffline); window.addEventListener("offline", updateOffline);
@@ -1315,6 +1351,18 @@ function closeSheet(){   // history 항목은 다음 뒤로가기/열기가 소�
 $scrim.addEventListener("click",e=>{ if(e.target===$scrim) closeSheet(); });
 // 칩 키보드 접근성: 포커스된 칩(tabindex=0)에서 Enter/Space → 클릭(키보드·스크린리더 사용자)
 document.addEventListener("keydown",e=>{ const t=e.target; if((e.key==="Enter"||e.key===" "||e.key==="Spacebar")&&t&&t.getAttribute&&t.getAttribute("tabindex")==="0"&&(t.getAttribute("role")==="button"||(t.classList&&t.classList.contains("chip")))){ e.preventDefault(); t.click(); } });
+/* Escape 로 닫기 (R20-4). 모바일에는 뒤로가기가 있어 이 앱이 여기까지 오지 않아도 됐지만,
+   데스크톱 브라우저에서 열면 모달을 닫는 관습적인 키가 하나도 없었다.
+   닫는 순서는 아래 popstate 와 똑같이 '위에 뜬 것부터'다 — 확인창(70) → 게임(55) → 시트(40).
+   히스토리 처리도 각 화면의 닫기 버튼과 같은 함수에 맡겨 경로를 늘리지 않는다:
+   finishConfirm 은 자기 항목을 ignorePop 으로 소비하고, closeSheet 은 항목을 다음 뒤로가기·열기가
+   재사용하도록 남긴다(스크림을 눌러 닫을 때와 똑같다). */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape") return;
+  if(confirmOpen){ e.preventDefault(); finishConfirm(false); return; }
+  if(GS && GS.open){ e.preventDefault(); closeGame(); return; }
+  if(sheetOpen){ e.preventDefault(); closeSheet(); return; }
+});
 window.addEventListener("popstate",()=>{
   if(ignorePop > 0){ ignorePop--; return; }   // 우리가 부른 history.back() 한 칸을 무시(확인창 버튼 닫기 등). 한 번에 한 칸씩만 소비한다.
   if(confirmOpen){ confirmOpen=false; $cscrim.classList.remove("show"); closeConfirmA11y(); const r=confirmResolve; confirmResolve=null; if(r) r(false); return; }  // 뒤로가기=확인창 취소(우선)
@@ -1597,13 +1645,13 @@ function renderOpen(){
      '주문함'에서 '안 마심'으로 상태가 통째로 바뀌고, 섬기는 분 화면의 잔 수까지 줄어든다. */
   view().querySelectorAll(".skip-btn").forEach(b=> b.onclick=async()=>{
     if(!(await askConfirm("오늘은 음료를 안 드시는 거죠?\n마음이 바뀌면 아래에서 메뉴를 고르면 돼요.",{ok:"네, 안 마실게요"}))) return;
-    guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"idle"}); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } });
+    guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"idle"}); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }, b, "저장 중…");
   });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
   const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
-    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); trackOrder(o,"copy_other"); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }));
+    forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); trackOrder(o,"copy_other"); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }, b, "담는 중…"));
   /* 지난번 주문 → 주문 시트를 채워서 연다. 바로 서버에 쓰지 않는 이유가 둘이다.
      ① 검증. 저장된 옵션이 지금도 유효한지는 시트의 draw() 가 판정한다(온도는 temps 로 조이고
         extras 는 availExtras 로 거른다). 여기서 바로 쓰면 그 판정을 한 벌 더 만들어야 하고,
@@ -1728,14 +1776,15 @@ function openOrderSheet(menuId, existing, prefill){
         ex.querySelectorAll(".chip").forEach(x=>{ if(x.dataset.x===opp){ x.classList.remove("sel"); x.setAttribute("aria-pressed","false"); } }); } } }
       refreshSum(); });
     const noteEl=document.getElementById("note"); if(noteEl) noteEl.onfocus=()=>{ setTimeout(()=>{ try{ noteEl.scrollIntoView({block:"center",behavior:"smooth"}); }catch(e){} },250); };  // 키보드가 입력창 가리지 않게
-    document.getElementById("confirmOrder").onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
+    const cob=document.getElementById("confirmOrder");
+    cob.onclick=()=>guardWrite(async()=>{ note=document.getElementById("note").value.trim(); forceGrid=false;
       if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
       const ord={type:"drink",menuId,menuName:m.name,temp,extras,note};
-      if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); trackOrder(ord, existing?"edit":"sheet"); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } });
+      if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); trackOrder(ord, existing?"edit":"sheet"); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } }, cob, existing?"바꾸는 중…":"담는 중…");
     const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     // 바로 위 [이걸로 주문]과 같은 가드에 넣는다 — 이 버튼만 밖에 있어서 빠른 더블탭이 삭제 요청을
     // 두 번 보냈다(두 번째는 이미 없는 주문을 지운다).
-    const co=document.getElementById("cancelOrder"); if(co) co.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ track("order_removed"); closeSheet(); toast("주문을 취소했어요"); render(); } });
+    const co=document.getElementById("cancelOrder"); if(co) co.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ track("order_removed"); closeSheet(); toast("주문을 취소했어요"); render(); } }, co, "취소하는 중…");
   }
   draw();
 }
@@ -1797,8 +1846,8 @@ function openCustomSheet(existing, prefillName, prefillNote){
   let exactMatch=null, isDecline=false;
   // 기존 메뉴로 자연스럽게 전환 — 알림창 대신 이미 쓰던 시트 전환(openFullMenuSheet의 메뉴 클릭과 동일한 방식)
   function goToExisting(m){ openOrderSheet(m.id, existing); }
-  function goToSkip(){ guardWrite(async()=>{ forceGrid=false;
-    if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"sheet"}); closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }); }
+  function goToSkip(btn){ guardWrite(async()=>{ forceGrid=false;
+    if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"sheet"}); closeSheet(); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }, btn, "저장 중…"); }
   function refreshSuggestions(){
     const qn=norm(nameEl.value);
     isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
@@ -1824,7 +1873,7 @@ function openCustomSheet(existing, prefillName, prefillNote){
   sugEl.addEventListener("click", e=>{ const r=e.target.closest(".menu-row"); if(!r) return; const m=pool.find(x=>x.id===r.dataset.id); if(m) goToExisting(m); });
 
   addBtn.onclick=async()=>{
-    if(isDecline){ goToSkip(); return; }
+    if(isDecline){ goToSkip(addBtn); return; }
     if(exactMatch){ goToExisting(exactMatch); return; }
     const name=document.getElementById("cname").value.trim(), note=document.getElementById("cnote").value.trim();
     if(!name){ toast("메뉴 이름을 입력해주세요"); return; }
@@ -2155,8 +2204,14 @@ function wheelSlices(weights){
 
 /* ══ 돌림판 물리 ══
    각도를 먼저 뽑아 거기로 감으면, 결과는 균등해도 '뽑고 나서 맞춘다'는 구조가 그대로 남는다.
-   그래서 진짜로 돌린다 — 초기 각속도만 무작위로 주고, 마찰과 테두리 압정이 판을 세운다.
+   그래서 진짜로 돌린다. 판은 [그만 돌리기]를 누를 때까지 등속으로 계속 돌고, 누른 순간부터
+   마찰과 테두리 압정이 판을 세운다 — 멈춘 자리에 있는 조각이 당첨이다.
    초기 속도는 5~14 바퀴/초다. 눈으로 따라갈 수 없어야 '이쯤에서 멈추겠다'는 감이 안 생긴다.
+
+   무작위가 둘이라는 점이 중요하다. 누른 순간의 각도(사람의 손)와 감속하며 더 도는 양(아래
+   시뮬레이션)이 각각 균등하고, 둘을 더한 것이 최종 각도다. 그래서 설령 누구도 못 하겠지만
+   누르는 순간을 완벽히 맞춘다 해도 결과를 못 고른다 — 감속량을 모르기 때문이다.
+   반대로 감속량만으로 정하면 '누르기 전에 이미 답이 있는' 옛 구조로 돌아간다. 둘 다 필요하다.
    멈춘 자리에 있는 조각이 당첨이다. 아무도 결과를 먼저 알지 못하고, 알 수 있는 코드도 없다.
 
    압정은 저항만 준다. '가장 가까운 압정 사이로 딸깍 물리는' 디텐트를 넣으면 안 된다 —
@@ -2186,7 +2241,8 @@ const WHEEL_MAXF = 900;             // 15초 상한
 function wheelSimulate(rnd){
   const r = rnd || Math.random;
   const pegA = 360/WHEEL_PEGS;
-  let w = WHEEL_W0[0] + r()*(WHEEL_W0[1]-WHEEL_W0[0]);
+  const w0 = WHEEL_W0[0] + r()*(WHEEL_W0[1]-WHEEL_W0[0]);
+  let w = w0;
   let th = 0, f = 0;
   const angles = new Float32Array(WHEEL_MAXF);
   const ticks  = new Uint8Array(WHEEL_MAXF);      // 그 프레임에 압정을 몇 개 지났나
@@ -2203,7 +2259,7 @@ function wheelSimulate(rnd){
   }
   // 핀은 12시에 고정이고 판이 th 만큼 돌았으므로, 핀 아래에 온 판의 각도는 -th 다.
   const hit = ((-th % 360) + 360) % 360;
-  return { angles: angles.subarray(0, f), ticks: ticks.subarray(0, f), frames: f, turn: th, hit };
+  return { angles: angles.subarray(0, f), ticks: ticks.subarray(0, f), frames: f, turn: th, hit, w0 };
 }
 
 /* 멈춘 각도가 어느 조각인지. 조각을 못 찾는 경우는 없어야 하지만, 못 찾으면 마지막 조각으로
@@ -3747,8 +3803,7 @@ function playWheel(roster, weights){
      물리를 먼저 끝까지 돌려 각도를 기록해 두고 화면은 그것을 재생한다(구슬 레이스와 같은 구조).
      이렇게 해야 [그만 돌리기]로 건너뛰거나 느린 기기에서 프레임을 흘려도 멈추는 자리가 같다. */
   const sim=wheelSimulate(Math.random);
-  const wi=wheelWinner(slices, sim.hit);
-  const winner=roster[wi];
+
   // 조각 색은 gcolor(i, n). n 을 안 넘기면 11명째에 0번과 같은 색이 되고, 그 둘은 바로
   // 옆 조각이라 흰 구분선만 남아 경계가 사실상 사라진다 (R9-1·R9-2).
   const sectors=roster.map((m,i)=>{
@@ -3787,59 +3842,78 @@ function playWheel(roster, weights){
     return `<circle cx="${(pr*Math.cos(t)).toFixed(2)}" cy="${(pr*Math.sin(t)).toFixed(2)}" r="2.6" fill="#fffdf9" stroke="#6f6253" stroke-width="1"/>`;
   }).join("");
   openGameOv("🎡 돌림판", `
-    <div class="game-say" id="gvSay" aria-live="polite">돌아갑니다…</div>
+    <div class="game-say" id="gvSay" aria-live="polite">돌고 있어요 — [그만 돌리기]를 누르면 멈춰요</div>
     <div class="wheel-wrap"><div class="wheel-pin" id="wPin">🔻</div>
       <div id="wRot" style="transform:rotate(0deg)"><svg viewBox="-108 -108 216 216" role="img" aria-label="돌림판 회전 중">
         ${sectors}${labels}${pegs}<circle cx="0" cy="0" r="13" fill="#fff" stroke="#e7ddcf" stroke-width="2"/></svg></div></div>
     ${gameLegendHtml(roster, n)}
     <div id="gvWin" role="status"></div>`);
   /* [⏹ 그만 돌리기] — 기다리기 싫을 때 회전을 끊는다. 이름을 '여기서 멈추기'로 하지 않은 이유가
-     있다. 판은 이미 다 돌아 있고(물리를 미리 끝까지 돌려 각도를 기록해 둔다), 화면은 그 기록을
-     재생하는 중일 뿐이다. '여기서'라고 쓰면 누르는 순간의 각도가 결과를 정한다는 뜻이 되는데,
-     그건 추첨이 아니라 반응 속도 시합이다. 이 버튼이 줄이는 건 결과가 아니라 기다리는 시간이다. */
+     있다. 누른 순간의 각도는 출발점일 뿐이고, 거기서 감속하며 더 도는 양(5~23 바퀴)이 얹혀야
+     최종 각도가 나온다. 그 양은 판이 시작할 때 이미 뽑혀 있지만 아무 데도 안 보이므로,
+     누르는 순간을 완벽히 맞춰도 결과를 고를 수 없다 — 반응 속도 시합이 되지 않는 이유다. */
   setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvStop">⏹ 그만 돌리기</button>
     <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
 
   const rot=document.getElementById("wRot"), pin=document.getElementById("wPin");
   const labs=[...(rot?rot.querySelectorAll(".wlab"):[])];
-  /* 기록을 그대로 재생한다. CSS 트랜지션으로 목표 각도까지 감던 예전 구조를 버린 이유는,
-     그 구조가 '결과를 먼저 정하고 거기로 간다'를 전제하기 때문이다. 지금은 매 프레임의 각도가
-     물리에서 나오므로 트랜지션에 넘길 '목표'라는 게 없다.
-     이름은 판과 같이 돌면 거꾸로 선다 — 판이 돈 만큼 글자를 제자리에서 되돌린다. 되돌림 값을
-     정지 화면에 박아 두지 않고 매 프레임 계산하므로, 시작 화면은 어느 판에서나 똑같다 (R6). */
-  let wf = 0, done = false;
-  function paint(f){
-    const deg = sim.angles[Math.min(f, sim.frames-1)];
+  /* 두 구간이다. 누르기 전에는 등속으로 계속 돈다 — 그동안은 결과가 존재하지 않는다.
+     [그만 돌리기]를 누른 순간의 각도에 감속 기록을 이어 붙이면 그게 최종 각도다.
+     감속 구간을 CSS 트랜지션이 아니라 기록 재생으로 두는 이유는, 트랜지션이 '목표 각도'를
+     먼저 알아야 하는 물건이라서다 — 매 프레임 각도가 물리에서 나오는 지금은 넘길 목표가 없다.
+     이름은 판과 같이 돌면 거꾸로 선다. 되돌림을 매 프레임 계산하므로 정지 화면에는 어떤
+     각도도 박혀 있지 않다 (R6). */
+  const pegA = 360/WHEEL_PEGS;
+  let spinning = true, base = 0, wf = 0, done = false, t0 = 0;
+  let winner = null;
+
+  function paint(deg, tick){
     rot.style.transform = "rotate(" + deg.toFixed(2) + "deg)";
     labs.forEach(el=> el.setAttribute("transform", "rotate(" + (-deg).toFixed(2) + " " + el.dataset.cx + " " + el.dataset.cy + ")"));
-    /* 압정 딸깍임 — 핀이 압정을 지날 때 살짝 튕긴다. 압정 사이 어디쯤인지로 기울기를 만들면
-       속도가 빠를 때는 떨고 느려지면 잦아들어, 저항이 눈에 보인다. */
+    /* 압정 딸깍임 — 압정 사이 어디쯤인지로 핀을 기울인다. 빠를 때는 떨고 느려지면 잦아들어
+       저항이 눈에 보인다. CSS 가 translateX(-50%) 로 가운데를 잡고 있으니 덮어쓰지 않는다. */
     if(pin){
-      const frac = ((deg / (360/WHEEL_PEGS)) % 1 + 1) % 1;
-      const amp = Math.min(1, (sim.ticks[Math.min(f, sim.frames-1)] || 0) / 2);
-      // CSS 가 translateX(-50%) 로 가운데를 잡고 있다 — 덮어쓰지 말고 뒤에 이어 붙인다
-      pin.style.transform = "translateX(-50%) rotate(" + (Math.sin(frac*6.283) * 14 * amp).toFixed(1) + "deg)";
+      const frac = ((deg/pegA) % 1 + 1) % 1;
+      const amp = Math.min(1, tick/2);
+      pin.style.transform = "translateX(-50%) rotate(" + (Math.sin(frac*6.283)*14*amp).toFixed(1) + "deg)";
     }
   }
-  function finish(){
-    if(done) return; done = true;
-    paint(sim.frames-1);
+  function settle(){
+    const deg = base + sim.angles[sim.frames-1];
+    paint(deg, 0);
     if(pin) pin.style.transform = "translateX(-50%) rotate(0deg)";
+    // 핀은 12시 고정이고 판이 deg 만큼 돌았으므로, 핀 아래에 온 판의 각도는 -deg 다.
+    winner = roster[wheelWinner(slices, ((-deg % 360) + 360) % 360)];
     const say=document.getElementById("gvSay"); if(say) say.textContent="멈췄어요!";
-    gtimer(()=>showGameResult(winner), 260);
+    gtimer(()=>showGameResult(winner), 300);
   }
-  function step(){
+  function step(now){
     if(done) return;
-    if(!rot.isConnected){ done = true; return; }     // 오버레이가 닫힌 뒤 예약된 프레임 방어
-    paint(wf);
-    if(++wf >= sim.frames){ finish(); return; }
+    if(!rot.isConnected){ done = true; return; }   // 오버레이가 닫힌 뒤 예약된 프레임 방어
+    if(spinning){
+      if(!t0) t0 = now;
+      base = sim.w0 * (now - t0) / 1000;           // 등속 — 결과는 아직 없다
+      paint(base, 2);
+    } else {
+      paint(base + sim.angles[wf], sim.ticks[wf]);
+      if(++wf >= sim.frames){ done = true; settle(); return; }
+    }
     if(GS) GS.raf = requestAnimationFrame(step);
   }
+  /* [⏹ 그만 돌리기] — 이제 이 버튼이 감속을 시작한다. 누른 순간의 각도가 출발점이고, 거기에
+     감속하며 더 도는 양이 얹힌다. 둘 다 무작위라 누구도 결과를 고를 수 없다.
+     두 번 눌러도 한 번만 먹는다 — 감속 도중에 다시 누르면 각도가 튄다. */
+  function stopSpin(){
+    if(!spinning || done) return;
+    spinning = false; wf = 0;
+    const say=document.getElementById("gvSay"); if(say) say.textContent="멈추는 중…";
+    const b=document.getElementById("gvStop"); if(b) b.disabled = true;
+  }
   if(GS) GS.teardown = ()=>{ done = true; if(GS && GS.raf) cancelAnimationFrame(GS.raf); };
-  bind("gvStop", finish);
-  if(lessMotion()){ finish(); }                       // 연출을 건너뛰고 결과로 간다
-  else { paint(0); if(GS) GS.raf = requestAnimationFrame(step); }
+  bind("gvStop", stopSpin);
+  if(lessMotion()){ done = true; settle(); }        // 연출을 건너뛰고 결과로 간다
+  else { paint(0, 0); if(GS) GS.raf = requestAnimationFrame(step); }
 }
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
@@ -4573,7 +4647,8 @@ function openEditCellSheet(cell){
     const chips=document.getElementById("ecCafe");
     chips.querySelectorAll(".chip").forEach(c=> c.onclick=()=>{ cafeId=c.dataset.c; chips.querySelectorAll(".chip").forEach(x=>x.classList.toggle("sel",x.dataset.c===cafeId)); });
     document.getElementById("ecClose").onclick=closeSheet;
-    document.getElementById("ecSave").onclick=()=>guardWrite(async()=>{
+    const ecb=document.getElementById("ecSave");
+    ecb.onclick=()=>guardWrite(async()=>{
       const name=(nameVal||"").trim();
       const seen={}, out=[];
       for(const m of mlist){ const nm=(m.name||"").trim().slice(0,40); if(!nm||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name:nm}); }
@@ -4593,7 +4668,7 @@ function openEditCellSheet(cell){
       if(error){ toast("저장 실패: "+(error.message||"")); return; }
       if(DB_CELLS[cell.id]){ DB_CELLS[cell.id].name=name; DB_CELLS[cell.id].members=members; DB_CELLS[cell.id].homeCafeId=cafeId; }
       closeSheet(); toast("셀을 수정했어요"); renderAdminDash();
-    });
+    }, ecb, "저장 중…");
   }
   draw();
 }
@@ -5274,6 +5349,8 @@ function openRenameCellSheet(cell){
   const upd=()=>{ const v=norm(inp.value); if(inp.value!==v) inp.value=v; prev.textContent=`${location.origin}${location.pathname}?cell=${v}`; };
   inp.oninput=upd; upd();
   document.getElementById("rclose").onclick=closeSheet;
+  // 여기만 busy 버튼을 안 붙인다 — askConfirm 이 guardWrite 안에 있어서, 확인창이 떠 있는 동안
+  // 뒤 버튼이 "이관 중…"이라고 거짓말을 하게 된다. 확인창 자체가 이미 '진행 중'을 말하고 있다.
   document.getElementById("dorename").onclick=()=>guardWrite(async()=>{
     const nid=norm(inp.value);
     if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(nid)){ toast("초대코드 형식을 확인해주세요(3~40자, 소문자/숫자/-)"); return; }
@@ -5371,7 +5448,8 @@ function openMembersSheet(){
     $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
     $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
     document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
-    document.getElementById("saveM").onclick=()=>guardWrite(async()=>{
+    const smb=document.getElementById("saveM");
+    smb.onclick=()=>guardWrite(async()=>{
       // 동시편집 충돌 감지(OCC): 저장 직전 최신 멤버 확인 → 바뀌었으면 덮어쓰지 말고 최신 반영+경고
       if(SHARED){ const fresh=await fetchCell(CELL.id);
         if(fresh && memSig(fresh.members)!==baseline){
@@ -5384,7 +5462,7 @@ function openMembersSheet(){
       const final=out.slice(0,60);
       if(!final.length){ toast("구성원을 1명 이상 두세요"); return; }
       if(await saveMembers(final)){ if(ME && !final.some(m=>m.id===ME)) setMe(null); closeSheet(); toast("구성원 명단을 저장했어요"); render(); }
-    });
+    }, smb, "저장 중…");
     document.getElementById("closeM").onclick=closeSheet;
   }
   draw();
