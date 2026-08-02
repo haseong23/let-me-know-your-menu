@@ -27,6 +27,7 @@ const REQUIRED = [
   "GS_SOFT_W",
   "GAME_MAX",
   "wheelSpin",
+  "wheelSlices",
   // 아래 둘은 두 번째 마커 블록(대시보드 기간)에 있다. 여기 적어두면 그 블록이 통째로
   // 사라졌을 때 "조용한 통과" 대신 심볼 누락으로 터진다.
   "weekBackDays",
@@ -659,78 +660,76 @@ test("q3Start — 시작일은 항상 1일이고 길이는 92일 이하다 (R2-5
 // ===================== 돌림판 정보 누출 (R6) =====================
 // 이 회귀는 조용히 돌아올 수 있는 종류다 — labelStart 를 상수 −spin 으로 되돌리면 화면은
 // 멀쩡해 보이는데 정지 상태의 기울기가 곧 당첨자다. 그래서 값 자체를 못 박아 둔다.
-const { wheelSpin } = gameLogic;
-const WHEEL_NS = [2, 3, 5, 10, 11, 24];
-const norm360 = (deg) => ((deg % 360) + 360) % 360;
+const { wheelSpin, wheelSlices } = gameLogic;
 
-test("wheelSpin — 시작 시점 라벨 각도가 wi 와 무관하게 항상 같다 (R6-1, R6-2, R6-8)", () => {
-  for (const n of WHEEL_NS) {
-    const seen = new Set();
-    for (let wi = 0; wi < n; wi++) {
-      // 난수도 함께 흔든다 — wi 뿐 아니라 jitter 와도 무관해야 한다 (R6-2).
-      for (const r of [0, 0.13, 0.5, 0.87, 0.999]) {
-        seen.add(wheelSpin(n, wi, () => r).labelStart);
-      }
-    }
-    assert.equal(
-      seen.size,
-      1,
-      `n=${n}: 시작 시점 라벨 각도가 ${[...seen].join(", ")} 로 갈린다 — 여기서 당첨자가 샌다`
-    );
-    assert.equal([...seen][0], 0, `n=${n}: 시작 각도는 0(똑바로)이어야 한다`);
+/* 돌림판의 확률은 조각 각도다. 예전에는 조각을 n 등분해 놓고 당첨자를 가중 추첨으로 먼저
+   뽑았는데, 결과는 맞아도 화면이 거짓말을 했다 — 조각이 다 같은 크기인데 확률은 다르다고
+   글로만 적혀 있었다. 이제 각도가 곧 확률이라, 아래 두 가지를 함께 지켜야 한다:
+   ① 각도가 가중치에 비례하고 ② 실제 뽑기 분포가 그 각도와 일치한다. */
+
+test("wheelSlices — 각도가 가중치에 비례하고 빈틈 없이 360 을 채운다", () => {
+  for (const w of [[1, 1, 1], [1, 1, 1, 1 / 3], [2, 1], [1 / 3, 1, 1, 1, 1, 1]]) {
+    const sl = wheelSlices(w);
+    const sum = w.reduce((a, b) => a + b, 0);
+    assert.equal(sl.length, w.length);
+    assert.equal(sl[0].start, 0, "첫 조각은 0 도에서 시작한다");
+    assert.equal(sl[sl.length - 1].end, 360, "마지막 조각은 정확히 360 에서 끝난다");
+    sl.forEach((s, i) => {
+      assert.ok(Math.abs(s.deg - 360 * w[i] / sum) < 1e-9, `${i}번 조각 각도가 가중치와 안 맞는다`);
+      if (i) assert.ok(Math.abs(s.start - sl[i - 1].end) < 1e-9, "조각 사이에 틈이 있다");
+    });
   }
 });
 
-test("wheelSpin — 종료 시점 글자의 절대 각도가 0 으로 수렴한다 (R6-3, R6-9)", () => {
-  for (const n of WHEEL_NS) {
-    for (let wi = 0; wi < n; wi++) {
-      for (const r of [0, 0.5, 0.999]) {
-        const { spin, labelEnd } = wheelSpin(n, wi, () => r);
-        assert.equal(
-          Math.round(norm360(spin + labelEnd) * 1e6) / 1e6,
-          0,
-          `n=${n} wi=${wi} r=${r}: 멈춘 뒤 글자가 ${norm360(spin + labelEnd)}° 기울어 있다`
-        );
-      }
-    }
+test("wheelSlices — 가중치가 모두 0 이면 균등하게 나눈다 (0 으로 나누지 않는다)", () => {
+  const sl = wheelSlices([0, 0, 0, 0]);
+  assert.equal(sl.length, 4);
+  sl.forEach((s) => assert.ok(Math.abs(s.deg - 90) < 1e-9, "0 뿐이면 균등이어야 한다"));
+});
+
+/* 이 판정이 이 파일에서 제일 중요하다. 각도만 맞고 뽑기가 딴 데를 보면 화면과 결과가
+   어긋나고, 그건 확률을 글로만 적던 옛 구조로 되돌아가는 것이다. */
+test("wheelSpin — 당첨 분포가 조각 각도와 일치한다 (각도가 곧 확률이다)", () => {
+  const w = [1, 1, 1, 1 / 3];                  // 네 번째가 '직전 섬긴 분'
+  const sl = wheelSlices(w);
+  const N = 60000, hit = new Array(w.length).fill(0);
+  for (let i = 0; i < N; i++) hit[wheelSpin(sl, () => (i + 0.5) / N).wi]++;
+  const sum = w.reduce((a, b) => a + b, 0);
+  w.forEach((_, i) => {
+    const want = w[i] / sum, got = hit[i] / N;
+    assert.ok(Math.abs(got - want) < 0.005, `${i}번 당첨률 ${(got * 100).toFixed(2)}% ≠ 각도 ${(want * 100).toFixed(2)}%`);
+  });
+});
+
+test("wheelSpin — 멈춘 각도가 당첨 조각 안에 들어온다 (핀 아래가 곧 결과다)", () => {
+  const sl = wheelSlices([1, 1, 1, 1 / 3, 2]);
+  for (let k = 0; k <= 200; k++) {
+    const { wi, hit, spin } = wheelSpin(sl, () => k / 201);
+    assert.ok(hit >= sl[wi].start && hit < sl[wi].end + 1e-9, `hit ${hit} 이 ${wi}번 조각 밖이다`);
+    // 판을 spin 만큼 돌리면 판의 각도 hit 이 핀(12시) 아래로 온다
+    const under = ((-spin % 360) + 360) % 360;
+    assert.ok(Math.abs(under - hit) < 1e-6, `핀 아래 각도 ${under} 가 hit ${hit} 과 다르다`);
   }
 });
 
-test("wheelSpin — 멈춘 순간 승자 조각이 핀(12시) 아래에 온다 (R6-6)", () => {
-  for (const n of WHEEL_NS) {
-    const a = 360 / n;
-    for (let wi = 0; wi < n; wi++) {
-      for (const r of [0, 0.25, 0.75, 0.999]) {
-        const { spin, mid } = wheelSpin(n, wi, () => r);
-        // 조각 wi 는 [mid−a/2, mid+a/2] 를 차지한다. spin 만큼 돌린 뒤 그 구간이 0°(12시)를 품어야 한다.
-        const lo = norm360(mid - a / 2 + spin), hi = norm360(mid + a / 2 + spin);
-        const covers = lo <= hi ? lo <= 360 && hi >= 360 - 1e-9 || (lo <= 0 + 1e-9 && hi >= 0) : true;
-        assert.ok(
-          covers || lo > hi, // 구간이 0° 를 넘어가며 감싸는 경우
-          `n=${n} wi=${wi} r=${r}: 승자 조각 [${lo.toFixed(2)}, ${hi.toFixed(2)}] 가 12시를 안 품는다`
-        );
-        // 조각 중심과 12시의 거리가 반칸(a/2) 이내여야 한다 — jitter 범위가 (a−10)/2 라 항상 성립한다.
-        const d = Math.min(norm360(mid + spin), 360 - norm360(mid + spin));
-        assert.ok(
-          d <= a / 2 + 1e-9,
-          `n=${n} wi=${wi} r=${r}: 승자 조각 중심이 12시에서 ${d.toFixed(2)}° 떨어져 반칸(${(a / 2).toFixed(2)}°)을 넘었다`
-        );
-      }
-    }
+/* 누출 차단 (R6). 시작 화면이 답을 말하면 안 된다 — 라벨은 어느 판에서든 0 도에서 출발한다. */
+test("wheelSpin — 시작 시점 라벨 각도가 결과와 무관하게 항상 0 이다 (R6-1, R6-2)", () => {
+  const sl = wheelSlices([1, 1, 1, 1 / 3]);
+  const seen = new Set();
+  for (let k = 0; k <= 100; k++) seen.add(wheelSpin(sl, () => k / 101).labelStart);
+  assert.deepEqual([...seen], [0], "시작 라벨 각도가 판마다 다르면 그게 곧 답이다");
+});
+
+test("wheelSpin — 멈춘 뒤 글자의 절대 각도가 0 이라 똑바로 읽힌다 (R6-3)", () => {
+  const sl = wheelSlices([1, 1, 1, 1 / 3]);
+  for (let k = 0; k <= 100; k++) {
+    const { spin, labelEnd } = wheelSpin(sl, () => k / 101);
+    assert.ok(Math.abs(((spin + labelEnd) % 360 + 360) % 360) < 1e-9, "판 회전과 글자 역회전의 합이 0 이 아니다");
   }
 });
 
-test("wheelSpin — 5바퀴 이상 돌고 jitter 가 조각 안에 머문다", () => {
-  for (const n of WHEEL_NS) {
-    const a = 360 / n;
-    for (let wi = 0; wi < n; wi++) {
-      const lo = wheelSpin(n, wi, () => 0).spin, hi = wheelSpin(n, wi, () => 1).spin;
-      const jit = (hi - lo) / 2;
-      assert.ok(
-        Math.abs(jit) <= Math.max(0, a - 10) / 2 + 1e-9,
-        `n=${n}: jitter 반경 ${jit} 가 (a−10)/2 를 넘었다 — 옆 조각으로 넘어갈 수 있다`
-      );
-      assert.ok(lo > 360 * 4, `n=${n} wi=${wi}: 회전량 ${lo} 가 5바퀴에 못 미친다`);
-    }
-  }
+test("wheelSpin — 최소 네 바퀴는 돈다 (한 바퀴만 돌면 추첨처럼 안 보인다)", () => {
+  const sl = wheelSlices([1, 1, 1]);
+  for (let k = 0; k <= 100; k++) assert.ok(wheelSpin(sl, () => k / 101).spin >= 360 * 4, "회전이 너무 짧다");
 });
+

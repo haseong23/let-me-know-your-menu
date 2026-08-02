@@ -51,6 +51,13 @@
     /* --accent(#c98a3a)는 흰 배경 대비 2.92:1 이라 글자에 못 쓴다. 칠(배지·점)에만 쓰고 글자는 --accent-ink.
        --gray(2.05:1)도 글자 금지 — 보조문구는 --sub(5.27:1). */
     --accent-ink: #96631f;
+    /* --red(#c2552f)도 --accent 와 같은 처지였다. 칠로는 멀쩡한데(#offline 배경 위 흰 글자) 글자로
+       쓰면 바탕에 따라 AA 를 넘나든다 — 흰 카드 4.53:1(겨우 통과) · --bg 4.03:1 · --brand-soft 3.67:1.
+       .btn-close 는 29곳이 시트 배경(--bg) 위에, 확인창 [취소] 한 곳이 --brand-soft 위에 서므로
+       둘 다 미달이었다. 16px/700 은 large text(18.66px bold)가 아니라 4.5:1 이 필요하다.
+       색상(16°)·채도(0.76)는 그대로 두고 명도만 낮춘다 — 세 바탕 모두 4.9:1 이상이 된다.
+       칠에 쓰는 --red 는 건드리지 않는다(흰 글자 대비가 오히려 나빠진다). */
+    --red-ink: #a34627;
     /* ---- 타입 스케일 (R13-7) ----
        142개로 흩어져 있던 font-size 를 일곱 값으로 모은다. <style> 블록에 리터럴로 남는 값은
        아래 열넷뿐이고, 각각 자기 letter-spacing·line-height 나 폭 예산과 한 세트로 조정된
@@ -662,7 +669,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.06";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.07";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2033,12 +2040,36 @@ function playersFrom(roster, policy, lastHostId){
    하고, 이 함수는 그 시작값과 끝값을 준다.
    labelStart 가 0(상수)인 것이 이 설계의 전부다. wi 와도 jitter 와도 무관하므로 정지 상태에서
    샐 것이 없다. 난수를 인자로 받는 이유도 그 성질을 결정론적으로 검증하기 위해서다. */
-function wheelSpin(n, wi, rnd){
-  const a=360/n;
-  const mid=(wi+0.5)*a;
-  const jitter=((rnd||Math.random)()-0.5)*Math.max(0, a-10);
-  const spin=360*5 - mid + jitter;
-  return { a, mid, spin, labelStart:0, labelEnd:-spin };
+/* 조각 각도가 곧 확률이다.
+   예전에는 조각을 똑같이 n 등분해 놓고, 당첨자를 가중 추첨으로 먼저 뽑은 다음 그 조각이 핀
+   아래로 오도록 각도를 맞췄다. 결과는 정확했지만 화면이 거짓말을 했다 — 조각이 다 같은
+   크기인데 '이분은 확률이 3분의 1'이라고 글로만 적혀 있으니, 보는 사람은 숫자를 믿는 수밖에
+   없었다. 돌림판을 쓰는 이유가 '확률이 눈에 보이는 것'인데 그게 없어진 셈이다.
+
+   이제 조각 각도를 가중치에 비례해 나눈다. 그러면 추첨은 따로 할 것이 없다 — 핀이 멈출
+   각도를 0~360 에서 고르게 뽑고, 그 각도가 어느 조각에 떨어졌는지 보면 그게 당첨자다.
+   P(i) = 조각 각도 / 360 = w_i / Σw 라 옛 가중 추첨과 확률이 정확히 같고, 이제는 그 확률이
+   화면에 그려져 있다. 확률 조정을 따로 하지 않는 것이 요점이다. */
+function wheelSlices(weights){
+  const w = (weights||[]).map(x => (typeof x === "number" && x > 0) ? x : 0);
+  let sum = w.reduce((a,b)=>a+b, 0);
+  if(!(sum > 0)) return w.map((_,i,arr)=>({ start:i*360/arr.length, end:(i+1)*360/arr.length, deg:360/arr.length }));
+  const out=[]; let at=0;
+  for(let i=0;i<w.length;i++){ const deg = 360*w[i]/sum; out.push({ start:at, end:at+deg, deg }); at += deg; }
+  /* 마지막 끝을 360 에 못 박는다. 부동소수 오차로 359.9999 가 되면 그 틈에 핀이 떨어졌을 때
+     아무 조각에도 안 걸린다 — 확률 1/10^13 짜리 버그는 재현이 안 되므로 미리 막는다. */
+  out[out.length-1].end = 360;
+  return out;
+}
+
+/* 핀은 12시. 판을 spin 만큼 돌리면 판의 각도 hit 이 핀 아래로 온다.
+   hit 은 0~360 균등이고, 이 한 번의 뽑기가 곧 추첨이다. */
+function wheelSpin(slices, rnd){
+  const hit = ((rnd||Math.random)()) * 360;
+  let wi = -1;
+  for(let i=0;i<slices.length;i++) if(hit >= slices[i].start && hit < slices[i].end){ wi=i; break; }
+  if(wi < 0) wi = slices.length - 1;
+  return { wi, hit, spin: 360*5 - hit, labelStart:0, labelEnd:-(360*5 - hit) };
 }
 
 // 사다리 치수. 인원 상한(16)이 실제 한계와 맞는지 이 값으로 역검증한다.
@@ -3231,7 +3262,8 @@ function startGame(kind){
   // 결과를 먼저 뽑고 그림이 그 결과를 향하게 한다 — 애니메이션이 결과를 만들면 확률이 고르지 않다.
   // 그래서 확률 정책이 여기 한 지점에만 얹힌다 (R6-9).
   if(kind==="ladder") playLadder(players, gamePickWinner(players));
-  else if(kind==="wheel") playWheel(players, gamePickWinner(players));
+  // 돌림판만 당첨자를 미리 뽑지 않는다 — 조각 각도가 이미 확률이라 판이 멈춘 자리가 곧 추첨이다.
+  else if(kind==="wheel") playWheel(players, gameWeights(players));
   // 구슬 레이스도 같은 지점에서 당첨자를 먼저 뽑는다 — 확률 정책이 그대로 반영된다 (R19-4).
   // 명단도 여기서 읽은 players 를 그대로 넘긴다. [한 판 더]가 이 지점을 다시 지나므로 그때의
   // gamePlayers() 로 새로 뽑히고, playRace 는 명단을 어디에도 캐시하지 않는다 (R19-15).
@@ -3563,16 +3595,19 @@ function playLadder(roster, winner){
 }
 
 /* ---------- 🎡 돌림판 ---------- */
-function playWheel(roster, winner){
-  const n=roster.length, R=100, a=360/n, wi=roster.indexOf(winner);
+function playWheel(roster, weights){
+  const n=roster.length, R=100;
+  const slices=wheelSlices(weights && weights.length===n ? weights : roster.map(()=>1));
+  // 핀이 멈출 각도를 먼저 뽑는다 = 추첨. 그림은 그 각도를 향해 갈 뿐이다.
+  const { wi, spin, labelEnd } = wheelSpin(slices, Math.random);
+  const winner = roster[wi];
   // 조각 색은 gcolor(i, n). n 을 안 넘기면 11명째에 0번과 같은 색이 되고, 그 둘은 바로
   // 옆 조각이라 흰 구분선만 남아 경계가 사실상 사라진다 (R9-1·R9-2).
   const sectors=roster.map((m,i)=>{
-    const s=(i*a-90)*Math.PI/180, e=((i+1)*a-90)*Math.PI/180, big=a>180?1:0;
+    const sl=slices[i];
+    const s=(sl.start-90)*Math.PI/180, e=(sl.end-90)*Math.PI/180, big=sl.deg>180?1:0;
     return `<path d="M0 0 L ${(R*Math.cos(s)).toFixed(2)} ${(R*Math.sin(s)).toFixed(2)} A ${R} ${R} 0 ${big} 1 ${(R*Math.cos(e)).toFixed(2)} ${(R*Math.sin(e)).toFixed(2)} Z" fill="${gcolor(i, n)}" stroke="#fff" stroke-width="1.2"/>`;
   }).join("");
-  // 핀은 12시. 12시에서 시계방향 mid 만큼 떨어진 조각을 핀 아래로 보내려면 그만큼 되돌려 감는다.
-  const { spin, labelEnd } = wheelSpin(n, wi, Math.random);
   // 이름은 판과 같이 돌면 멈췄을 때 거꾸로 선다. 판이 도는 만큼 글자를 제자리에서 되돌려 놔
   // 멈춘 순간 항상 똑바로 읽히게 한다(폰에서는 가로로 놓인 2~4글자가 제일 잘 읽힌다).
   // 다만 그 되돌림을 '상수'로 박아 두면 정지 상태의 기울기가 곧 당첨 조각의 각도가 되어
@@ -3585,7 +3620,10 @@ function playWheel(roster, winner){
   // 11px 을 주고, 두 자리 숫자가 ≈12px 이라 24명의 라벨 간격(반지름 62 · 15° ≈ 16px)에 들어간다.
   // 더 줄일 이유가 없으니 줄이지 않는다.
   const NUMS = n > GAME_LABEL_MAX;
-  const labels=roster.map((m,i)=>{ const t=((i+0.5)*a-90)*Math.PI/180, lr=R*0.62;
+  /* 좁은 조각의 이름은 바깥으로 밀어낸다. 호의 길이가 r·θ 라 반지름을 키우면 같은 각도에서도
+     글자가 들어갈 자리가 넓어진다 — 확률을 낮춘 분의 조각이 제일 좁으니 이 손질이 필요하다. */
+  const labels=roster.map((m,i)=>{ const sl=slices[i];
+    const t=((sl.start+sl.end)/2-90)*Math.PI/180, lr=R*(sl.deg<14 ? 0.80 : 0.62);
     const x=lr*Math.cos(t), y=lr*Math.sin(t);
     // font-size 는 SVG 사용자 단위다 — viewBox 216 을 .wheel-wrap(max-width min(320px,50vh))에
     // 맞추므로 배율이 1.31~1.48 이고 화면에서는 CSS 14.5~19.3px 로 렌더된다. 이 파일에서 가장
@@ -3602,11 +3640,11 @@ function playWheel(roster, winner){
     ${gameLegendHtml(roster, n)}
     <div id="gvWin" role="status"></div>`);
   /* [⏹ 그만 돌리기] — 기다리기 싫을 때 회전을 끊는다. 이름을 '여기서 멈추기'로 하지 않은 이유가
-     있다. 당첨자는 판을 돌리기 전에 이미 정해져 있고(확률⬇️·제외·평등이 적용된 가중 추첨),
-     판은 그 자리를 향해 갈 뿐이다. '여기서'라고 쓰면 누르는 순간의 각도가 결과를 정한다는 뜻이
+     있다. 핀이 멈출 각도는 판을 돌리기 전에 이미 뽑혀 있고(그 한 번의 뽑기가 곧 추첨이다),
+     판은 그 각도를 향해 갈 뿐이다. '여기서'라고 쓰면 누르는 순간의 각도가 결과를 정한다는 뜻이
      되어 사실과 다르다. 이 버튼이 줄이는 건 결과가 아니라 기다리는 시간이다.
-     누른 각도로 결과를 정하려면 확률 조정을 포기해야 하는데(각도가 곧 추첨이 되므로),
-     돌림판은 '🎯 확률 조정 가능' 무리에 있는 게임이라 그쪽을 지켰다. */
+     누르는 순간의 각도로 결과를 정하지 않는 이유는 그것이 추첨이 아니라 반응 속도 시합이기
+     때문이다 — 확률을 조각 각도로 옮긴 지금도 이건 그대로다. */
   setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvStop">⏹ 그만 돌리기</button>
     <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
