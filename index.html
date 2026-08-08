@@ -330,13 +330,26 @@
   .sheet.has-foot { padding-bottom: 0; }
   .sheet-foot { position: sticky; bottom: 0; z-index: 3; background: var(--bg); margin: 16px -16px 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -10px 22px -12px rgba(40,28,16,.22); }
   .ord-sum { font-size: var(--fs-md); font-weight: 700; color: var(--brand); text-align: center; margin: 0 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* 메뉴 바꾸기 — 기본 접힘. 시트 열리면 온도·옵션이 바로 보이도록(카톡 등 짧은 화면 대응) */
-  .menu-switch { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
-  .menu-switch > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: var(--fs-base); font-weight: 700; color: var(--sub); display: flex; align-items: center; justify-content: space-between; }
-  .menu-switch > summary::-webkit-details-marker { display: none; }
-  .menu-switch > summary::after { content: "▾"; color: var(--sub); font-size: var(--fs-sm); transition: transform .15s; }
-  .menu-switch[open] > summary::after { transform: rotate(180deg); }
-  .menu-switch > .grid { padding: 2px 12px 12px; }
+  /* 고른 메뉴 확인 바 — 옛 .menu-switch(접힌 메뉴 그리드)가 있던 자리다.
+     그 상자는 "방금 고른 걸 왜 또 고르라는 거지"로 읽혔고(실사용 제보), 정작 해야 할 온도·
+     [이걸로 주문]보다 위에 있었다. 시트가 답해야 할 질문은 "바꾸시겠어요"가 아니라
+     "내가 누른 게 이거 맞나"다 — 그래서 같은 자리에서 그리드 대신 확인을 그린다.
+     .menu-tile.sel 과 같은 꽉 찬 --brand 채움을 쓴다: 방금 누른 타일이 그대로 올라온 것으로
+     읽혀야 하고, 이 앱에서 '정해진 것'은 늘 꽉 찬 채움이다(.chip.sel · .state-skip 과 한 계열).
+     되돌아가는 길은 없애지 않고 푸터 맨 아래 .sheet-relink 한 줄로 내렸다. */
+  .pickbar { display: flex; align-items: center; gap: 12px; background: var(--brand); color: #fff;
+    border-radius: 16px; padding: 14px 16px; margin: 2px 0 4px; }
+  .pickbar .em { font-size: 26px; line-height: 1; flex: none; }
+  .pickbar .tx { min-width: 0; }
+  .pickbar .k { display: block; font-size: var(--fs-sm); font-weight: 700; color: #e7d9c6; }
+  /* 이름만 말줄임한다 — 커스텀 메뉴는 이름이 길 수 있는데 두 줄이 되면 시트 머리가 흔들린다 */
+  .pickbar .n { display: block; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 푸터 맨 아래 되돌리기. 주 버튼과 경쟁하면 안 되므로 채움 없는 글자 링크지만,
+     탭 타겟 44px 은 지킨다(B9). --sub 는 --bg 위 5.27:1 로 AA 를 넘는다. */
+  .sheet-relink { display: block; width: 100%; background: none; border: none; font-family: inherit;
+    font-size: var(--fs-base); font-weight: 700; color: var(--sub); text-decoration: underline;
+    text-underline-offset: 3px; padding: 12px 0 2px; min-height: 44px; cursor: pointer; }
   /* 참가자 화면에서 접히는 '다른 분들' 목록. 요약 줄 자체가 탭 타겟이라 44px 을 지킨다.
      .menu-switch 와 같은 시각 언어를 쓴다 — 같은 일(접기)에 새 모양을 만들지 않는다. */
   .roster-fold { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 14px; }
@@ -729,7 +742,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.13";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.14";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1853,8 +1866,12 @@ function openOrderSheet(menuId, existing, prefill){
       <!-- 옵션이 여럿이면 "이걸 다 골라야 하나"로 읽힌다. 실제로는 기본값 그대로 담을 수 있고
            [이걸로 주문]도 스크롤 없이 보인다 — 동작은 옳은데 표시가 그걸 감추고 있었다.
            옵션이 하나도 없는 메뉴에는 이 줄이 거짓말이 되므로 있을 때만 적는다. -->
-      ${(optionsHtml||tempHtml)?`<p class="sheet-hint">고르실 게 없으면 그대로 <b>[${existing?'주문 수정':'이걸로 주문'}]</b>을 누르시면 돼요.</p>`:""}
-      <details class="menu-switch"><summary>🔄 다른 메뉴로 바꾸기</summary><div class="grid">${gridTilesHtml(menuId)}</div></details>
+      <div class="pickbar"><span class="em">${esc(m.emoji)}</span><span class="tx"><span class="k">${existing?'담아 둔 주문':'고른 메뉴'}</span><span class="n">${esc(m.name)}</span></span></div>
+      <!-- 안내 한 줄. 새로 담을 때는 남은 할 일을 말하고, 수정하러 들어왔을 때는
+           "안 고쳐도 된다"를 말한다 — 이 시트에 들어온 이유가 서로 다르다. -->
+      ${(optionsHtml||tempHtml)
+        ? `<p class="sheet-hint">${existing?'고치실 게 없으면 그대로 닫으셔도 돼요.':(tempHtml?'이제 <b>온도</b>만 고르면 돼요.':'고르실 게 없으면 그대로 <b>[이걸로 주문]</b>을 누르시면 돼요.')}</p>`
+        : ""}
       <div class="order-opts">
         ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
         ${optsHtml}
@@ -1867,14 +1884,22 @@ function openOrderSheet(menuId, existing, prefill){
              이미 .row-2 를 쓴다.
              순서는 askConfirm 과 같게 부(좌)·주(우)다 — 이 앱에서 '진행'은 늘 오른쪽에 있다.
              라벨이 모두 네 글자 이하라 320px 반쪽 폭(≈130px)에서도 접히지 않는다. -->
-        <div class="row-2">
-          ${existing?'<button class="btn btn-danger" id="cancelOrder">주문 취소</button>'
-                    :'<button class="btn btn-ghost btn-close" id="closeSheet">닫기</button>'}
-          <button class="btn btn-brand" id="confirmOrder">${existing?'주문 수정':'이걸로 주문'}</button>
-        </div>
+        ${existing
+          ? `<div class="row-2">
+          <button class="btn btn-danger" id="cancelOrder">주문 취소</button>
+          <button class="btn btn-brand" id="confirmOrder">주문 수정</button>
+        </div>`
+          : `<button class="btn btn-brand" id="confirmOrder">이걸로 주문</button>`}
+        <!-- 옛 [닫기]를 대신한다. 같은 일(시트 닫기)을 하지만 라벨이 '가는 곳'을 말한다 —
+             시트를 닫으면 메뉴 그리드로 돌아간다는 사실이 화면 어디에도 안 적혀 있었다.
+             수정 중에는 이미 담긴 주문이 있어 그리드가 접혀 있으므로 forceGrid 로 펴 준다. -->
+        <button class="sheet-relink" id="relinkMenu">${existing?'다른 메뉴로 바꾸기':'메뉴를 잘못 골랐어요 · 다시 고르기'}</button>
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
-    $sheet.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full){ t.onclick=()=>{ const n=document.getElementById("note").value; openFullMenuSheet(menuId, n); }; } else if(t.dataset.custom){ t.onclick=()=>{ const n=document.getElementById("note").value; openCustomSheet(existing, null, n); }; } else { t.onclick=()=>{ note=document.getElementById("note").value; menuId=t.dataset.id; temp=null; extras=[]; draw(); }; }});
+    /* 시트 안에 메뉴 그리드가 없으므로 타일 배선도 없다. 대신 되돌아가는 길 하나 —
+       시트를 닫고 화면의 그리드로 돌린다. 옛 방식(시트 안에서 menuId 를 갈아끼우고 draw())과
+       달리 고르는 자리가 한 곳뿐이라, "여기서 고른 것"과 "저기서 고른 것"이 갈리지 않는다. */
+    const rl=document.getElementById("relinkMenu"); if(rl) rl.onclick=()=>{ forceGrid=true; closeSheet(); render(); };
     const of_=document.getElementById("optFold"); if(of_) of_.addEventListener("toggle",()=>{ optOpen=of_.open; });
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(true); }; });
     // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
@@ -1896,7 +1921,6 @@ function openOrderSheet(menuId, existing, prefill){
       if(hasGroups) extras.sort((a,b)=>availExtras.indexOf(a)-availExtras.indexOf(b));   // 표시 순서 안정화(사이즈→샷→물→얼음)
       const ord={type:"drink",menuId,menuName:m.name,temp,extras,note};
       if(await safeWrite(Sync.setOrder(ME,ord,SESSION.seq))){ rememberOrder(ord); bumpFreq(menuId); trackOrder(ord, existing?"edit":"sheet"); closeSheet(); toast(existing?"주문을 바꿨어요":"주문 담았어요 🙏"); render(); } }, cob, existing?"바꾸는 중…":"담는 중…");
-    const cs=document.getElementById("closeSheet"); if(cs) cs.onclick=closeSheet;
     // 바로 위 [이걸로 주문]과 같은 가드에 넣는다 — 이 버튼만 밖에 있어서 빠른 더블탭이 삭제 요청을
     // 두 번 보냈다(두 번째는 이미 없는 주문을 지운다).
     const co=document.getElementById("cancelOrder"); if(co) co.onclick=()=>guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.removeOrder(ME,SESSION.seq))){ track("order_removed"); closeSheet(); toast("주문을 취소했어요"); render(); } }, co, "취소하는 중…");
@@ -4103,6 +4127,31 @@ function playWheel(roster, weights){
     bind("gvStop", stopSpin);
     bind("gvCancel",()=>closeGame());
   };
+  /* 자동 갈래의 푸터. [그만 돌리기]를 자리만 남기고 비활성으로 두지 않는다 — 누를 수 없는 버튼이
+     같은 자리에 서 있으면 "왜 안 눌리지"가 되고, 자동은 애초에 손댈 것이 없는 갈래다.
+     대신 [그만두기]만 남긴다. row-2 안에 혼자 두면 반쪽 폭이 되므로 밖으로 뺀다. */
+  const autoFoot = ()=>{
+    setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    bind("gvCancel",()=>closeGame());
+  };
+  /* 출발 게이트가 두 단계다. [▶ 돌리기!] 는 이제 "돈다"가 아니라 "어떻게 세울래"를 묻는다 —
+     같은 판인데 사람마다 원하는 게 갈렸다: 여럿이 둘러보는 자리에서는 손으로 끊는 맛이 있고,
+     혼자 빨리 정할 때는 그 버튼이 일거리다. 물리는 한 벌이라 어느 갈래든 결과의 성질은 같다.
+     기본(진한 버튼)은 자동이다 — 아무 생각 없이 진행하려는 사람이 다수고, 자동 쪽이 더 적은
+     손으로 끝난다. 수동을 고르면 예전 그대로 [⏹ 그만 돌리기] 가 나온다. */
+  const askFoot = ()=>{
+    /* 안내를 여기 한 줄로 적는다. 이 게임의 핵심 약속은 "누구도 결과를 고를 수 없다"인데,
+       갈래를 묻는 순간이 그 약속이 흔들려 보이는 유일한 자리다 — 손으로 끊는 쪽을 고르면
+       타이밍으로 조작할 수 있다고 읽히기 때문이다. 버튼 라벨에는 못 적으니 이 줄에 적는다. */
+    const say=document.getElementById("gvSay");
+    if(say) say.textContent="어떻게 세울까요? — 어느 쪽이든 결과는 못 고릅니다";
+    setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvManual">✋ 내가 멈추기</button>
+      <button class="btn btn-brand" id="gvAuto">🤖 알아서 멈추기</button></div>
+      <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
+    bind("gvManual", ()=>startSpin("manual"));
+    bind("gvAuto",   ()=>startSpin("auto"));
+    bind("gvCancel", ()=>closeGame());
+  };
   setGameFoot(`<div class="row-2"><button class="btn btn-brand" id="gvGo">▶ 돌리기!</button>
     <button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button></div>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
@@ -4167,15 +4216,31 @@ function playWheel(roster, weights){
      예전에는 lessMotion 갈래가 열자마자 settle() 을 불러, 아무것도 안 눌렀는데 결과가 떠 있고
      그 사이 [⏹ 그만 돌리기] 가 300ms 깜빡였다 (QA X-3). 이제 셋 다 '누르면 시작'으로 같다. */
   let started = false;
-  const startSpin = ()=>{
+  /* mode 는 "manual" 아니면 "auto" 다. 물리도 감속 기록도 갈래와 무관하게 같은 sim 한 벌을 쓴다 —
+     다른 건 stopSpin() 을 누가 부르느냐뿐이다. 자동의 등속 구간 길이(1.8~3.4초)는 무작위라,
+     자동을 고른 사람도 결과를 고를 수 없다는 성질이 수동과 똑같이 유지된다.
+     이 시간을 고정값으로 두면 안 된다 — 판이 늘 같은 시간을 등속으로 돌면 시작 각도가 곧
+     최종 각도의 함수가 되어 결과가 예측 가능해진다 (R6 이 막아 온 것과 같은 새는 구멍이다). */
+  const startSpin = (mode)=>{
     if(started || done) return;
     started = true;
     if(lessMotion()){ done = true; settle(); return; }   // 연출을 건너뛰고 결과로 간다
-    const say=document.getElementById("gvSay"); if(say) say.textContent="돌고 있어요 — [그만 돌리기]를 누르면 멈춰요";
-    runFoot();
+    const say=document.getElementById("gvSay");
+    if(mode==="auto"){
+      if(say) say.textContent="돌고 있어요 — 알아서 멈춰요";
+      autoFoot();
+      // gtimer 에 실어 둔다 — 오버레이를 닫으면 GS.timers 가 통째로 정리되므로 죽은 뒤에 감속이
+      // 시작되는 일이 없다. stopSpin() 자체도 done/spinning 을 다시 확인한다(이중 방어).
+      gtimer(stopSpin, 1800 + Math.random()*1600);
+    } else {
+      if(say) say.textContent="돌고 있어요 — [그만 돌리기]를 누르면 멈춰요";
+      runFoot();
+    }
     if(GS) GS.raf = requestAnimationFrame(step);
   };
-  bind("gvGo", startSpin);
+  // [▶ 돌리기!] 는 굴리지 않고 묻는다. 동작 줄이기 갈래도 이 문을 지난다 — 물어보고 나서
+  // 건너뛰는 편이, 아무것도 안 물어보고 결과가 떠 있는 것보다 낫다(어느 쪽을 골라도 결과는 같다).
+  bind("gvGo", askFoot);
 }
 
 /* ---------- ☝️ 손가락 룰렛 ---------- */
