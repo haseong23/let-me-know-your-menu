@@ -889,7 +889,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.22";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.23";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -5121,7 +5121,7 @@ function openEditCellSheet(cell){
       <div class="label" id="lbl-ecName">셀 이름</div>
       <input autocomplete="off" type="text" id="ecName" maxlength="40" value="${esc(nameVal)}" aria-labelledby="lbl-ecName" />
       <div class="label" id="lbl-ecMembers">구성원 (이름을 고쳐도 주문 링크 유지)</div>
-      <div class="card" style="padding:6px 14px" aria-labelledby="lbl-ecMembers">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input autocomplete="off" type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
+      <div class="card" style="padding:6px 14px" aria-labelledby="lbl-ecMembers">${mlist.length?mlist.map((m,i)=>`<div class="person"><div class="avatar" data-ecav="${i}">${esc(initials(m.name))}</div><input autocomplete="off" type="text" class="ecm" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)"/><button class="ecmdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
       <div class="inline-form" style="margin-top:8px"><input autocomplete="off" type="text" id="ecNewM" maxlength="40" placeholder="구성원 추가" aria-label="구성원 추가"/><button class="btn btn-soft btn-sm" id="ecAddM" style="flex:none">추가</button></div>
       <div class="label">홈 카페 (기본 카페)</div>
       <div class="chips" id="ecCafe">${CAFE_LIST.map(c=>`<div class="chip ${c.id===cafeId?'sel':''}" data-c="${c.id}">${c.emoji} ${esc(c.name)}</div>`).join("")}</div>
@@ -5130,7 +5130,12 @@ function openEditCellSheet(cell){
       <div class="row-2"><button class="btn btn-ghost btn-close" id="ecClose">닫기</button>
         <button class="btn btn-brand" id="ecSave">저장</button></div>`);
     document.getElementById("ecName").oninput=e=>{ nameVal=e.target.value; };
-    $sheet.querySelectorAll(".ecm").forEach(inp=> inp.oninput=()=>{ mlist[+inp.dataset.i].name=inp.value; });   // 이름만 갱신(id 보존)
+    // 이름만 갱신(id 보존) + 이니셜도 타이핑에 맞춰 (사용자용 구성원 편집 시트와 같은 처방).
+    // 옆 아바타는 처음 그린 두 글자로 남아 있어서, 이름을 다 바꿔도 이니셜은 옛 이름이었다.
+    $sheet.querySelectorAll(".ecm").forEach(inp=> inp.oninput=()=>{
+      const i=+inp.dataset.i; mlist[i].name=inp.value;
+      const av=$sheet.querySelector('.avatar[data-ecav="'+i+'"]'); if(av) av.textContent=initials(inp.value);
+    });
     $sheet.querySelectorAll(".ecmdel").forEach(b=> b.onclick=()=>{ mlist.splice(+b.dataset.i,1); draw(); });
     document.getElementById("ecAddM").onclick=()=>{ const el=document.getElementById("ecNewM"), v=el.value.trim(); if(v){ mlist.push({id:genMemberId(), name:v}); draw(); } };
     const chips=document.getElementById("ecCafe");
