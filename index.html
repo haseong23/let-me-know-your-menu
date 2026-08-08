@@ -699,10 +699,13 @@
   /* 🏁 구슬 레이스 (R19)
      캔버스는 논리 크기 340×440 에 devicePixelRatio 를 곱해 실제 픽셀을 잡고, 폭은 CSS 가 맞춘다 —
      width/height 속성 비율이 남아 있으므로 height:auto 로 세로가 따라온다(폰에서 흐릿하지 않게 하는 표준 처방).
-     세로 상한은 설계(부록 A.5)의 62vh 대신 45vh 다. 340:440 = 1:1.29 라서 62vh 를 그대로 쓰면 캔버스
-     높이가 80vh 가 되어 게임 안내 한 줄·HUD·결과 블록이 전부 스크롤 밖으로 밀린다. 45vh 면 높이가
-     ≈58vh 로 사다리(50vh × 1:1.09 ≈ 54vh)와 같은 대역에 들어온다. */
-  .race-wrap { position:relative; width:100%; max-width:min(340px, 45vh); margin:0 auto; }
+     세로 상한은 설계(부록 A.5)의 62vh 대신 50vh 다. 340:440 = 1:1.29 라서 62vh 를 그대로 쓰면 캔버스
+     높이가 80vh 가 되어 게임 안내 한 줄·HUD·결과 블록이 전부 스크롤 밖으로 밀린다.
+     340px·45vh 에서 400px·50vh 로 키웠다 — 번호를 이름으로 바꾸면서 구슬을 알아볼 수 있어야 하고,
+     아래 범례(번호↔이름 대응표)를 없앤 자리를 판이 받는다. 폰에서 실제로 무는 건 대개 vh 가 아니라
+     px 상한 쪽이다: 390px 폭이면 .game-body 좌우 패딩 16px 을 빼고 358px 이 한계라 400 은 못 채운다.
+     그래서 이 숫자는 '넓은 기기에서 더 크게, 좁은 기기에서는 폭이 알아서 막는다'로 읽어야 한다. */
+  .race-wrap { position:relative; width:100%; max-width:min(400px, 50vh); margin:0 auto; }
   .race-wrap canvas { display:block; width:100%; height:auto; border-radius:12px;
                       background:#fffdf9; border:1.5px solid var(--line); }
   .race-hud { margin-top:8px; font-size:var(--fs-sm); color:var(--sub); font-weight:600; line-height:1.5; }
@@ -710,12 +713,20 @@
   /* 200ms 마다만 갱신하므로 그 간격만큼 선형 보간을 걸어 바가 계단처럼 튀지 않게 한다.
      prefers-reduced-motion 은 이 파일 맨 위 전역 블록이 모든 transition 을 끄므로 여기 미디어쿼리를 또 두지 않는다. */
   .race-hud .bar > i { display:block; width:0; height:100%; border-radius:3px; background:var(--brand); transition:width .2s linear; }
-  .race-hud .rc-row { display:flex; align-items:center; gap:6px; min-width:0; }
-  .race-hud .rc-rk { flex:none; width:13px; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
+  /* 순위를 상위 3명이 아니라 전원으로 편다. 한 줄에 한 명씩 세로로 쌓으면 24명이 24줄이라
+     판을 밀어내므로 폭이 허락하는 만큼 여러 칸으로 흘린다 — 340px 기준 세 칸이라 24명이 8줄이다.
+     읽는 순서는 행 우선(1·2·3 / 4·5·6) — 왼쪽에서 오른쪽으로 읽고 다음 줄로 내려간다.
+     그래도 넘치면 이 목록만 스크롤한다. 판을 줄여서 순위를 다 보여주는 건 앞뒤가 바뀐 것이다.
+     overscroll-behavior 로 목록 끝에서 .game-body 까지 스크롤이 번지지 않게 막는다. */
+  .race-hud .rc-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr));
+    gap:1px 10px; max-height:24vh; overflow-y:auto; overscroll-behavior:contain; }
+  .race-hud .rc-row { display:flex; align-items:center; gap:5px; min-width:0; }
+  /* 두 자리(10~24위)가 상자 안에서 줄바꿈되지 않게 — 폭이 좁으면 "1/0" 으로 접혀 그 줄만 두 배로
+     높아지고, 목록 전체가 넘쳐 스크롤이 생긴다. nowrap 과 두 자리분 폭을 함께 줘야 막힌다. */
+  .race-hud .rc-rk { flex:none; width:19px; white-space:nowrap; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
   .race-hud .rc-sw { flex:none; width:9px; height:9px; border-radius:3px; }
-  .race-hud .rc-no { flex:none; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
   /* 이름은 한 줄로 자른다 — HUD 가 200ms 마다 바뀌는 자리라 줄 수가 늘었다 줄면 캔버스가 위아래로 흔들린다.
-     전체 이름은 범례(11명 이상)와 결과 발표에 그대로 남는다. */
+     전체 이름은 결과 발표에 그대로 남는다. */
   .race-hud .rc-nm { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--ink); font-weight:700; }
 </style>
 </head>
@@ -742,7 +753,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.15";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.16";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2809,8 +2820,13 @@ function raceMapBuild(rnd){
 function raceSimulate(st, n, rnd){
   const px=new Float64Array(n), py=new Float64Array(n), vx=new Float64Array(n), vy=new Float64Array(n);
   const done=new Int32Array(n).fill(-1);          // 결승선을 넘은 프레임
-  // 출발 정렬 — 격자로 세우되 자리는 시드로 섞는다(자리가 유리하면 번호가 곧 답이 된다).
-  const per = 8, SPX = 2.2, slot=[];
+  /* 출발 정렬 — 격자로 세우되 자리는 시드로 섞는다(자리가 유리하면 번호가 곧 답이 된다).
+     한 줄 여섯·간격 3.0 은 이름표가 읽히는 최소 폭이다. 예전 여덟·2.2 는 간격이 ≈24 논리 px 이라
+     세 글자 이름(≈30px)이 이웃을 물었다. 여섯이면 한 줄 폭이 5×3.0=15 라 출발선의 벽 사이
+     (x 3.5~22.5)에 여유 있게 들어가고, 줄이 하나 늘어도 위쪽 벽은 y=-30 까지 뻗어 있어 남는다.
+     자리 유불리는 섞기가 지우므로 이 값은 공정성이 아니라 가독성의 문제다 — 그래도 쏠림이
+     생기지 않는지는 tests/race.test.mjs 의 '1등이 특정 번호로 쏠리지 않는다' 가 판정한다. */
+  const per = 6, SPX = 3.0, slot=[];
   for(let i=0;i<n;i++) slot.push(i);
   for(let i=n-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const t=slot[i]; slot[i]=slot[j]; slot[j]=t; }
   for(let i=0;i<n;i++){
@@ -2970,10 +2986,10 @@ function shortName(n,k){ n=String(n||""); return n.length>k ? n.slice(0,k) : n; 
    색은 그림이 쓴 gcolor(i, n) 을 그대로 부른다. 여기서 따로 계산하면 언젠가 그림과 어긋난다.
    n 은 인자로 받는다(players.length 를 쓰지 않는다) — 그리는 시점의 인원과 같은 값이어야 하고,
    호출부가 이미 그 값을 쥐고 있다.
-   always 는 구슬 레이스용이다. 그 게임은 인원과 무관하게 라벨이 늘 번호라서(근거는 playRace 의
-   주석) 범례가 없으면 번호를 이름으로 옮길 자리가 사라진다. */
-function gameLegendHtml(players, n, always){
-  if(!always && n <= GAME_LABEL_MAX) return "";
+   (구슬 레이스가 인원과 무관하게 범례를 켜던 always 인자는 없앴다 — 그 게임은 구슬에 이름을
+    직접 달고 순위 목록이 색·이름을 다 갖고 있어서, 번호를 이름으로 옮겨 적을 표가 사라졌다.) */
+function gameLegendHtml(players, n){
+  if(n <= GAME_LABEL_MAX) return "";
   return `<div class="game-legend" role="list" aria-label="번호와 이름">${players.map((m,i)=>
     `<span class="gl-it" role="listitem"><i class="gl-sw" style="background:${gcolor(i, n)}"></i><span class="gl-no">${i+1}</span><span class="gl-nm">${esc(m.name)}</span></span>`).join("")}</div>`;
 }
@@ -4469,6 +4485,10 @@ function playFinger(){
    그림 코드에 dpr 이 섞이면 반지름·글자 크기가 기기마다 달라진다. */
 /* 캔버스 크기는 화면 논리 px 다. 세계 단위(RACE_W=26)와 다른 축이라 섞으면 안 된다. */
 const RACE_VIEW_W = 340, RACE_VIEW_H = 391;
+/* 구슬 아래 이름표에 몇 글자까지 쓰나. 출발 간격(RACE_SPX)이 허락하는 폭에서 나온 값이다 —
+   10px 한글은 글자당 ≈10px 이고 간격이 ≈33 논리 px 이라 세 글자까지 이웃을 안 문다.
+   여기를 늘리려면 RACE_SPX 를 같이 늘려야 하고, 그건 출발 대형이 코스 폭에 들어가는 선까지다. */
+const RACE_LABEL_CH = 3;
 /* 미니맵이 차지하는 폭과 여백(화면 논리 px). 코스는 그 왼쪽에만 그린다 —
    COURSE_W 가 그 약속을 실제로 지키는 값이고, 미니맵의 왼쪽 모서리(mmX)와 같아야 한다. */
 const RACE_MINI_W = 46, RACE_MINI_PAD = 8;
@@ -4518,16 +4538,17 @@ function playRace(players, onDone){
   const n = players.length;
   const built = raceBuild(n);
   openGameOv("🏁 구슬 레이스", `
-    <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 번호를 찾아두세요</div>
+    <div class="game-say" id="gvSay" aria-live="polite">준비됐어요 — 내 이름을 찾아두세요</div>
     <div class="game-hint" style="margin-bottom:8px">부딪히고 튕기며 내려가요 — 결과는 아무도 몰라요</div>
     <div class="race-wrap">
       <canvas id="raceCv" role="img" aria-label="구슬 레이스 진행 중"></canvas>
+      <!-- 순위는 전원. 아래 범례(번호↔이름 대응표)는 없앴다 — 구슬에 이름이 붙었으니
+           번호를 이름으로 옮겨 적을 표가 더는 필요 없고, 색 칸은 이 목록이 그대로 갖고 있다. -->
       <div class="race-hud" id="raceHud">
         <div class="bar"><i id="raceBar"></i></div>
-        ${players.slice(0, 3).map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}</b><i class="rc-sw"></i><span class="rc-no"></span><span class="rc-nm"></span></div>`).join("")}
+        <div class="rc-list">${players.map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}</b><i class="rc-sw"></i><span class="rc-nm"></span></div>`).join("")}</div>
       </div>
     </div>
-    ${gameLegendHtml(players, n, true)}
     <div id="gvWin" role="status"></div>`);
   setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
   bind("gvCancel",()=>closeGame());   // closeGame(opts) — 이벤트 객체를 opts 로 흘려보내지 않는다
@@ -4557,7 +4578,7 @@ function playRace(players, onDone){
 
   const barEl = document.getElementById("raceBar");
   const rowEls = [...document.querySelectorAll("#raceHud .rc-row")].map(r=>({
-    sw:r.querySelector(".rc-sw"), no:r.querySelector(".rc-no"), nm:r.querySelector(".rc-nm"), cur:-1 }));
+    sw:r.querySelector(".rc-sw"), nm:r.querySelector(".rc-nm"), cur:-1 }));
   let hudAt = -Infinity, barCur = "";
   function drawHud(t, order, force){
     if(!force && t - hudAt < RACE_HUD_MS) return;
@@ -4569,7 +4590,6 @@ function playRace(players, onDone){
       if(i === undefined || row.cur === i) return;
       row.cur = i;
       row.sw.style.background = gcolor(i, n);
-      row.no.textContent = (i+1) + ".";
       row.nm.textContent = players[i].name;
     });
   }
@@ -4710,16 +4730,18 @@ function playRace(players, onDone){
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillStyle="#2b2118"; ctx.fillText("결승선", COURSE_W/2, CH*0.42 + (map.finishY-camY)*z);
     }
-    /* 구슬을 누구로 읽을 것인가 — 인원과 무관하게 '번호' 하나로 간다.
+    /* 구슬을 누구로 읽을 것인가 — 이름이다.
        구슬 자체는 지름 5.5px 라 그 안에 글자를 넣을 자리가 없다(반지름은 물리 상수 RACE_R 이라
        화면 사정으로 못 키운다). 그래서 식별은 구슬 아래 라벨이 진다.
-       사다리·돌림판처럼 GAME_LABEL_MAX 로 이름/번호를 가르지 않는 이유는, 이 게임만 출발선에서
-       구슬이 한 덩어리로 모여 있어서다 — 자기 것을 찾아야 하는 바로 그 순간에 이름표가 가장
-       심하게 겹친다(네 명에서도 `이다니김요셉박사무최에스` 로 뭉갰다). 번호는 한두 글자라
-       그 자리에서도 갈라지고, HUD 상위 3명과 아래 범례가 이미 번호로 말하므로 세 표시가
-       같은 표를 쓰게 된다. 전체 이름은 범례에 잘리지 않고 그대로 있다.
-       (예전엔 인원과 무관하게 이름을 그리면서 shortName 의 두 번째 인자를 빠뜨려
-        `길이 > undefined` = false → 절삭이 죽어 있었다 — QA F-3.) */
+       예전엔 번호를 썼다. 이 게임만 출발선에서 구슬이 한 덩어리로 모여 있어서, 자기 것을 찾아야
+       하는 바로 그 순간에 이름표가 가장 심하게 겹치기 때문이었다(네 명에서도 뭉갰다).
+       번호는 겹치지는 않았지만 대신 아래에 번호↔이름 대응표를 하나 더 두고, 사람이 판을 보다가
+       그 표로 눈을 내렸다 올려야 했다 — 겹침을 지우는 대신 눈을 한 번 더 움직이게 한 거래였다.
+       이름으로 되돌리되 겹침은 자리로 푼다: 출발 대형을 한 줄 여덟에서 여섯으로 줄이고 간격을
+       2.2 → 3.0 세계단위(≈33 논리 px)로 넓혀, 세 글자(10px × 3 ≈ 30px)가 이웃을 안 물게 했다.
+       RACE_LABEL_CH 를 넘는 이름은 자른다 — 전체 이름은 HUD 순위와 결과 발표에 그대로 있다.
+       (예전엔 shortName 의 두 번째 인자를 빠뜨려 `길이 > undefined` = false 로 절삭이 죽어
+        있었다 — QA F-3. 인자를 반드시 함께 준다.) */
     ctx.font = "800 10px -apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif";
     ctx.textAlign="center"; ctx.textBaseline="top"; ctx.lineWidth=3; ctx.lineJoin="round";
     for(let k=n-1;k>=0;k--){
@@ -4727,7 +4749,7 @@ function playRace(players, onDone){
       if(sim.done[i]>=0 && sim.done[i]<f) continue;
       const sx = COURSE_W/2 + (sim.path[b0+i*2]-camX)*z, sy = CH*0.42 + (ypos[i]-camY)*z;
       if(sy<-14||sy>CH+8||sx<-20||sx>COURSE_W+20) continue;
-      const nm = String(i+1);
+      const nm = shortName(players[i].name, RACE_LABEL_CH);
       ctx.strokeStyle="rgba(255,253,249,.95)"; ctx.strokeText(nm, sx, sy + RACE_R*z + 1);
       ctx.fillStyle=gcolor(i,n);                ctx.fillText(nm, sx, sy + RACE_R*z + 1);
     }
