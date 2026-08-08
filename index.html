@@ -315,6 +315,15 @@
   .stat-sum { font-size: var(--fs-md); color: var(--sub); text-align: center; margin: -2px 0 10px; }
   .stat-sum b { color: var(--ink); font-weight: 700; }
   .cs-go { margin-left: auto; flex: none; color: var(--sub); font-weight: 800; font-size: var(--fs-title); }
+  /* 종류 머리를 스티키로 (사용자 요청). 구분선이 없어 어디서 종류가 바뀌는지 안 보였다 —
+     경계에 선을 긋는 것만으로는 스크롤해 내려가면 다시 "지금 뭘 보고 있지"가 된다.
+     머리가 위에 붙어 따라오면 경계와 현재 위치를 한 요소가 같이 말한다.
+     배경을 시트와 같은 --bg 로 깔아야 아래 흰 카드가 글자 뒤로 비쳐 지나가지 않는다. */
+  .mcat-h { position: sticky; top: 0; z-index: 2; background: var(--bg);
+    padding: 10px 2px 6px; margin: 0; font-size: var(--fs-md); font-weight: 800;
+    color: var(--brand); border-bottom: 1px solid var(--line); }
+  /* 종류와 종류 사이는 한 칸 띄운다 — 스티키 머리가 다음 머리를 밀어낼 때 둘이 붙어 보이지 않게. */
+  .mcat + .mcat { margin-top: 10px; }
   .mcat-chips { margin: 8px 0 0; }
   .mcat-chips .tab { padding-left: 10px; padding-right: 10px; }
   .menu-more { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
@@ -891,7 +900,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.24";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.25";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2244,7 +2253,7 @@ function openFullMenuSheet(curId, carryNote){
   const listHtml = CATEGORIES.map(c=>{
     const items=MENUS.filter(m=>m.cat===c.id);
     if(!items.length) return "";
-    return `<div class="mcat" data-cat="${esc(c.id)}"><div class="label" style="margin-top:14px">${c.label}</div><div class="card" style="padding:4px 14px">`+
+    return `<div class="mcat" data-cat="${esc(c.id)}"><div class="mcat-h">${c.label}</div><div class="card" style="padding:4px 14px">`+
       items.map(m=>`<div class="person menu-row${m.id===curId?' picksel':''}" data-id="${esc(m.id)}" data-name="${esc(norm(m.name))}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===curId}" aria-label="${esc(m.name)} 주문">
         <div class="mrow-em">${esc(m.emoji)}</div>
         <div class="mrow-nm">${esc(m.name)}</div>
@@ -2283,15 +2292,15 @@ function openFullMenuSheet(curId, carryNote){
   // 오타 허용 검색: 직접입력과 같은 matchesName 기준 — "아메리카노"를 "아메리카노"로 오타쳐도 목록에서 바로 찾힘
   const count=document.getElementById("mCount");
   // 초성 검색: "ㅇㅁㄹ" → 아메리카노
-  let curCat="";   // "" = 전체. 종류 칩과 검색어는 AND 로 걸린다 (13a)
+  /* 종류 칩은 목록을 걸러내지 않고 그 자리로 데려간다 (사용자 요청).
+     걸러내면 지금 보는 것이 전체의 일부라는 사실이 화면에서 사라져서, "라떼가 세 개뿐인가"로
+     읽히고 다른 종류를 보려면 매번 칩을 다시 눌러야 했다. 목록은 늘 전부 있고 칩은 이동이다.
+     걸러내는 일은 검색창 하나가 맡는다 — 좁히는 수단이 둘이면 서로를 가린다. */
   function applyFilter(){
     const ql=norm(mq.value); let any=false, n=0;
     results.querySelectorAll(".mcat").forEach(cat=>{
-      // 종류를 좁혀 둔 상태에서 검색하면, 안 보이는 종류의 결과를 못 찾고 "없어요"만 본다.
-      // 그래서 검색어가 있으면 종류 필터를 접어 둔다 — 검색은 늘 전체에서 찾는다.
-      const catOk = !curCat || ql || cat.dataset.cat===curCat;
       let catVisible=false;
-      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=catOk && nameHit(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
+      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=nameHit(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
       cat.style.display=catVisible?"":"none"; if(catVisible) any=true;
     });
     empty.style.display=any?"none":"";
@@ -2299,13 +2308,36 @@ function openFullMenuSheet(curId, carryNote){
     count.textContent = ql ? ("검색 결과 "+n+"개") : "💡 초성으로도 찾아요 — ㅇㅁㄹ → 아메리카노";
   }
   mq.addEventListener("input", applyFilter);
-  const cats=document.getElementById("mCats");
+  const cats=document.getElementById("mCats"), scroller=$sheet.querySelector(".sheet-scroll");
+  // 어느 칩이 켜져 있는지는 '지금 화면에 걸린 종류'가 정한다 — 누른 칩으로 고정해 두면
+  // 스크롤로 다른 종류에 가 있어도 칩은 옛 자리를 가리켜 거짓말을 한다.
+  function markCat(id){
+    if(!cats) return;
+    cats.querySelectorAll(".tab").forEach(x=>{ const on=(x.dataset.cat||"")===(id||""); 
+      x.classList.toggle("on",on); x.setAttribute("aria-pressed",on); });
+  }
   if(cats) cats.querySelectorAll(".tab").forEach(t=> t.onclick=()=>{
-    curCat=t.dataset.cat; mq.value="";                        // 종류를 고르면 검색어는 비운다(둘이 서로를 가린다)
-    cats.querySelectorAll(".tab").forEach(x=>{ const on=x===t; x.classList.toggle("on",on); x.setAttribute("aria-pressed",on); });
-    applyFilter();
-    const sc=$sheet.querySelector(".sheet-scroll"); if(sc) sc.scrollTop=0;   // 좁힌 결과는 맨 위부터 본다
+    if(mq.value){ mq.value=""; applyFilter(); }   // 검색 중이면 풀어야 갈 자리가 화면에 있다
+    markCat(t.dataset.cat);
+    if(!scroller) return;
+    if(!t.dataset.cat){ scroller.scrollTop=0; return; }        // [전체] = 맨 위로
+    const el=results.querySelector('.mcat[data-cat="'+t.dataset.cat+'"]');
+    // offsetTop 은 offsetParent 가 무엇이냐에 따라 달라진다 — 두 사각형의 차이로 옮기면
+    // 컨테이너 구조가 바뀌어도 그대로 맞는다. 스티키 머리가 top:0 이라 이 값이 곧 제자리다.
+    if(el) scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
   });
+  // 스크롤을 따라 칩을 옮긴다. 매 스크롤마다 재는 대신 프레임당 한 번으로 묶는다.
+  if(scroller && cats){
+    let spy=0;
+    scroller.addEventListener("scroll", ()=>{ if(spy) return; spy=requestAnimationFrame(()=>{ spy=0;
+      const top=scroller.getBoundingClientRect().top + 4;
+      let cur="";
+      results.querySelectorAll(".mcat").forEach(c=>{
+        if(c.style.display!=="none" && c.getBoundingClientRect().top<=top) cur=c.dataset.cat;
+      });
+      markCat(cur);
+    }); });
+  }
   applyFilter();   // 시트를 열자마자 초성 힌트가 보이도록 한 번 실행(빈 질의라 목록은 그대로)
   // 검색 키를 누르면 키보드를 내려 목록 전체를 보여준다(보낼 폼이 없으므로 제출은 무의미)
   mq.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); mq.blur(); } });
