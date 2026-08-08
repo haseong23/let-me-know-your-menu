@@ -195,7 +195,13 @@
     text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
   .open-hero p { margin:0; color:var(--sub); font-size:var(--fs-lg); line-height:1.5;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-  .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: var(--fs-base); }
+  /* 본문 15px (9b). 아래에 있던 회색 안내 문단을 이 카드 한 줄로 흡수했으므로, 이 줄이
+     화면에서 유일한 설명이 된다 — 14px 로 두면 그 역할에 비해 작다. */
+  .banner h2 { margin: 10px 0 4px; font-size: 21px; letter-spacing: -.4px; } .banner p { margin: 0; color: var(--sub); font-size: var(--fs-lg); line-height: 1.6; }
+  /* 이름 선택 화면 (8a). 카드 좌우 여백을 18 → 10px 로 줄이고 그만큼을 행이 가져간다(4 → 12px).
+     바깥 여백 합(22px)은 그대로라 이름·배지 위치는 안 움직이고, 눌리는 상자(.picksel)만
+     좌우로 8px 씩 넓어진다 — 손가락이 닿는 면적이 커지되 레이아웃은 그대로다. */
+  .pick-list .person { padding-left: 12px; padding-right: 12px; }
   .host-name { color: var(--brand); font-weight: 800; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .menu-tile { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; font-weight: 700; font-size: var(--fs-base); position: relative; transition: .12s; }
@@ -211,6 +217,110 @@
   .menu-tile .cnt { display:block; font-size: var(--fs-xs); color: var(--accent-ink); margin-top: 3px; font-weight: 700; }
   .menu-tile .ck { position: absolute; top: 6px; right: 9px; color: var(--brand); font-weight: 900; opacity: 0; } .menu-tile.sel .ck { opacity: 1; }
   .menu-tile.add { border-style: dashed; color: var(--brand); background: #fbf8f3; }
+  /* ── 메뉴 목록 (11b) ── 2×2 타일을 대신한다. 한 장의 흰 카드를 구분선으로 나눈 목록이라
+     사람 목록(.person)과 같은 언어가 되고, 세로가 184 → 158px 로 줄어든다.
+     각 줄이 '누를 수 있는 것'으로 덜 보이는 값은 안고 간다(문서 11b 의 지적) — 대신 흰 카드
+     안에 두어 이 앱의 '누르는 것은 흰 카드' 규칙은 지킨다. 마지막 줄만 구분선을 뗀다. */
+  .menu-list { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 0 14px; box-shadow: var(--shadow); }
+  .menu-row2 { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    background: none; border: 0; border-bottom: 1px solid var(--line); padding: 0; min-height: 52px;
+    font-family: inherit; cursor: pointer; }
+  .menu-list .menu-row2:last-child { border-bottom: 0; }
+  .menu-row2 .em { flex: none; font-size: 22px; }
+  .menu-row2 b { flex: 1; min-width: 0; font-size: var(--fs-input); font-weight: 700; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu-row2 .cnt { flex: none; font-size: var(--fs-sm); font-weight: 700; color: var(--accent-ink); }
+  /* 고른 줄. 타일 시절의 꽉 찬 --brand 채움을 목록에서도 유지한다 — 이 앱에서 '정해진 것'은
+     늘 꽉 찬 채움이다(.chip.sel · .state-skip · .pickbar 와 한 계열). */
+  .menu-row2.sel { background: var(--brand); border-radius: 12px; margin: 0 -8px; padding: 0 8px; }
+  .menu-row2.sel b { color: #fff; }
+  .menu-row2.sel .cnt { color: #e7d9c6; }
+  /* 전체 메뉴판은 메뉴가 아니라 '더 보기'다 — 밑줄 링크로 내려 메뉴와 같은 급으로 안 읽히게. */
+  /* ── 전체 메뉴판 행 (13a) ── 이름 16px · 이모지 24px. 훑는 화면이라 이름이 먼저 읽혀야 하고,
+     이모지는 종류를 구분하는 표식이라 그다음이다. */
+  .mrow-em { flex: none; width: 30px; text-align: center; font-size: 24px; }
+  .mrow-nm { min-width: 0; font-size: var(--fs-input); font-weight: 700; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mrow-t { margin-left: auto; flex: none; }
+  /* 온도 배지. 둘 다 되면 색 없이(제약이 없으니 눈에 걸릴 이유가 없다), 한쪽만 되면 색이 켜진다.
+     색은 온도 버튼과 같은 것을 쓴다 — 같은 사실을 두 곳에서 다른 색으로 말하지 않는다. */
+  .mt-b { font-size: var(--fs-xs); font-weight: 800; color: var(--sub); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
+  .mt-b.hot { color: #a8401f; background: #fbe9e3; border-color: #c2552f; }
+  .mt-b.ice { color: #2b6aa3; background: #e8f1fb; border-color: #3b82c4; }
+  /* 지금 담겨 있는 메뉴. 온도 배지 자리를 대신 쓴다 — 둘 다 붙이면 오른쪽 끝이 두 겹이 되고,
+     이 행에서 알아야 할 것은 온도 가능 여부가 아니라 '이게 지금 그거다'이다. */
+  .mt-now { font-size: var(--fs-xs); font-weight: 800; color: #fff; background: var(--brand);
+    border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
+  /* 종류 칩 줄은 기간 프리셋과 같은 가로 스크롤 규칙을 쓴다. 다만 여기 라벨은 풀네임이라
+     기본 .dash-filter .tab 보다 좌우 여백을 조금 더 준다. */
+  /* 눌러서 갈아탈 수 있다는 표시 (14b). 목록만 있으면 읽을 것으로 보인다. */
+  /* 두 줄짜리 주문 행 (15b). 옵션·메모 줄은 말줄임을 풀어 전부 보인다 — 전달해야 할 내용이라
+     잘리면 안 된다. 이름 줄은 그대로 한 줄로 자른다(길어도 사람 이름은 한 줄이 낫다). */
+  .p-2line { align-items: flex-start; }
+  .p-2line .avatar { margin-top: 2px; }
+  .p-2line .ord-1 { font-weight: 700; color: var(--ink); }
+  .p-2line .ord-2 { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.45; }
+  /* ── 나눠 주기 (16b) ── 받을 사람만 남은 목록. 각 행이 체크되는 원을 갖는다. */
+  /* ── 설정 정보 카드 (19b) ── 셀·카페·연결을 맨 위에서 한눈에. */
+  /* ── 구성원 편집 (20b) ── 이름칸에 테두리와 옅은 배경을 넣어 '고치는 칸'임을 보인다.
+     예전엔 배경도 테두리도 없어서 그냥 적힌 글자로 읽혔다. */
+  .mem-row .medit { flex: 1; min-width: 0; font-size: var(--fs-input); font-weight: 600; color: var(--ink);
+    background: #faf6f0; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+  .mem-row .mdel { flex: none; background: none; border: none; color: var(--red-ink);
+    font-size: 18px; line-height: 1; cursor: pointer; padding: 12px 10px; margin: -12px -10px -12px 0; }
+  /* 지운 행은 사라지지 않고 취소선으로 남는다 — [되돌리기]가 같은 줄에 있어야 되돌릴 수 있다. */
+  .mem-name-del { flex: 1; min-width: 0; font-size: var(--fs-input); font-weight: 600;
+    color: var(--sub); text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mem-row.del .avatar { background: var(--gray); }
+  .mundo { flex: none; background: none; border: 1px solid var(--line); border-radius: 10px;
+    font-family: inherit; font-size: var(--fs-md); font-weight: 700; color: var(--brand);
+    min-height: 44px; padding: 0 12px; cursor: pointer; }
+  .mem-pending { margin: 10px 0 0; font-size: var(--fs-md); color: var(--accent-ink);
+    background: #fdf4e6; border: 1px solid var(--accent); border-radius: 10px; padding: 9px 11px; }
+  .set-info { padding: 12px 14px; }
+  .set-i { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 5px 0; font-size: var(--fs-base); }
+  .set-i + .set-i { border-top: 1px solid var(--line); }
+  .set-i .k { flex: none; color: var(--sub); font-weight: 700; }
+  .set-i .v { min-width: 0; text-align: right; font-weight: 700; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 정상 연결은 초록 점 하나로 조용히 말한다 — 잘 되고 있을 때 경고 상자를 띄우면
+     사용자는 매번 읽고 '문제인가' 판단해야 한다. */
+  .set-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); margin-right: 6px; vertical-align: middle; }
+  /* 흰 카드 동작 버튼의 › (19b·13a 와 같은 표시). .game-pick 을 그대로 쓰되 끝에 붙는다. */
+  .gp-go { margin-left: auto; flex: none; color: var(--sub); font-weight: 800; font-size: var(--fs-title); }
+  .dlv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin: 0 0 6px; font-size: var(--fs-base); }
+  .dlv-head b { color: var(--brand); }
+  .dlv-head .muted { font-size: var(--fs-sm); }
+  .dlv-card { padding: 6px 14px; }
+  .dlv-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+    background: none; border: 0; border-bottom: 1px solid var(--line); padding: 12px 2px;
+    min-height: 44px; font-family: inherit; cursor: pointer; }
+  .dlv-card .dlv-row:last-child { border-bottom: 0; }
+  .dlv-ck { flex: none; width: 24px; height: 24px; margin-top: 2px; border-radius: 50%;
+    border: 2px solid var(--line); display: grid; place-items: center;
+    font-size: var(--fs-md); font-weight: 900; color: #fff; }
+  .dlv-row.on .dlv-ck { background: var(--green); border-color: var(--green); }
+  .dlv-tx { min-width: 0; }
+  .dlv-tx b { display: block; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+  .dlv-1 { display: block; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+  .dlv-2 { display: block; font-size: var(--fs-md); color: var(--sub); line-height: 1.45; }
+  /* 전달한 행은 글자만 흐린다 — 체크 원은 또렷하게 남아야 무엇이 켜졌는지 읽힌다
+     (참가자 시트의 .gs-off 와 같은 처방). #000 을 .55 로 깔면 흰 카드 대비 4.76:1 로 AA 를 넘는다. */
+  .dlv-row.on .dlv-tx b, .dlv-row.on .dlv-1, .dlv-row.on .dlv-2 { color: #000; opacity: .55; }
+  .stat-sum { font-size: var(--fs-md); color: var(--sub); text-align: center; margin: -2px 0 10px; }
+  .stat-sum b { color: var(--ink); font-weight: 700; }
+  .cs-go { margin-left: auto; flex: none; color: var(--sub); font-weight: 800; font-size: var(--fs-title); }
+  .mcat-chips { margin: 8px 0 0; }
+  .mcat-chips .tab { padding-left: 10px; padding-right: 10px; }
+  .menu-more { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+    background: none; border: 0; font-family: inherit; min-height: 44px; padding: 10px 0 0;
+    font-size: var(--fs-base); font-weight: 700; color: var(--sub); text-decoration: underline;
+    text-underline-offset: 3px; cursor: pointer; }
   .seg-temp { display:flex; gap:8px; }
   .tbtn { flex:1; padding:14px; border-radius:12px; font-weight:800; font-size:var(--fs-lg); border:2px solid var(--line); background:#fff; color:var(--sub); }
   .tbtn.ice.on { background:#e8f1fb; border-color:#3b82c4; color:#2b6aa3; }
@@ -779,7 +889,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.21";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.22";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -987,15 +1097,19 @@ function popularMenus(){
     .sort((a,b)=> b.f-a.f || b.p-a.p).slice(0,10).map(x=>x.m);
 }
 // 빠른 선택 그리드 = 사람마다 개인 빈도순 3개 + 전체 메뉴판(총 4칸). 나머지는 전체 메뉴판에서.
+/* 2×2 타일에서 한 카드 안 목록으로 (11b). 행 52px 로 목록 전체가 184 → 158px 로 줄고,
+   사람 목록(.person)과 같은 언어를 쓰게 된다 — 이 앱에서 세로로 훑는 것은 전부 그 모양이다.
+   전체 메뉴판은 타일 한 칸을 차지하던 것에서 목록 아래 밑줄 링크로 내려간다. 그것은 메뉴가
+   아니라 '더 보기'라서, 메뉴와 같은 크기로 나란히 서 있으면 넷 중 하나로 읽힌다. */
 function gridTilesHtml(selId){
   const sel = selId && anyMenuById(selId);
   let items = popularMenus();
   if(sel) items = [sel, ...items.filter(m=>m.id!==sel.id)];   // 현재 선택을 맨 앞에(중복 제거)
   items = items.slice(0,3);                                    // 사람마다 3개
-  const addTile = activeCafe().freeform
-    ? `<div class="menu-tile add" data-custom="1" role="button" tabindex="0"><span class="em">📝</span>직접 입력</div>`
-    : `<div class="menu-tile add" data-full="1" role="button" tabindex="0"><span class="em">📋</span>전체 메뉴판</div>`;
-  return items.map(m=>tileHtml(m,selId)).join("") + addTile;
+  const more = activeCafe().freeform
+    ? `<button class="menu-more" data-custom="1">📝 직접 입력</button>`
+    : `<button class="menu-more" data-full="1">📋 전체 메뉴판 (${MENUS.length}가지)</button>`;
+  return `<div class="menu-list">${items.map(m=>tileHtml(m,selId)).join("")}</div>${more}`;
 }
 function memberById(id){ return MEMBERS.find(m=>m.id===id); }
 // 멤버는 {id(숨은 고유값), name(표시·수정 가능)} 객체. 레거시(문자열)도 안전 처리(문자열→id=name).
@@ -1021,8 +1135,9 @@ function orderDisplay(o){ // {emoji,name}
 }
 function myMenuCount(id){ return (ME && H_byMemberId[ME] && H_byMemberId[ME][id]) || 0; }
 function bumpFreq(menuId){ /* 오늘 주문은 횟수에 즉시 반영하지 않음 — 마감 후 익일에 loadHist로 +1 */ }
+// 횟수는 오른쪽 끝에 "6번" 으로 짧게 (11b) — 이름과 같은 줄에 서므로 "총 6회 주문"은 길다.
 function tileHtml(m, selId){ const c=myMenuCount(m.id);
-  return `<div class="menu-tile ${m.id===selId?'sel':''}" data-id="${esc(m.id)}" role="button" tabindex="0" aria-pressed="${m.id===selId}"><span class="ck">✓</span><span class="em">${esc(m.emoji)}</span>${esc(m.name)}${c?`<span class="cnt">총 ${c}회 주문</span>`:''}</div>`; }
+  return `<button class="menu-row2 ${m.id===selId?'sel':''}" data-id="${esc(m.id)}" aria-pressed="${m.id===selId}"><span class="em">${esc(m.emoji)}</span><b>${esc(m.name)}</b>${c?`<span class="cnt">${c}번</span>`:''}</button>`; }
 
 /* ===================== 공통 유틸 ===================== */
 let ME = null; // 셀별 스코프 — enterCell()에서 loadMe()로 채움
@@ -1550,7 +1665,7 @@ function renderPickMe(){
   $app.innerHTML = `
     <header><div class="room-name" style="padding-top:6px">☕ ${esc(ROOM_NAME)}</div>
     <div class="date">먼저 <b>본인</b>을 선택해 주세요 (ㄱㄴㄷ순)</div></header>
-    <div class="card" style="padding:8px 18px">${list}</div>
+    <div class="card pick-list" style="padding:8px 10px">${list}</div>
     <div class="label" id="lbl-addMeName">내 이름이 목록에 없나요?</div>
     <div class="inline-form"><input autocomplete="off" type="text" id="addMeName" maxlength="40" placeholder="이름 입력" aria-labelledby="lbl-addMeName"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
   $app.querySelectorAll(".person").forEach(el=> el.onclick=()=>{ pickSel=el.dataset.id; renderPickMe(); });
@@ -1591,13 +1706,8 @@ function renderIdle(){
         <h2>${past.length ? "지금은 열린 주문이 없어요"
              : orderFirstRPC ? "오늘 음료,<br>뭐 드실래요?"
                              : "오늘은 아직<br>섬기기로 하신 분이 없어요"}</h2>
-        <p>${orderFirstRPC ? "먼저 <b>메뉴부터</b> 골라도 돼요.<br>섬기실 분은 나중에 정해도 됩니다." : "오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘은 제가 섬길게요]</b>를 눌러주세요"}</p></div>
+        <p>${orderFirstRPC ? "먼저 <b>메뉴부터</b> 골라도 돼요.<br>섬기실 분은 나중에 <b>🎲 게임</b>으로 정해도 됩니다." : "오늘 음료로 섬겨주실 분은<br>아래 <b>[오늘은 제가 섬길게요]</b>를 눌러주세요"}</p></div>
       ${list}
-      <!-- 안내는 화면에서 실제로 가능한 것만 말해야 한다. 주문 먼저 받기가 열려 있으면
-           '누가 시작해야 열린다'는 말은 더 이상 사실이 아니다(아무나 [메뉴 고르기]로 연다). -->
-      <p class="muted center" style="margin-top:10px">${orderFirstRPC
-        ? `<b>[📝 메뉴 고르기]</b>를 누르면 바로 주문할 수 있어요.<br>섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.`
-        : `<b>${esc(meName())}</b>${nimSfx(meName())}이 시작하면 이번 섬김의 주문이 열립니다.<br>섬길 사람은 <b>주문을 받은 뒤</b> 🎲 게임으로 정할 수도 있어요.`}</p>
     </div>`;
   view().querySelectorAll(".viewserv").forEach(b=> b.onclick=()=>{ viewSeq=+b.dataset.seq; render(); });
 }
@@ -1661,7 +1771,7 @@ function renderOpen(){
   const gridHtml = showGrid ? `
       ${againHtml}
       <h3 class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</h3>
-      <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
+      <div id="menuGrid">${gridTilesHtml()}</div>
       ${skipHtml}` : "";
   /* 주문을 이미 담은 뒤 화면에 남는 갈래는 둘뿐이다 — 고치기 / 안 마시기 (6a).
      예전엔 [🔄 다른 메뉴로]가 여기 하나 더 있었는데, 메뉴를 바꾸는 길이 두 곳(이 버튼과
@@ -1780,7 +1890,7 @@ function renderOpen(){
   if(openTab!=="order") return;   // 아래 배선은 합친 화면 전용(카페 주문서 탭에는 없다)
 
   const grid=document.getElementById("menuGrid");
-  if(grid) grid.querySelectorAll(".menu-tile").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
+  if(grid) grid.querySelectorAll(".menu-row2, .menu-more").forEach(t=>{ if(t.dataset.full) t.onclick=()=>openFullMenuSheet(myOrder&&myOrder.menuId, myOrder&&myOrder.note); else if(t.dataset.custom) t.onclick=()=>openCustomSheet(null, null, myOrder&&myOrder.note); else t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null); });
   // 안 마실게요 버튼은 두 자리(그리드 아래 / 주문 후 버튼줄)에 나타난다 — 상호배타지만 클래스로 한 번에 배선
   /* 한 번 묻는다. 되돌릴 수 있는 선택이지만(아래 메뉴 그리드가 그대로 열려 있다) 이 버튼은
      메뉴 타일 바로 아래에 전폭으로 있어서 타일을 누르려다 스치는 자리다. 실수로 눌리면
@@ -2013,6 +2123,7 @@ function openCustomSheet(existing, prefillName, prefillNote){
     <p class="muted" style="margin-top:0">목록에 없는 메뉴를 추가해요. 추가하면 다른 분에게도 보입니다.</p>
     <div class="label" id="lbl-cname">메뉴 이름</div>
     <input type="text" id="cname" maxlength="60" placeholder="예: 흑임자라떼" autocomplete="off" value="${esc(prefillName||"")}" aria-labelledby="lbl-cname" />
+    <div id="cNotice"></div>
     <div id="cSuggest"></div>
     <div class="label">온도</div>
     <div class="seg-temp" id="ctemp">
@@ -2021,12 +2132,17 @@ function openCustomSheet(existing, prefillName, prefillNote){
     </div>
     <div class="label" id="lbl-cnote">메모 (선택)</div><input autocomplete="off" type="text" id="cnote" maxlength="200" placeholder="예: 덜 달게" value="${esc(noteVal)}" aria-labelledby="lbl-cnote" />
     <div style="height:18px"></div>
-    <button class="btn btn-brand" id="cAdd">추가하고 주문</button>
-    <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="cClose">닫기</button>`);
+    <!-- [닫기]를 옆으로 (14b) — 세로로 쌓으면 버튼 하나 + 간격만큼 시트가 길어진다.
+         순서는 다른 시트와 같게 부(좌)·주(우). -->
+    <div class="row-2">
+      <button class="btn btn-ghost" id="cClose">닫기</button>
+      <button class="btn btn-brand" id="cAdd">추가하고 주문</button>
+    </div>`);
   document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(b=> b.onclick=()=>{ temp=b.dataset.t;
     document.getElementById("ctemp").querySelectorAll(".tbtn").forEach(x=>x.classList.toggle("on", x.dataset.t===temp)); });
 
-  const nameEl=document.getElementById("cname"), sugEl=document.getElementById("cSuggest"), addBtn=document.getElementById("cAdd");
+  const nameEl=document.getElementById("cname"), sugEl=document.getElementById("cSuggest"),
+        noticeEl=document.getElementById("cNotice"), addBtn=document.getElementById("cAdd");
   let exactMatch=null, isDecline=false;
   // 기존 메뉴로 자연스럽게 전환 — 알림창 대신 이미 쓰던 시트 전환(openFullMenuSheet의 메뉴 클릭과 동일한 방식)
   function goToExisting(m){ openOrderSheet(m.id, existing); }
@@ -2063,17 +2179,27 @@ function openCustomSheet(existing, prefillName, prefillNote){
     isDecline = !!qn && DECLINE_WORDS.some(w=>qn.includes(w));
     exactMatch = (!isDecline && qn.length>=2) ? bestExisting(qn) : null;
     const matches = (!isDecline && qn && !exactMatch) ? pool.filter(m=>matchesName(norm(m.name),qn)).slice(0,4) : [];
-    sugEl.innerHTML = matches.length ? `<div class="card" style="padding:2px 12px;margin:6px 0 0">${
+    /* 제안 목록에 제목과 › 를 붙인다 (14b) — 목록만 있으면 '읽을 것'으로 보이고, 눌러서
+       그 메뉴로 갈아탈 수 있다는 사실이 화면에 없다. */
+    sugEl.innerHTML = matches.length ? `<div class="label" style="margin:10px 0 4px">혹시 이 메뉴인가요?</div>
+      <div class="card" style="padding:2px 12px">${
       matches.map(m=>`<div class="person menu-row" data-id="${esc(m.id)}" style="cursor:pointer;padding:9px 2px" role="button" tabindex="0" aria-label="${esc(m.name)}로 전환">
         <div style="font-size:19px;width:24px;text-align:center">${esc(m.emoji||"🥤")}</div>
-        <div class="pname" style="font-size:14px">${esc(m.name)}</div></div>`).join("")}</div>` : "";
+        <div class="pname" style="font-size:14px">${esc(m.name)}</div>
+        <span class="cs-go">›</span></div>`).join("")}</div>` : "";
+    /* 판정은 안내 박스가 말하고 버튼에는 동사만 남긴다 (14b).
+       예전엔 버튼 하나가 판정과 동작을 같이 짊어져서 "✋ 이미 있는 메뉴예요 — 🍦 바닐라라떼로
+       주문" 처럼 세 줄로 접혔다. 무엇이 일어나는지와 무엇을 누르는지는 다른 정보다. */
     if(isDecline){
-      addBtn.textContent = "🙅 오늘은 생략하시는 거죠? — '안 마실게요, 감사합니다'로 저장";
+      noticeEl.innerHTML = `<div class="banner-warn" style="margin:10px 0 0"><b>🙅 오늘은 안 드시는 건가요?</b><br>'안 마실게요'로 저장할게요.</div>`;
+      addBtn.textContent = "안 마실게요";
       addBtn.classList.remove("btn-brand"); addBtn.classList.add("btn-soft");
     } else if(exactMatch){
-      addBtn.textContent = `✋ 이미 있는 메뉴예요 — ${exactMatch.emoji||"🥤"} ${exactMatch.name}로 주문`;
-      addBtn.classList.remove("btn-brand"); addBtn.classList.add("btn-soft");
+      noticeEl.innerHTML = `<div class="banner-warn" style="margin:10px 0 0"><b>✋ 이미 메뉴판에 있어요</b><br>${esc((exactMatch.emoji||"🥤")+" "+exactMatch.name)} · ${esc(exactMatch.temps&&exactMatch.temps.length?exactMatch.temps.join("/"):"온도 없음")}</div>`;
+      addBtn.textContent = "이걸로 주문";
+      addBtn.classList.remove("btn-soft"); addBtn.classList.add("btn-brand");
     } else {
+      noticeEl.innerHTML = "";
       addBtn.textContent = "추가하고 주문";
       addBtn.classList.remove("btn-soft"); addBtn.classList.add("btn-brand");
     }
@@ -2102,19 +2228,36 @@ function openCustomSheet(existing, prefillName, prefillNote){
 
 function openFullMenuSheet(curId, carryNote){
   // 목록을 '한 번만' 그리고, 검색은 보이기/숨기기 토글만 → 덜컹임 없음
+  /* 온도 배지는 모든 행에 붙는다 (13a). 둘 다 되면 색 없는 중립 칩, 한쪽만 되면 색이 붙어
+     눈에 걸린다 — 색은 온도 버튼(.tbtn.ice.on·.tbtn.hot.on)과 같은 것을 쓴다.
+     "HOT ONLY" 가 알려주는 것은 '이건 아이스가 안 된다'는 제약이라, 제약이 있을 때만 색이 켜진다. */
+  const tempBadge = m => !m.temps.length ? `<span class="mt-b">·</span>`
+    : m.temps.length>1 ? `<span class="mt-b">ICE · HOT</span>`
+    : m.temps[0]==="HOT" ? `<span class="mt-b hot">HOT ONLY</span>`
+                         : `<span class="mt-b ice">ICE ONLY</span>`;
   const listHtml = CATEGORIES.map(c=>{
     const items=MENUS.filter(m=>m.cat===c.id);
     if(!items.length) return "";
-    return `<div class="mcat"><div class="label" style="margin-top:14px">${c.label}</div><div class="card" style="padding:4px 14px">`+
+    return `<div class="mcat" data-cat="${esc(c.id)}"><div class="label" style="margin-top:14px">${c.label}</div><div class="card" style="padding:4px 14px">`+
       items.map(m=>`<div class="person menu-row${m.id===curId?' picksel':''}" data-id="${esc(m.id)}" data-name="${esc(norm(m.name))}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===curId}" aria-label="${esc(m.name)} 주문">
-        <div style="font-size:21px;width:30px;text-align:center">${esc(m.emoji)}</div>
-        <div class="pname">${esc(m.name)}</div>
-        <span class="pmenu" style="margin-left:auto">${m.id===curId?'현재 선택 · ':''}${m.temps.length?m.temps.join("/"):"·"}</span></div>`).join("")+`</div></div>`;
+        <div class="mrow-em">${esc(m.emoji)}</div>
+        <div class="mrow-nm">${esc(m.name)}</div>
+        <span class="mrow-t">${m.id===curId?'<span class="mt-now">지금 이거</span>':tempBadge(m)}</span></div>`).join("")+`</div></div>`;
   }).join("");
+  /* 종류 칩 줄 (13a). 32가지를 한 줄로 훑으려면 스크롤이 길어서, 먼저 종류로 좁힐 수 있게 한다.
+     라벨은 줄임 없는 풀네임이다 — 칩 줄 자체가 가로 스크롤이라 길이를 아낄 이유가 없고,
+     줄이면 "티 라떼"와 "티 (차)"처럼 앞이 같은 종류가 구분되지 않는다.
+     기간 프리셋(.dash-filter)이 쓰는 가로 스크롤 규칙을 그대로 쓴다. */
+  const catChips = `<div class="tabs dash-filter mcat-chips" id="mCats" role="group" aria-label="종류 고르기">`
+    + `<button class="tab on" data-cat="">전체</button>`
+    + CATEGORIES.filter(c=>MENUS.some(m=>m.cat===c.id))
+        .map(c=>`<button class="tab" data-cat="${esc(c.id)}">${esc(c.label)}</button>`).join("")
+    + `</div>`;
   openSheet(`
     <div style="flex:none;background:var(--bg);z-index:10;margin:0 -16px 0;padding:6px 16px 10px">
       <div class="row-between" style="margin-bottom:8px"><h3 style="margin:0">📋 전체 메뉴판</h3><button class="sheet-x btn-close" id="mCloseX" aria-label="닫기">✕</button></div>
       <input type="search" id="mq" placeholder="🔍 메뉴 검색 (예: 자몽, ㅇㅁㄹ)" aria-label="메뉴 검색 — 초성으로도 찾을 수 있어요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+      ${catChips}
     </div>
     <div class="sheet-scroll">
       <div class="sheet-count" id="mCount"></div>
@@ -2134,11 +2277,15 @@ function openFullMenuSheet(curId, carryNote){
   // 오타 허용 검색: 직접입력과 같은 matchesName 기준 — "아메리카노"를 "아메리카노"로 오타쳐도 목록에서 바로 찾힘
   const count=document.getElementById("mCount");
   // 초성 검색: "ㅇㅁㄹ" → 아메리카노
+  let curCat="";   // "" = 전체. 종류 칩과 검색어는 AND 로 걸린다 (13a)
   function applyFilter(){
     const ql=norm(mq.value); let any=false, n=0;
     results.querySelectorAll(".mcat").forEach(cat=>{
+      // 종류를 좁혀 둔 상태에서 검색하면, 안 보이는 종류의 결과를 못 찾고 "없어요"만 본다.
+      // 그래서 검색어가 있으면 종류 필터를 접어 둔다 — 검색은 늘 전체에서 찾는다.
+      const catOk = !curCat || ql || cat.dataset.cat===curCat;
       let catVisible=false;
-      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=nameHit(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
+      cat.querySelectorAll(".menu-row").forEach(r=>{ const hit=catOk && nameHit(r.dataset.name,ql); r.style.display=hit?"":"none"; if(hit){ catVisible=true; n++; } });
       cat.style.display=catVisible?"":"none"; if(catVisible) any=true;
     });
     empty.style.display=any?"none":"";
@@ -2146,6 +2293,13 @@ function openFullMenuSheet(curId, carryNote){
     count.textContent = ql ? ("검색 결과 "+n+"개") : "💡 초성으로도 찾아요 — ㅇㅁㄹ → 아메리카노";
   }
   mq.addEventListener("input", applyFilter);
+  const cats=document.getElementById("mCats");
+  if(cats) cats.querySelectorAll(".tab").forEach(t=> t.onclick=()=>{
+    curCat=t.dataset.cat; mq.value="";                        // 종류를 고르면 검색어는 비운다(둘이 서로를 가린다)
+    cats.querySelectorAll(".tab").forEach(x=>{ const on=x===t; x.classList.toggle("on",on); x.setAttribute("aria-pressed",on); });
+    applyFilter();
+    const sc=$sheet.querySelector(".sheet-scroll"); if(sc) sc.scrollTop=0;   // 좁힌 결과는 맨 위부터 본다
+  });
   applyFilter();   // 시트를 열자마자 초성 힌트가 보이도록 한 번 실행(빈 질의라 목록은 그대로)
   // 검색 키를 누르면 키보드를 내려 목록 전체를 보여준다(보낼 폼이 없으므로 제출은 무의미)
   mq.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); mq.blur(); } });
@@ -2175,11 +2329,15 @@ function dashSplit(){ return {
   ordered: MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="drink"),
   skipped: MEMBERS.filter(m=>ORDERS[m.id]&&ORDERS[m.id].type==="skip"),
   pending: MEMBERS.filter(m=>!ORDERS[m.id]) }; }
+/* KPI 세 칸 아래 한 줄로 분모와 잔 수를 보탠다 (15b). 세 숫자만 있으면 "3·1·2 가 전부인가"를
+   사용자가 더해 봐야 하고, 카페에 말할 잔 수는 어디에도 없다. */
 function dashStatsHtml(){ const {ordered,skipped,pending}=dashSplit();
+  const answered=ordered.length+skipped.length;
   return `<div class="stats">
     <div class="stat"><div class="num" style="color:var(--green)">${ordered.length}</div><div class="lbl">주문</div></div>
     <div class="stat"><div class="num" style="color:var(--sub)">${skipped.length}</div><div class="lbl">안마심</div></div>
-    <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>`; }
+    <div class="stat"><div class="num" style="color:var(--accent-ink)">${pending.length}</div><div class="lbl">미응답</div></div></div>
+    <div class="stat-sum">구성원 ${MEMBERS.length}명 중 <b>${answered}명 응답</b> · 지금까지 <b>${countDrinks()}잔</b></div>`; }
 /* 열린 화면과 닫힌 화면이 같은 함수를 쓴다. 시그니처를 바꾸지 않고 두 화면을 가르는 조건은
    SESSION.state==="open" 하나다 (R12-12) — #nudge 가 이미 쓰던 조건이라 새 개념이 늘지 않고,
    닫힌 화면(renderClosed → dashboardHtml)은 코드 경로가 예전 그대로다.
@@ -2196,14 +2354,21 @@ function dashPeopleHtml(){ const {ordered,skipped,pending}=dashSplit();
   const openNow = SESSION.state==="open";
   const mine = m => openNow && m.id===ME;
   const row=(m,kind)=>{ const o=ORDERS[m.id]; let menu="",pill="";
+    /* 주문 행만 두 줄로 푼다 (15b). 메뉴·온도는 이름 아래 굵게, 옵션·메모는 그 아랫줄에
+       잘리지 않고 전부. 예전엔 넷을 한 줄에 이어 붙여 말줄임으로 잘렸는데, 그 잘린 부분이
+       바로 '얼음적게'·'시럽 빼주세요' 같은 실제로 전달해야 할 내용이었다.
+       나머지 행(안마심·미응답)은 한 줄 그대로라 목록 전체가 길어지지는 않는다. */
     if(kind==="ordered"){ const d=orderDisplay(o);
-      menu=`${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}${(o.extras&&o.extras.length)?(' · '+esc(o.extras.join(", "))):''}${o.note?(' · 📝'+esc(o.note)):''}`;
+      const bits=[]; if(o.extras&&o.extras.length) bits.push(esc(o.extras.join(", ")));
+      if(o.note) bits.push("📝 "+esc(o.note));
+      menu=`<div class="pmenu ord-1">${esc(d.emoji+" "+d.name)}${o.temp?(' · '+o.temp):''}</div>`
+         + (bits.length?`<div class="pmenu ord-2">${bits.join(" · ")}</div>`:"");
       pill = openNow ? `<button class="btn btn-sm btn-soft sameas" data-id="${esc(m.id)}">나도</button>`
                      : `<span class="pill ordered">주문</span>`; }
-    else if(kind==="skip"){ menu="오늘은 안 마심"; pill=`<span class="pill skip">안마심</span>`; }
-    else { menu="아직 응답 없음"; pill=`<span class="pill pending">미응답</span>`; }
-    return `<div class="person"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
-      <div><div class="pname">${esc(m.name)}</div><div class="pmenu">${menu}</div></div>${pill}</div>`; };
+    else if(kind==="skip"){ menu=`<div class="pmenu">오늘은 안 마심</div>`; pill=`<span class="pill skip">안마심</span>`; }
+    else { menu=`<div class="pmenu">아직 응답 없음</div>`; pill=`<span class="pill pending">미응답</span>`; }
+    return `<div class="person${kind==='ordered'?' p-2line':''}"><div class="avatar" style="${kind==='pending'||kind==='skip'?'background:var(--sub)':''}">${esc(initials(m.name))}</div>
+      <div><div class="pname">${esc(m.name)}</div>${menu}</div>${pill}</div>`; };
   const rows=`${ordered.filter(m=>!mine(m)).map(m=>row(m,"ordered")).join("")}${skipped.filter(m=>!mine(m)).map(m=>row(m,"skip")).join("")}${pending.filter(m=>!mine(m)).map(m=>row(m,"pending")).join("")}`;
   let body = rows
     ? `<div class="card" style="padding:6px 18px">${rows}</div>`
@@ -2236,22 +2401,74 @@ function dashCafeHtml(){
       <div class="muted" style="margin-bottom:10px">카페에 그대로 보여주거나 복사하세요 (이름 없이 수량만)</div>
       <div class="order-box" id="orderBox">${esc(cafeText())}</div><div style="height:12px"></div>
       <button class="btn btn-brand" id="copyCafe">📋 주문서 복사</button></div>`; }
+/* ---------- 마감 후: 나눠 주기 (16b) ----------
+   마감 뒤 화면이 하는 일은 '현황 보기'가 아니라 '받을 사람에게 나눠 주기'다. 그래서 목록이
+   받을 사람만 남고, 각 행이 체크되는 원을 갖고, 탭 이름도 그 일을 말한다.
+   안 마심·미응답은 아래 한 줄로 접는다 — 마감 뒤엔 할 일이 아니다.
+
+   체크 상태는 이 기기에만 둔다(localStorage). 서버를 안 건드리는 선에서 유지하는 값이고,
+   키는 셀 + 날짜 + 섬김 회차다 — 하루에 두 번 섬겨도 회차가 갈리므로 1번째 체크가 2번째로
+   새지 않고, 날짜가 바뀌면 어제 키는 다시 읽히지 않는다(용량이 무한정 늘지는 않게 아래에서 정리). */
+function deliverKey(){ return "coffee_deliver_v1|" + (CELL?CELL.id:"none") + "|" + todayKey() + "|" + (SESSION.seq||0); }
+function deliverGet(){
+  try{ const r=localStorage.getItem(deliverKey()); return r ? new Set(JSON.parse(r)) : new Set(); }
+  catch(e){ return new Set(); }
+}
+function deliverSet(set){
+  try{
+    localStorage.setItem(deliverKey(), JSON.stringify([...set]));
+    // 지난 날짜 키는 그때그때 하나씩 걷는다 — 쌓아 두면 이 앱이 안 쓰는 값으로 저장소를 채운다
+    const today=todayKey();
+    for(let i=localStorage.length-1;i>=0;i--){ const k=localStorage.key(i);
+      if(k && k.startsWith("coffee_deliver_v1|") && k.split("|")[2] !== today) localStorage.removeItem(k); }
+  }catch(e){}
+}
+function dashDeliverHtml(){
+  const {ordered,skipped,pending}=dashSplit();
+  const done=deliverGet();
+  const n=ordered.filter(m=>done.has(m.id)).length;
+  if(!ordered.length) return `<div class="card center muted">받을 분이 없어요</div>`;
+  const rows=ordered.map(m=>{ const o=ORDERS[m.id], d=orderDisplay(o);
+    const bits=[]; if(o.extras&&o.extras.length) bits.push(esc(o.extras.join(", ")));
+    if(o.note) bits.push("📝 "+esc(o.note));
+    const on=done.has(m.id);
+    return `<button class="dlv-row${on?" on":""}" data-id="${esc(m.id)}" aria-pressed="${on}">
+      <span class="dlv-ck">${on?"✓":""}</span>
+      <span class="dlv-tx"><b>${esc(m.name)}</b>
+        <span class="dlv-1">${esc(d.emoji+" "+d.name)}${o.temp?(" · "+o.temp):""}</span>
+        ${bits.length?`<span class="dlv-2">${bits.join(" · ")}</span>`:""}</span></button>`; }).join("");
+  const restN=skipped.length+pending.length;
+  const rest=restN ? `<details class="roster-fold" style="margin-top:10px"><summary>
+      <span>안 마신 분 ${skipped.length}명 · 안 고른 분 ${pending.length}명</span><span class="rf-more">보기</span></summary>
+      <div class="card" style="padding:6px 18px">${
+        skipped.map(m=>`<div class="person"><div class="avatar" style="background:var(--sub)">${esc(initials(m.name))}</div><div><div class="pname">${esc(m.name)}</div><div class="pmenu">오늘은 안 마심</div></div></div>`).join("")
+      + pending.map(m=>`<div class="person"><div class="avatar" style="background:var(--sub)">${esc(initials(m.name))}</div><div><div class="pname">${esc(m.name)}</div><div class="pmenu">아직 응답 없음</div></div></div>`).join("")}</div></details>` : "";
+  return `<div class="dlv-head"><b>${n} / ${ordered.length} 전달</b><span class="muted">눌러서 체크하세요</span></div>
+    <div class="card dlv-card">${rows}</div>${rest}`;
+}
 function dashboardHtml(){   // 마감 화면 전용 — 안쪽 탭 그대로
   const stats=dashStatsHtml();
   const tabs=`<div class="tabs" id="dashTabs">
-    <div class="tab ${dashTab==='people'?'on':''}" data-t="people">사람별 / 전달하기</div>
+    <div class="tab ${dashTab==='people'?'on':''}" data-t="people">나눠 주기</div>
     <div class="tab ${dashTab==='cafe'?'on':''}" data-t="cafe">카페 주문서</div></div>`;
-  let body;
-  if(dashTab==="people"){
-    body=dashPeopleHtml();
-  } else {
-    body=dashCafeHtml();
-  }
+  const body = dashTab==="people" ? dashDeliverHtml() : dashCafeHtml();
   return stats+tabs+body;
 }
 function wireDashboard(){
   const t=document.getElementById("dashTabs"); if(t) t.querySelectorAll(".tab").forEach(el=> el.onclick=()=>{ dashTab=el.dataset.t; rerenderDash(); });
   const cp=document.getElementById("copyCafe"); if(cp) cp.onclick=()=>copyText(cafeText(),"주문서를 복사했어요", cp);
+  /* 체크는 그 행만 제자리에서 고친다 — 목록을 다시 그리면 스크롤이 맨 위로 튀어서
+     여러 명을 연달아 체크할 수 없다(참가자 시트가 같은 이유로 같은 처방을 쓴다). */
+  document.querySelectorAll(".dlv-row").forEach(r=> r.onclick=()=>{
+    const set=deliverGet(), id=r.dataset.id;
+    if(set.has(id)) set.delete(id); else set.add(id);
+    deliverSet(set);
+    const on=set.has(id);
+    r.classList.toggle("on",on); r.setAttribute("aria-pressed",on);
+    r.querySelector(".dlv-ck").textContent = on?"✓":"";
+    const head=document.querySelector(".dlv-head b");
+    if(head){ const {ordered}=dashSplit(); head.textContent=`${ordered.filter(m=>set.has(m.id)).length} / ${ordered.length} 전달`; }
+  });
   const nd=document.getElementById("nudge"); if(nd) nd.onclick=()=>{ const names=MEMBERS.filter(m=>!ORDERS[m.id]).map(m=>m.name).join(", ");
     const h=memberById(SESSION.hostId); const hostClause=h?`${hon(h.name)}이 `:"";   // host가 구성원에서 빠져도 안전
     /* 링크를 같이 붙인다 — "링크에서 골라주세요"라고 적어 놓고 링크를 안 주면 받는 사람이
@@ -4724,14 +4941,26 @@ function startRace(players){
 function openSettings(){
   openSheet(`
     <h3>⚙️ 설정</h3>
-    <div class="banner-warn">${SHARED?"✅ 공유 모드로 연결됨":"⚠️ 이 기기 전용 모드 (공유 안 됨)"}</div>
-    <button class="btn btn-soft" id="changeMe">🙋 내 이름 다시 선택  <span style="opacity:.7">(현재: ${esc(meName()||'-')})</span></button>
+    <!-- 맨 아래 13px 회색 한 줄이던 셀·카페·연결 상태를 맨 위 정보 카드로 올린다 (19b).
+         설정을 열어 가장 먼저 확인하는 것이 '지금 어디에 붙어 있나'인데 그게 제일 아래·제일
+         작은 글씨였다. 정상은 초록 점 한 개로 조용히, 이 기기 전용일 때만 주황 경고를 그대로 쓴다. -->
+    <div class="card set-info">
+      <div class="set-i"><span class="k">셀</span><span class="v">${esc(CELL?CELL.name:'-')} · ${MEMBERS.length}명</span></div>
+      <div class="set-i"><span class="k">오늘 카페</span><span class="v">${esc(activeCafe().name)}</span></div>
+      <div class="set-i"><span class="k">연결</span><span class="v">${SHARED?'<i class="set-dot"></i>공유 모드':'이 기기 전용'}</span></div>
+    </div>
+    ${SHARED?"":`<div class="banner-warn">⚠️ 이 기기 전용 모드 — 다른 분에게 공유되지 않아요</div>`}
+    <!-- 동작은 게임 고르기와 같은 흰 카드 + 부제 + › (19b). 버튼 안에 괄호로 들어가 있던
+         "(현재: 이믿음)" 은 부제로 내려간다 — 라벨은 무엇을 하는지만 말한다. -->
+    <h3 class="label">내 정보</h3>
+    <button class="game-pick" id="changeMe"><span class="gp-em">🙋</span><span><b>내 이름 다시 선택</b><small>현재: ${esc(meName()||'-')}</small></span><span class="gp-go">›</span></button>
+    <h3 class="label">셀 관리</h3>
+    <button class="game-pick" id="editMembers"><span class="gp-em">👥</span><span><b>구성원 편집</b><small>추가 · 이름 변경 · 삭제</small></span><span class="gp-go">›</span></button>
+    ${gameEligible() && !gameCanCommit()
+      ? `<button class="game-pick" id="gameTry"><span class="gp-em">🎲</span><span><b>게임 구경하기 (연습)</b><small>돌려보기만 — 오늘 섬기실 분은 안 바뀝니다</small></span><span class="gp-go">›</span></button>` : ""}
     <div style="height:8px"></div>
-    <button class="btn btn-soft" id="editMembers">👥 구성원 편집 (추가·수정·삭제)</button>
-    ${gameEligible() && !gameCanCommit() ? `<div style="height:8px"></div>
-    <button class="btn btn-soft" id="gameTry">🎲 게임 구경하기 (연습)</button>
-    <p class="muted" style="margin:6px 0 0;font-size:var(--fs-sm);line-height:1.5">돌려보기만 하는 판이에요 — 오늘 섬기실 분은 안 바뀝니다.</p>` : ""}
-    <p class="muted center" style="margin-top:14px">셀 ${esc(CELL?CELL.name:'-')} · 구성원 ${MEMBERS.length}명 · 오늘 카페 ${esc(activeCafe().name)}</p>`);
+    <button class="btn btn-ghost btn-close" id="setClose">닫기</button>`);
+  bind("setClose", closeSheet);
   document.getElementById("changeMe").onclick=()=>{ closeSheet(); renderPickMe(); };
   document.getElementById("editMembers").onclick=()=>{ closeSheet(); openMembersSheet(); };
   /* 연습 진입점의 새 집 (검토 C-2). 본문에서는 뺐지만 기능을 없애지는 않았다 —
@@ -5693,32 +5922,51 @@ function openMenuEditSheet(cafeId, existing){
 }
 
 // 구성원 편집 (이 셀 링크를 가진 누구나) — set_members RPC
+/* ---------- 구성원 편집 (20b) ----------
+   ✕ 를 눌러도 행을 지우지 않는다. 취소선 + [되돌리기] 로 남기고, 실제 삭제는 [저장] 때 일어난다 —
+   지우는 것은 되돌릴 수 없는데 확인 한 번 없이 손끝에서 끝나던 자리였다.
+   저장 전이라는 사실도 화면이 말한다("아직 저장 전이에요 — N명 삭제 대기"). */
 function openMembersSheet(){
-  let list = MEMBERS.map(m=>({id:m.id, name:m.name}));   // 객체로 편집 — 이름 바꿔도 숨은 id 유지
-  let baseline = memSig(list);                            // 동시편집 충돌 감지용 스냅샷(순서무관)
+  let list = MEMBERS.map(m=>({id:m.id, name:m.name, del:false}));   // 객체로 편집 — 이름 바꿔도 숨은 id 유지
+  let baseline = memSig(MEMBERS.map(m=>({id:m.id,name:m.name})));   // 동시편집 충돌 감지용 스냅샷(순서무관)
   function draw(){
+    const delN = list.filter(m=>m.del).length;
     openSheet(`
       <h3>👥 ${esc(ROOM_NAME)} 구성원 편집</h3>
       <p class="muted" style="margin-top:0">이 셀 링크를 가진 누구나 편집할 수 있어요. <b>이름을 고쳐도 기존 주문은 그대로 따라옵니다.</b></p>
-      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person"><div class="avatar">${esc(initials(m.name))}</div><input autocomplete="off" type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" style="flex:1;border:none;background:transparent;font-size:16px;font-weight:600;color:var(--ink)" /><button class="mdel" data-i="${i}" aria-label="구성원 삭제" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;flex:none;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button></div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
+      <div class="card" style="padding:6px 14px" id="mlist">${list.length?list.map((m,i)=>`<div class="person mem-row${m.del?" del":""}"><div class="avatar" data-av="${i}">${esc(initials(m.name))}</div>${
+        m.del ? `<span class="mem-name-del">${esc(m.name)}</span><button class="mundo" data-i="${i}">되돌리기</button>`
+              : `<input autocomplete="off" type="text" class="medit" data-i="${i}" value="${esc(m.name)}" maxlength="40" aria-label="구성원 이름" /><button class="mdel" data-i="${i}" aria-label="${esc(m.name)} 삭제">✕</button>`
+      }</div>`).join(""):'<p class="muted">구성원이 없어요</p>'}</div>
       <div class="inline-form" style="margin-top:10px"><input autocomplete="off" type="text" id="newM" maxlength="40" placeholder="구성원 이름 추가" aria-label="구성원 이름 추가"/><button class="btn btn-soft btn-sm" id="addM" style="flex:none">추가</button></div>
+      ${delN?`<p class="mem-pending">아직 저장 전이에요 — <b>${delN}명 삭제 대기</b></p>`:""}
       <div style="height:14px"></div>
       <div class="row-2"><button class="btn btn-ghost btn-close" id="closeM">닫기</button>
         <button class="btn btn-brand" id="saveM">저장</button></div>`);
-    $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{ list[+inp.dataset.i].name=inp.value; });   // 이름만 갱신, id 보존
-    $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list.splice(+b.dataset.i,1); draw(); });
-    document.getElementById("addM").onclick=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v}); draw(); } };
+    /* 이니셜을 타이핑에 맞춰 갱신한다 (20b). 예전엔 oninput 이 배열만 고치고 옆 아바타는
+       처음 그린 두 글자로 남아, 이름을 다 바꿔도 이니셜은 옛 이름이었다. */
+    $sheet.querySelectorAll(".medit").forEach(inp=> inp.oninput=()=>{
+      const i=+inp.dataset.i; list[i].name=inp.value;
+      const av=$sheet.querySelector('.avatar[data-av="'+i+'"]'); if(av) av.textContent=initials(inp.value);
+    });
+    $sheet.querySelectorAll(".mdel").forEach(b=> b.onclick=()=>{ list[+b.dataset.i].del=true; draw(); });
+    $sheet.querySelectorAll(".mundo").forEach(b=> b.onclick=()=>{ list[+b.dataset.i].del=false; draw(); });
+    const addM=()=>{ const el=document.getElementById("newM"), v=el.value.trim(); if(v){ list.push({id:genMemberId(), name:v, del:false}); draw(); } };
+    document.getElementById("addM").onclick=addM;
+    // Enter 로도 추가 (20b) — 여러 명을 연달아 넣을 때 매번 버튼으로 손을 옮기지 않게
+    document.getElementById("newM").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addM(); } });
     const smb=document.getElementById("saveM");
     smb.onclick=()=>guardWrite(async()=>{
       // 동시편집 충돌 감지(OCC): 저장 직전 최신 멤버 확인 → 바뀌었으면 덮어쓰지 말고 최신 반영+경고
       if(SHARED){ const fresh=await fetchCell(CELL.id);
         if(fresh && memSig(fresh.members)!==baseline){
-          CELL=fresh; applyCellGlobals(); list=MEMBERS.map(m=>({id:m.id,name:m.name})); baseline=memSig(list);
+          CELL=fresh; applyCellGlobals(); list=MEMBERS.map(m=>({id:m.id,name:m.name,del:false})); baseline=memSig(MEMBERS.map(m=>({id:m.id,name:m.name})));
           toast("다른 분이 방금 구성원을 바꿨어요 — 최신 목록을 불러왔어요. 다시 확인 후 저장해주세요"); draw(); return;
         }
       }
+      // 삭제 대기(del)는 여기서 처음 실제로 빠진다 — 저장이 곧 확정이다 (20b)
       const seen={}, out=[];
-      for(const m of list){ const name=(m.name||"").trim().slice(0,40); if(!name||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name}); }
+      for(const m of list){ if(m.del) continue; const name=(m.name||"").trim().slice(0,40); if(!name||seen[m.id]) continue; seen[m.id]=1; out.push({id:m.id, name}); }
       const final=out.slice(0,60);
       if(!final.length){ toast("구성원을 1명 이상 두세요"); return; }
       if(await saveMembers(final)){ if(ME && !final.some(m=>m.id===ME)) setMe(null); closeSheet(); toast("구성원 명단을 저장했어요"); render(); }
