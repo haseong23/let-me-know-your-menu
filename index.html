@@ -474,7 +474,9 @@
   .pickbar .tx { min-width: 0; }
   .pickbar .k { display: block; font-size: var(--fs-sm); font-weight: 700; color: #e7d9c6; }
   /* 이름만 말줄임한다 — 커스텀 메뉴는 이름이 길 수 있는데 두 줄이 되면 시트 머리가 흔들린다 */
-  .pickbar .n { display: block; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em;
+  /* 이 자리가 곧 시트 제목이라 <h3> 다 — .sheet h3 의 margin(4px 0) 을 눌러 pickbar 안에서
+     세로가 벌어지지 않게 한다(.pickbar .n 이 0-2-0 이라 0-1-1 인 .sheet h3 를 이긴다). */
+  .pickbar .n { display: block; margin: 0; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.017em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* 푸터 맨 아래 되돌리기. 주 버튼과 경쟁하면 안 되므로 채움 없는 글자 링크지만,
      탭 타겟 44px 은 지킨다(B9). --sub 는 --bg 위 5.27:1 로 AA 를 넘는다. */
@@ -889,7 +891,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.23";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.24";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2011,11 +2013,15 @@ function openOrderSheet(menuId, existing, prefill){
       const c=document.getElementById("optCount"); if(c) c.textContent = extras.length ? extras.length+"개 선택됨" : "기본 그대로"; };
     const prevScroll = keepScroll && sheetOpen ? $sheet.scrollTop : 0;   // 온도 전환 등 리렌더 시 스크롤 위치 유지
     openSheet(`
-      <!-- 수정으로 들어왔으면 제목이 이미 메뉴 이름을 말하므로 .pickbar 를 안 그린다 (5a).
-           둘 다 있으면 같은 이름이 시트 머리에서 두 번 나오고, 그만큼 온도·옵션이 아래로 밀렸다.
-           새로 담을 때는 그리드에서 방금 누른 타일이 그대로 올라온 확인이라 그대로 둔다. -->
-      <h3>${esc(m.emoji)} ${esc(m.name)}${existing?" 수정":""}</h3>
-      ${existing?"":`<div class="pickbar"><span class="em">${esc(m.emoji)}</span><span class="tx"><span class="k">고른 메뉴</span><span class="n">${esc(m.name)}</span></span></div>`}
+      <!-- 시트 머리는 둘 중 하나만 쓴다 — 제목과 .pickbar 를 같이 두면 같은 메뉴 이름이
+           연달아 두 번 나온다(실사용 제보). 들어온 이유에 따라 남길 것이 다르다:
+             수정 — 제목 한 줄("☕ 아메리카노 수정"). 무엇을 하러 왔는지가 이름보다 중요하다.
+             새로 담기 — .pickbar. 방금 누른 타일이 그대로 올라온 확인이라 이모지·채움이 일을 한다.
+           .pickbar 쪽 이름을 <h3> 로 쓰는 이유: openSheet 이 <h3> 를 찾아 aria-labelledby 를
+           걸어 시트 이름을 만든다. 제목을 그냥 지우면 스크린리더에는 시트가 "상세"로만 읽힌다. -->
+      ${existing
+        ? `<h3>${esc(m.emoji)} ${esc(m.name)} 수정</h3>`
+        : `<div class="pickbar"><span class="em">${esc(m.emoji)}</span><span class="tx"><span class="k">고른 메뉴</span><h3 class="n">${esc(m.name)}</h3></span></div>`}
       <!-- 안내 한 줄. 새로 담을 때는 남은 할 일을 말하고, 수정하러 들어왔을 때는
            "안 고쳐도 된다"를 말한다 — 이 시트에 들어온 이유가 서로 다르다. -->
       ${(optionsHtml||tempHtml)
