@@ -262,6 +262,12 @@
   /* ── 전체 메뉴판 행 (13a) ── 이름 16px · 이모지 24px. 훑는 화면이라 이름이 먼저 읽혀야 하고,
      이모지는 종류를 구분하는 표식이라 그다음이다. */
   .mrow-em { flex: none; width: 30px; text-align: center; font-size: 24px; }
+  /* 이름 선택 화면(.pick-list)과 같은 처방. 카드의 좌우 여백을 14 → 6px 로 줄이고 그만큼을
+     행이 가져간다(4 → 12px). 바깥 여백 합(18px)이 그대로라 이모지·이름·배지는 한 픽셀도
+     안 움직이고, 고른 행의 상자(.picksel)만 좌우로 8px 씩 넓어진다.
+     #mResults 로 좁히는 이유: .menu-row 는 직접입력 시트의 '혹시 이 메뉴인가요?' 제안 목록도
+     쓰는데, 거기는 고른 행이라는 개념이 없어 넓힐 상자도 없다. */
+  #mResults .menu-row { padding-left: 12px; padding-right: 12px; }
   .mrow-nm { min-width: 0; font-size: var(--fs-input); font-weight: 700; color: var(--ink);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mrow-t { margin-left: auto; flex: none; }
@@ -930,7 +936,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.27";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.28";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1955,7 +1961,11 @@ function renderOpen(){
   if(openTab!=="order") return;   // 아래 배선은 합친 화면 전용(카페 주문서 탭에는 없다)
 
   const grid=document.getElementById("menuGrid");
-  if(grid) grid.querySelectorAll(".menu-row2").forEach(t=> t.onclick=()=>openOrderSheet(t.dataset.id, myOrder&&myOrder.note?{note:myOrder.note}:null));
+  /* 메모는 prefill 로 넘긴다. existing 자리에 넣으면 '이 메뉴는 이미 주문돼 있다'가 되어 시트가
+     [주문 수정]·[주문 취소하기] 편집 모드로 열린다 — 메뉴를 새로 고르는 자리인데 메모를 적어 둔
+     사람에게만 다른 시트가 열리고, 되돌아가는 문(#relinkMenu)까지 사라졌다. 두 인자의 뜻은
+     openOrderSheet 위에 이미 적혀 있다. */
+  if(grid) grid.querySelectorAll(".menu-row2").forEach(t=> t.onclick=()=>openOrderSheet(t.dataset.id, null, myOrder&&myOrder.note?{note:myOrder.note}:null));
   /* 전체 메뉴판·직접 입력은 그리드 안(고르는 중)과 그리드 밖(이미 담은 뒤) 두 자리에 나오므로
      #menuGrid 가 아니라 화면 전체에서 찾아 배선한다. 어느 자리에서 눌렸는지는 data-swap 이
      말해 준다 — 그 표시가 메뉴판의 되묻기를 켠다. */
@@ -2313,11 +2323,13 @@ function openFullMenuSheet(curId, carryNote, opts){
   const listHtml = CATEGORIES.map(c=>{
     const items=MENUS.filter(m=>m.cat===c.id);
     if(!items.length) return "";
-    return `<div class="mcat" data-cat="${esc(c.id)}"><div class="mcat-h">${c.label}</div><div class="card" style="padding:4px 14px">`+
+    // 좌우 6px — 나머지 8px 은 행이 가져간다(#mResults .menu-row). 고른 행 상자를 넓히려는 것이라
+    // 여기 값과 그 규칙은 한 쌍이다. 한쪽만 고치면 이름 위치가 밀린다.
+    return `<div class="mcat" data-cat="${esc(c.id)}"><div class="mcat-h">${c.label}</div><div class="card" style="padding:4px 6px">`+
       items.map(m=>`<div class="person menu-row${m.id===curId?' picksel':''}" data-id="${esc(m.id)}" data-name="${esc(norm(m.name))}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===curId}" aria-label="${esc(m.name)} 주문">
         <div class="mrow-em">${esc(m.emoji)}</div>
         <div class="mrow-nm">${esc(m.name)}</div>
-        <span class="mrow-t">${m.id===curId?'<span class="mt-now">지금 이거</span>':tempBadge(m)}</span></div>`).join("")+`</div></div>`;
+        <span class="mrow-t">${m.id===curId?'<span class="mt-now">현재 선택</span>':tempBadge(m)}</span></div>`).join("")+`</div></div>`;
   }).join("");
   /* 종류 칩 줄 (13a). 32가지를 한 줄로 훑으려면 스크롤이 길어서, 먼저 종류로 좁힐 수 있게 한다.
      라벨은 줄임 없는 풀네임이다 — 칩 줄 자체가 가로 스크롤이라 길이를 아낄 이유가 없고,
@@ -2417,7 +2429,7 @@ function openFullMenuSheet(curId, carryNote, opts){
       if(from && to && !(await askConfirm(`${from.name}에서 ${to.name}${ro(to.name)} 바꾸시겠어요?`,
         {ok:"네, 바꿀게요", cancel:"그냥 둘게요"}))) return;
     }
-    openOrderSheet(nextId, carryNote?{note:carryNote}:null);
+    openOrderSheet(nextId, null, carryNote?{note:carryNote}:null);   // 메모는 값(prefill)이지 '이미 주문됨'이 아니다
   });
   document.getElementById("freeInput").onclick=()=>openCustomSheet(null, mq.value, carryNote);
   document.getElementById("mClose").onclick=closeSheet;
