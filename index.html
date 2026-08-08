@@ -316,7 +316,14 @@
   .tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; padding: 9px; border-radius: 9px; font-size: var(--fs-base); font-weight: 700; color: var(--sub); background: none; } .tab.on { background: #fff; color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
   .order-box { background: #2b2118; color: #f6f1ea; border-radius: 14px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-base); line-height: 1.7; white-space: pre-wrap; word-break: keep-all; }
   .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: linear-gradient(to top, var(--bg) 70%, rgba(246,241,234,0)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
-  .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
+  .bottombar .inner { max-width: 480px; margin: 0 auto; display: flex; align-items: center; gap: 10px; } .bottombar .inner > * { flex: 1; min-width: 0; }
+  /* 하단바에서 '누를 수 없는 것'은 버튼이 아니라 상태로 말한다 (21b). 비활성 버튼을 반쪽에
+     세워 두면 형태가 '누르라'고 하고 동작이 거절해서, 사용자는 자기 탭이 씹혔다고 읽는다.
+     회색 점은 --gray 라 흰 배경 대비 2.05:1 로 글자로는 못 쓰지만, 여기서는 글자가 아니라
+     옆의 --sub 문구(5.27:1)를 거드는 표식이라 대비 기준의 대상이 아니다. */
+  .bar-state { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: var(--fs-base); font-weight: 700; color: var(--sub); }
+  .bar-state i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
   /* scrim 은 항상 화면 전체를 덮고, 키보드가 가린 높이(--kb)만큼 패딩으로 시트를 밀어올린다.
      바닥을 계산으로 만들지 않으므로 측정이 어긋나도 딤 안 된 틈이 드러나지 않는다(최악이어도 시트가 조금 짧아질 뿐). */
   .scrim { position: fixed; inset: 0; box-sizing: border-box; padding-bottom: var(--kb, 0px); background: rgba(40,28,16,.45); z-index: 40; display: none; align-items: flex-end; } .scrim.show { display: flex; }
@@ -349,7 +356,10 @@
      탭 타겟 44px 은 지킨다(B9). --sub 는 --bg 위 5.27:1 로 AA 를 넘는다. */
   .sheet-relink { display: block; width: 100%; background: none; border: none; font-family: inherit;
     font-size: var(--fs-base); font-weight: 700; color: var(--sub); text-decoration: underline;
-    text-underline-offset: 3px; padding: 12px 0 2px; min-height: 44px; cursor: pointer; }
+    text-underline-offset: 3px; padding: 12px 0 2px; min-height: 44px; cursor: pointer; text-align: center; }
+  /* 되돌릴 수 없는 동작(주문 취소하기)만 붉게. 같은 링크 모양을 쓰되 색으로만 갈라 놓는 이유는,
+     이게 '가는 곳'이 아니라 '지우는 것'이어서다. --red-ink 는 --bg 위 4.9:1 로 AA 를 넘는다. */
+  .sheet-relink.danger { color: var(--red-ink); }
   /* 참가자 화면에서 접히는 '다른 분들' 목록. 요약 줄 자체가 탭 타겟이라 44px 을 지킨다.
      .menu-switch 와 같은 시각 언어를 쓴다 — 같은 일(접기)에 새 모양을 만들지 않는다. */
   .roster-fold { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 14px; }
@@ -755,7 +765,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.19";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.20";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1639,9 +1649,12 @@ function renderOpen(){
       <h3 class="label">${myOrder?'메뉴 다시 고르기':'메뉴 선택'}</h3>
       <div class="grid" id="menuGrid">${gridTilesHtml()}</div>
       ${skipHtml}` : "";
-  // 주문 후에도 '안 마실게요'를 실제 버튼으로 바로 옆에 둔다 — 기존 13px 텍스트 링크는 탭 타겟이 너무 작았음
+  /* 주문을 이미 담은 뒤 화면에 남는 갈래는 둘뿐이다 — 고치기 / 안 마시기 (6a).
+     예전엔 [🔄 다른 메뉴로]가 여기 하나 더 있었는데, 메뉴를 바꾸는 길이 두 곳(이 버튼과
+     수정 시트 안의 [다른 메뉴로 바꾸기])이라 같은 일에 문이 둘이었다. 화면 쪽을 닫고
+     수정 시트 한 곳으로 모은다 — 고치러 들어간 자리에서 바꾸는 것이 순서에 맞다. */
   const changeLink = (myOrder && myOrder.type==="drink" && !forceGrid)
-    ? `<div class="row-2" style="margin:10px 0 0"><button class="btn btn-soft" id="changeMenu">🔄 다른 메뉴로</button><button class="btn btn-skip skip-btn">🙅 안 마실게요</button></div>` : "";
+    ? `<div style="margin:10px 0 0"><button class="btn btn-skip skip-btn">🙅 안 마실게요, 감사합니다</button></div>` : "";
 
   /* 탭 2개. '내 주문'과 '현황 n잔'을 합쳤다 (R12-1) — 내가 뭘 골랐는지 확인하고 다른 분이 다
      골랐는지 보려고 탭을 왕복하던 동선이 사라진다. 합친 탭은 키 order 를 그대로 쓰고 cafe 가
@@ -1763,7 +1776,6 @@ function renderOpen(){
     guardWrite(async()=>{ forceGrid=false; if(await safeWrite(Sync.setOrder(ME,{type:"skip"},SESSION.seq))){ track("order_skipped",{via:"idle"}); toast("오늘은 쉬어가기로 했어요 🙆"); render(); } }, b, "저장 중…");
   });
   const em=document.getElementById("editMine"); if(em) em.onclick=()=>openOrderSheet(myOrder.menuId,myOrder);
-  const cm=document.getElementById("changeMenu"); if(cm) cm.onclick=()=>{ forceGrid=true; renderOpen(); };
   view().querySelectorAll(".sameas").forEach(b=> b.onclick=()=>guardWrite(async()=>{ const src=ORDERS[b.dataset.id];
     const o={type:"drink",menuId:src.menuId,menuName:src.menuName||orderDisplay(src).name,temp:src.temp,extras:[...(src.extras||[])],note:""};
     forceGrid=false; if(await safeWrite(Sync.setOrder(ME,o,SESSION.seq))){ rememberOrder(o); bumpFreq(o.menuId); trackOrder(o,"copy_other"); toast(hon(memberById(b.dataset.id).name)+"과 같은 메뉴로 담았어요"); render(); } }, b, "담는 중…"));
@@ -1875,20 +1887,23 @@ function openOrderSheet(menuId, existing, prefill){
       const c=document.getElementById("optCount"); if(c) c.textContent = extras.length ? extras.length+"개 선택됨" : "기본 그대로"; };
     const prevScroll = keepScroll && sheetOpen ? $sheet.scrollTop : 0;   // 온도 전환 등 리렌더 시 스크롤 위치 유지
     openSheet(`
-      <h3>${esc(m.emoji)} ${esc(m.name)}</h3>
-      <!-- 옵션이 여럿이면 "이걸 다 골라야 하나"로 읽힌다. 실제로는 기본값 그대로 담을 수 있고
-           [이걸로 주문]도 스크롤 없이 보인다 — 동작은 옳은데 표시가 그걸 감추고 있었다.
-           옵션이 하나도 없는 메뉴에는 이 줄이 거짓말이 되므로 있을 때만 적는다. -->
-      <div class="pickbar"><span class="em">${esc(m.emoji)}</span><span class="tx"><span class="k">${existing?'담아 둔 주문':'고른 메뉴'}</span><span class="n">${esc(m.name)}</span></span></div>
+      <!-- 수정으로 들어왔으면 제목이 이미 메뉴 이름을 말하므로 .pickbar 를 안 그린다 (5a).
+           둘 다 있으면 같은 이름이 시트 머리에서 두 번 나오고, 그만큼 온도·옵션이 아래로 밀렸다.
+           새로 담을 때는 그리드에서 방금 누른 타일이 그대로 올라온 확인이라 그대로 둔다. -->
+      <h3>${esc(m.emoji)} ${esc(m.name)}${existing?" 수정":""}</h3>
+      ${existing?"":`<div class="pickbar"><span class="em">${esc(m.emoji)}</span><span class="tx"><span class="k">고른 메뉴</span><span class="n">${esc(m.name)}</span></span></div>`}
       <!-- 안내 한 줄. 새로 담을 때는 남은 할 일을 말하고, 수정하러 들어왔을 때는
            "안 고쳐도 된다"를 말한다 — 이 시트에 들어온 이유가 서로 다르다. -->
       ${(optionsHtml||tempHtml)
-        ? `<p class="sheet-hint">${existing?'고치실 게 없으면 그대로 닫으셔도 돼요.':(tempHtml?'이제 <b>온도</b>만 고르면 돼요.':'고르실 게 없으면 그대로 <b>[이걸로 주문]</b>을 누르시면 돼요.')}</p>`
+        ? `<p class="sheet-hint">${existing?'담아 둔 주문이에요. 고치실 게 없으면 <b>[닫기]</b>를 누르시면 돼요.':(tempHtml?'이제 <b>온도</b>만 고르면 돼요.':'고르실 게 없으면 그대로 <b>[이걸로 주문]</b>을 누르시면 돼요.')}</p>`
         : ""}
       <div class="order-opts">
         ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
         ${optsHtml}
         <div class="label" id="lbl-note">메모 (선택)</div><input autocomplete="off" type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" aria-labelledby="lbl-note" />
+        <!-- 메뉴를 바꾸는 길은 본문 맨 아래다 (5a). 푸터는 이 시트를 끝내는 세 동작
+             (닫기 · 주문 수정 · 주문 취소)만 쥔다 — 다른 화면으로 가는 문은 거기 섞지 않는다. -->
+        ${existing?`<button class="sheet-relink" id="relinkMenu">다른 메뉴로 바꾸기</button>`:""}
       </div>
       <div class="sheet-foot">
         <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
@@ -1899,20 +1914,23 @@ function openOrderSheet(menuId, existing, prefill){
              라벨이 모두 네 글자 이하라 320px 반쪽 폭(≈130px)에서도 접히지 않는다. -->
         ${existing
           ? `<div class="row-2">
-          <button class="btn btn-danger" id="cancelOrder">주문 취소</button>
+          <button class="btn btn-ghost" id="closeEdit">닫기</button>
           <button class="btn btn-brand" id="confirmOrder">주문 수정</button>
-        </div>`
-          : `<button class="btn btn-brand" id="confirmOrder">이걸로 주문</button>`}
-        <!-- 옛 [닫기]를 대신한다. 같은 일(시트 닫기)을 하지만 라벨이 '가는 곳'을 말한다 —
-             시트를 닫으면 메뉴 그리드로 돌아간다는 사실이 화면 어디에도 안 적혀 있었다.
-             수정 중에는 이미 담긴 주문이 있어 그리드가 접혀 있으므로 forceGrid 로 펴 준다. -->
-        <button class="sheet-relink" id="relinkMenu">${existing?'다른 메뉴로 바꾸기':'메뉴를 잘못 골랐어요 · 다시 고르기'}</button>
+        </div>
+        <!-- 파괴적 동작은 맨 아래 링크로 (5a). 예전엔 [주문 취소]가 [주문 수정] 과 같은 크기로
+             나란히 서서, 고치러 들어온 사람이 반반 확률로 지우는 쪽을 만났다. -->
+        <button class="sheet-relink danger" id="cancelOrder">주문 취소하기</button>`
+          : `<button class="btn btn-brand" id="confirmOrder">이걸로 주문</button>
+        <!-- 새로 담는 길에서는 여기가 되돌아가는 문이다. 라벨이 '가는 곳'을 말한다 —
+             시트를 닫으면 메뉴 그리드로 돌아간다는 사실이 화면 어디에도 안 적혀 있었다. -->
+        <button class="sheet-relink" id="relinkMenu">메뉴를 잘못 골랐어요 · 다시 고르기</button>`}
       </div>`);
     if(prevScroll) $sheet.scrollTop = prevScroll;   // openSheet가 0으로 리셋한 스크롤을 원복
     /* 시트 안에 메뉴 그리드가 없으므로 타일 배선도 없다. 대신 되돌아가는 길 하나 —
        시트를 닫고 화면의 그리드로 돌린다. 옛 방식(시트 안에서 menuId 를 갈아끼우고 draw())과
        달리 고르는 자리가 한 곳뿐이라, "여기서 고른 것"과 "저기서 고른 것"이 갈리지 않는다. */
     const rl=document.getElementById("relinkMenu"); if(rl) rl.onclick=()=>{ forceGrid=true; closeSheet(); render(); };
+    const ce=document.getElementById("closeEdit"); if(ce) ce.onclick=closeSheet;   // 고칠 게 없으면 그냥 닫는다 (5a)
     const of_=document.getElementById("optFold"); if(of_) of_.addEventListener("toggle",()=>{ optOpen=of_.open; });
     const tp=document.getElementById("temps"); if(tp) tp.querySelectorAll(".tbtn").forEach(b=>{ if(!b.disabled) b.onclick=()=>{ temp=b.dataset.t; note=document.getElementById("note").value; draw(true); }; });
     // 단일선택 그룹: 같은 그룹의 다른 옵션은 해제, 기본값 선택 시 저장 안 함
@@ -2272,10 +2290,16 @@ function renderBottom(){
                         : `<button class="btn btn-ghost btn-close" id="dropEmpty">이 섬김 접기</button>`)
            + `<button class="btn btn-brand" id="takeover">🙋 제가 섬길게요</button>`;
     } else if(amHost){
-      html=`<button class="btn btn-danger btn-sm" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`;
+      // btn-sm 을 뺀다 — 한 줄에 선 짝인데 한쪽만 44px, 다른 쪽이 51px 이었다 (21b)
+      html=`<button class="btn btn-danger" id="unclaim">섬김 취소</button><button class="btn btn-brand" id="close">주문 마감하기</button>`;
     }                                           // 호스트가 아니면 하단 액션 없음 — 할 일은 화면 안(메뉴 고르기)에 있다
   } else {                                       // closed(섬김 보기 중)
-    html = (amHost ? `<button class="btn btn-ghost btn-close" id="reopen">마감 취소</button>` : `<button class="btn btn-soft" disabled style="opacity:.6">주문 마감됨</button>`)
+    /* 되돌리는 동작(섬김 취소·마감 취소)은 늘 왼쪽·붉은 테두리다 — 한 자리에서 모양이 바뀌는
+       컨트롤이라 규칙이 일정해야 손이 자리를 기억한다 (21b).
+       참가자 시점의 '주문 마감됨'은 버튼이 아니라 상태다. 눌리지 않는 버튼이 절반을 차지하면
+       '왜 안 눌리지'가 되므로 회색 점 + 글자로 바꿔 애초에 누를 것으로 안 보이게 한다. */
+    html = (amHost ? `<button class="btn btn-danger" id="reopen">마감 취소</button>`
+                   : `<span class="bar-state"><i></i>주문 마감됨</span>`)
          + `<button class="btn btn-soft" id="toOverview">오늘의 섬김</button>`;
   }
   $bottom.innerHTML = html ? `<div class="bottombar"><div class="inner">${html}</div></div>` : "";
