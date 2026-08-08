@@ -755,7 +755,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.18";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.19";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -2951,6 +2951,22 @@ function rhit(b, i, tt, px, py, vx, vy){
      · 슬로모션 — 결승 직전이고 바로 앞뒤에 경쟁자가 붙어 있을 때만 시간을 늦춘다. */
 const RACE_GOAL_H = 2.2;          // 결승 괘선 두 줄 사이 간격(글자가 들어갈 만큼)
 const RACE_ZOOM_TRIG = 5, RACE_ZOOM_MAX = 4, RACE_LERP = 1/10, RACE_SNAP = 1/30;
+/* 결승 밖에서 선두~꼴찌를 다 담으려고 여는 줌의 바닥. 0.5 면 화면에 세로 71 세계단위가 들어와
+   24명 기준 99% 의 프레임을 덮는다(폭 분포: 중앙 24 · 90% 57 · 99% 70 · 최대 80).
+   더 내리면 남은 1% 를 위해 늘 구슬을 더 작게 보게 된다 — 구슬 지름이 5.5px × 줌이라
+   0.5 에서 2.8px 다. 여기가 '다 담긴다'와 '뭐가 담겼는지 보인다'가 갈리는 자리다. */
+const RACE_ZOOM_MIN = 0.5;
+/* 위아래 화면 여백 px. 맨 아래 구슬의 이름표(구슬 밑 10px 글자)가 잘리지 않을 만큼. */
+const RACE_FIT_PAD = 18;
+/* 지금 폭에 딱 맞추지 않고 12% 를 미리 더 열어 둔다. 이게 이 기능의 핵심 값이다 —
+   딱 맞추면 카메라가 늘 한 발 늦어 '벌어지는 중'인 프레임에서 누군가 밖에 있다.
+   실측(12시드): 전원 보이는 프레임이 8명 59.9 → 80.8% · 24명 41.2 → 63.7% 로 올랐고,
+   지연 때문에 놓치는 프레임은 22~25% → 1~3% 로 떨어졌다. 여는 속도를 아무리 올려도
+   (즉시 열어도) 여유 없이는 57~40% 에서 더 안 올라간다 — 속도가 아니라 여유의 문제다. */
+const RACE_FIT_MARGIN = 1.12;
+/* 열 때(줌아웃)만 쓰는 빠른 추종 계수. 뒤처진 구슬은 빨리 담고, 다시 다가갈 때는 RACE_LERP 로
+   천천히 — 양쪽 다 빠르면 선두가 튈 때마다 화면이 같이 들썩인다. */
+const RACE_OPEN = 1/3;
 const RACE_SLOW_MIN = 0.2, RACE_SLOW_NEAR = 1.6;
 
 /* 순위 — 이미 들어온 구슬이 항상 앞이고, 그들끼리는 들어온 순서다.
@@ -2968,7 +2984,8 @@ function raceOrder(rank, done, ypos, f){
   });
 }
 
-function raceLerp(cur, tgt){ return Math.abs(tgt-cur) < RACE_SNAP ? tgt : cur + (tgt-cur)*RACE_LERP; }
+// rate 를 주면 그 속도로 따라간다(줌을 열 때만 쓴다). 안 주면 예전 그대로 RACE_LERP.
+function raceLerp(cur, tgt, rate){ return Math.abs(tgt-cur) < RACE_SNAP ? tgt : cur + (tgt-cur)*(rate || RACE_LERP); }
 
 /* @test-export:end */
 
@@ -4672,11 +4689,37 @@ function playRace(players, onDone){
     const ti = targetIndex(f), tgt = rank[ti];
     const tx = sim.path[b0+tgt*2], ty = ypos[tgt];
 
-    // 줌 — zoomY 에 가까워질수록 최대 RACE_ZOOM_MAX 까지. 그 밖에서는 1.
+    /* 줌은 두 갈래다.
+       결승 근처(zoomY 기준 RACE_ZOOM_TRIG 안)에서는 예전대로 최대 RACE_ZOOM_MAX 까지 당긴다 —
+       누가 먼저 닿느냐가 전부인 순간이라 거기서는 뒤쪽을 버리는 게 맞다.
+       그 밖에서는 '선두와 꼴찌를 한 프레임에' 로 간다. 예전엔 여기서 줌이 늘 1 이라 화면에
+       세로 35.5 세계단위만 들어왔는데, 살아 있는 구슬의 y 폭은 중앙값 18~24 · 90% 42~57 ·
+       최대 80 이라 24명 기준 프레임의 37.5% 에서 누군가 화면 밖에 있었다(실측 12시드×4인원).
+       그래서 폭에 맞춰 줌을 연다. 바닥을 RACE_ZOOM_MIN 으로 막는 이유는 그 아래로 열면 구슬이
+       점이 되기 때문이다 — 다 담는 것과 무엇이 담겼는지 보이는 것은 다른 얘기다. */
     const goalDist = Math.abs(map.zoomY - ty);
-    const wantZ = goalDist < RACE_ZOOM_TRIG ? Math.max(1, (1 - goalDist/RACE_ZOOM_TRIG) * RACE_ZOOM_MAX) : 1;
-    camZ = raceLerp(camZ, wantZ);
-    camX = raceLerp(camX, tx); camY = raceLerp(camY, ty);
+    let wantZ, wantX, wantY, fitMode = false;
+    if(goalDist < RACE_ZOOM_TRIG){
+      wantZ = Math.max(1, (1 - goalDist/RACE_ZOOM_TRIG) * RACE_ZOOM_MAX);
+      wantX = tx; wantY = ty;
+    } else {
+      fitMode = true;
+      let lo=Infinity, hi=-Infinity;
+      for(let i=0;i<n;i++){
+        if(sim.done[i]>=0 && sim.done[i]<f) continue;   // 이미 들어온 구슬은 안 그리므로 폭에도 안 넣는다
+        const y=ypos[i]; if(y<lo) lo=y; if(y>hi) hi=y;
+      }
+      if(lo>hi){ lo=hi=ty; }                            // 전원 골인 직후 — 마지막 목표를 그대로 본다
+      const span = (hi-lo)*RACE_FIT_MARGIN + 2*RACE_R;
+      wantZ = Math.max(RACE_ZOOM_MIN, Math.min(1, (CH - 2*RACE_FIT_PAD) / (base*span)));
+      /* 가로는 코스 한가운데로 고정한다. 줌이 1 이하면 코스 폭(26)이 통째로 들어오므로 따라갈
+         이유가 없고, 선두를 따라 좌우로 흔들면 다 담아 놓고도 화면이 계속 흔들린다. */
+      wantX = RACE_W/2; wantY = (lo+hi)/2;
+    }
+    // 여는 쪽만 빠르게 — 뒤처진 구슬은 곧바로 담고, 다시 다가갈 때는 예전 속도로 부드럽게.
+    camZ = raceLerp(camZ, wantZ, wantZ < camZ ? RACE_OPEN : 0);
+    camX = raceLerp(camX, wantX);
+    camY = raceLerp(camY, wantY, fitMode ? RACE_OPEN : 0);
 
     const z = base*camZ;
     ctx.setTransform(dpr,0,0,dpr,0,0);
