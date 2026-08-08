@@ -713,13 +713,14 @@
   /* 200ms 마다만 갱신하므로 그 간격만큼 선형 보간을 걸어 바가 계단처럼 튀지 않게 한다.
      prefers-reduced-motion 은 이 파일 맨 위 전역 블록이 모든 transition 을 끄므로 여기 미디어쿼리를 또 두지 않는다. */
   .race-hud .bar > i { display:block; width:0; height:100%; border-radius:3px; background:var(--brand); transition:width .2s linear; }
-  /* 순위를 상위 3명이 아니라 전원으로 편다. 한 줄에 한 명씩 세로로 쌓으면 24명이 24줄이라
-     판을 밀어내므로 폭이 허락하는 만큼 여러 칸으로 흘린다 — 340px 기준 세 칸이라 24명이 8줄이다.
-     읽는 순서는 행 우선(1·2·3 / 4·5·6) — 왼쪽에서 오른쪽으로 읽고 다음 줄로 내려간다.
-     그래도 넘치면 이 목록만 스크롤한다. 판을 줄여서 순위를 다 보여주는 건 앞뒤가 바뀐 것이다.
+  /* 순위를 상위 3명이 아니라 전원으로 편다. 1등 아래 2등 아래 3등 — 한 줄에 한 명씩 내려 읽는다.
+     잠깐 여러 칸으로 흘려 봤지만(폭에 따라 2~4칸) 순위는 세로로 읽는 것이라 눈이 왼쪽에서
+     오른쪽으로 갔다가 다시 왼쪽으로 돌아와야 했다 — 등수가 가로로 늘어서면 순서가 안 읽힌다.
+     한 칸으로 되돌리면 24명이 24줄이라 판을 밀어내므로, 높이를 잘라 목록만 스크롤한다.
+     판을 줄여서 순위를 다 보여주는 건 앞뒤가 바뀐 것이다.
      overscroll-behavior 로 목록 끝에서 .game-body 까지 스크롤이 번지지 않게 막는다. */
-  .race-hud .rc-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr));
-    gap:1px 10px; max-height:24vh; overflow-y:auto; overscroll-behavior:contain; }
+  .race-hud .rc-list { display:grid; grid-template-columns:1fr;
+    gap:1px; max-height:22vh; overflow-y:auto; overscroll-behavior:contain; }
   .race-hud .rc-row { display:flex; align-items:center; gap:5px; min-width:0; }
   /* 폭은 가장 긴 "24등" 기준이다. 좁으면 상자 안에서 줄바꿈되어("1/0등") 그 줄만 두 배로 높아지고
      목록 전체가 넘쳐 스크롤이 생긴다 — nowrap 과 두 자리분 폭을 함께 줘야 막힌다.
@@ -754,7 +755,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.17";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.18";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
