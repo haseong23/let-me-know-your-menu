@@ -721,9 +721,10 @@
   .race-hud .rc-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr));
     gap:1px 10px; max-height:24vh; overflow-y:auto; overscroll-behavior:contain; }
   .race-hud .rc-row { display:flex; align-items:center; gap:5px; min-width:0; }
-  /* 두 자리(10~24위)가 상자 안에서 줄바꿈되지 않게 — 폭이 좁으면 "1/0" 으로 접혀 그 줄만 두 배로
-     높아지고, 목록 전체가 넘쳐 스크롤이 생긴다. nowrap 과 두 자리분 폭을 함께 줘야 막힌다. */
-  .race-hud .rc-rk { flex:none; width:19px; white-space:nowrap; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
+  /* 폭은 가장 긴 "24등" 기준이다. 좁으면 상자 안에서 줄바꿈되어("1/0등") 그 줄만 두 배로 높아지고
+     목록 전체가 넘쳐 스크롤이 생긴다 — nowrap 과 두 자리분 폭을 함께 줘야 막힌다.
+     오른쪽 정렬이라 자릿수가 달라도 '등' 이 세로로 한 줄에 서고, 이름 시작점도 모두 같아진다. */
+  .race-hud .rc-rk { flex:none; width:27px; text-align:right; white-space:nowrap; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; }
   .race-hud .rc-sw { flex:none; width:9px; height:9px; border-radius:3px; }
   /* 이름은 한 줄로 자른다 — HUD 가 200ms 마다 바뀌는 자리라 줄 수가 늘었다 줄면 캔버스가 위아래로 흔들린다.
      전체 이름은 결과 발표에 그대로 남는다. */
@@ -753,7 +754,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.16";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.17";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -4546,7 +4547,7 @@ function playRace(players, onDone){
            번호를 이름으로 옮겨 적을 표가 더는 필요 없고, 색 칸은 이 목록이 그대로 갖고 있다. -->
       <div class="race-hud" id="raceHud">
         <div class="bar"><i id="raceBar"></i></div>
-        <div class="rc-list">${players.map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}</b><i class="rc-sw"></i><span class="rc-nm"></span></div>`).join("")}</div>
+        <div class="rc-list">${players.map((m,k)=>`<div class="rc-row"><b class="rc-rk">${k+1}등</b><i class="rc-sw"></i><span class="rc-nm"></span></div>`).join("")}</div>
       </div>
     </div>
     <div id="gvWin" role="status"></div>`);
