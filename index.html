@@ -742,7 +742,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.14";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.15";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -3204,8 +3204,36 @@ function openGameOv(title, bodyHtml){
   }
   document.getElementById("gvX").onclick=()=>closeGame();   // 이벤트 객체가 opts 로 들어오지 않게 감싼다
   gameA11yOn();   // ✕ 를 배선한 뒤·show 를 켠 뒤라야 포커스가 걸린다(display:none 엔 포커스가 안 간다)
+  holdGameHeight(document.getElementById("gvSay"),"sayH");   // 첫 안내 줄부터 바닥을 잡는다 — 아래 주석
 }
-function setGameFoot(html){ const f=document.getElementById("gvFoot"); if(f) f.innerHTML=html; }
+/* 게임 화면에서 세로로 오르내리는 자리는 둘뿐이다 — 안내 한 줄(#gvSay)과 버튼 푸터(#gvFoot).
+   단계가 바뀔 때마다 줄 수가 달라지는데(한 줄 안내 ↔ 두 줄 안내, 버튼 한 줄 ↔ 두 줄),
+   그 사이에 놓인 판·사다리는 .game-body 의 auto 마진으로 세로 가운데에 떠 있어서
+   위아래 어느 쪽이 줄면 그만큼 끌려간다 — 돌아가는 판이 덜컹인다.
+   특히 돌림판은 [▶ 돌리기!] → 갈래 묻기 → 도는 중 → 멈추는 중으로 네 번 바뀌어서 제일 심했다.
+   그래서 두 자리 모두 '한 게임 안에서는 줄지 않는다'로 바꾼다: 지금까지 본 가장 큰 높이를
+   바닥(min-height)으로 깔아 둔다. 커질 때 한 번은 움직이지만 그건 방금 누른 단계의 화면 변화고,
+   판이 도는 동안에는 아무것도 움직이지 않는다.
+   가장 큰 높이를 미리 깔아 두지 않는 이유 — 첫 화면부터 결과 화면만큼(버튼 두 줄) 비워 두면
+   짧은 폰에서 판이 그만큼 작아진다. 움직임을 없애자고 판을 줄이는 건 바꾼 보람이 없다.
+   px 을 적어 두지 않고 실제로 재는 이유 — 버튼·글자 높이가 화면 폭(.btn 미디어쿼리)과
+   사용자 글자 크기 설정(rem)에 따라 달라진다. 적어 두면 어느 한쪽에서 어긋난다.
+   기준값은 GS 에 둔다. 게임 한 판과 생애가 같고, [한 판 더]로 다시 시작하면 startGame 이 비운다. */
+function holdGameHeight(el, key){
+  if(!el || !GS) return;
+  const h=el.offsetHeight;
+  if(h>(GS[key]||0)) GS[key]=h;
+  el.style.minHeight=GS[key]+"px";
+}
+function setGameFoot(html){
+  const f=document.getElementById("gvFoot"); if(!f) return;
+  f.innerHTML=html; holdGameHeight(f,"footH");
+}
+// 안내 한 줄도 같은 규칙. 호출부가 <b> 를 쓰므로 innerHTML 로 받는다.
+function setGameSay(html){
+  const s=document.getElementById("gvSay"); if(!s) return;
+  s.innerHTML=html; holdGameHeight(s,"sayH");
+}
 // opts.fromPop — 뒤로가기(popstate)로 들어온 호출. 그 경우 항목은 브라우저가 이미 소비했으므로
 // 다시 back() 을 부르면 한 칸을 더 먹어 탭·시트의 뒤로가기가 사라진다.
 function closeGame(opts){
@@ -3717,6 +3745,9 @@ function startGame(kind){
     return;
   }
   GS.kind=kind;   // [한 판 더]가 같은 게임을 다시 돌릴 수 있게 기억해 둔다 (R6-8)
+  // 안내 줄·푸터의 높이 바닥은 한 판마다 새로 잡는다 — 안 비우면 사다리(버튼 한 줄)가
+  // 앞서 돌린 구슬 레이스의 결과 푸터(두 줄)만큼 빈 자리를 안고 시작한다. holdGameHeight 주석 참조.
+  GS.sayH=0; GS.footH=0;
   trackGameAt = Date.now(); trackGameDone = false;
   track("game_started", { kind, players: gamePlayers().length, policy: (GS && GS.policy) || null,
                           soft_w: (GS && GS.softW != null) ? GS.softW : null, dry_run: !gameCanCommit() });
@@ -3790,7 +3821,7 @@ function showGameResult(w){
   if(box) box.innerHTML=`${warn?`<div class="game-warn">${esc(warn)}</div>`:""}<div class="game-win"><div class="we">☕</div>
     <div class="wn">${esc(hon(w.name))}</div>
     <div class="ws">오늘 음료로 섬겨주실 분${w.id===ME?" — 바로 나!":""}</div></div>`;
-  const say=document.getElementById("gvSay"); if(say) say.innerHTML="결과가 나왔어요";
+  setGameSay("결과가 나왔어요");
   const same = SESSION.hostId===w.id;
   // 라벨에서 이름을 뺀다 (R18-3, R18-4). 당첨자 이름은 바로 위 .game-win .wn 에 25px 로 크게 나와
   // 있으니 버튼에서 되풀이할 이유가 없고, 이름을 빼면 길이에 따른 넘침과 이름 뒤 조사 문제가
@@ -4024,7 +4055,7 @@ function playLadder(roster, winner){
   const startRun=()=>{
     if(started) return;
     started=true;
-    const say=document.getElementById("gvSay"); if(say) say.textContent="한 폰을 다 같이 보세요 — 내려갑니다…";
+    setGameSay("한 폰을 다 같이 보세요 — 내려갑니다…");
     setGameFoot(`<button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
     bind("gvCancel",()=>closeGame());
     void $gv().offsetHeight;   // 시작값 커밋(리플로우 1회)
@@ -4143,8 +4174,7 @@ function playWheel(roster, weights){
     /* 안내를 여기 한 줄로 적는다. 이 게임의 핵심 약속은 "누구도 결과를 고를 수 없다"인데,
        갈래를 묻는 순간이 그 약속이 흔들려 보이는 유일한 자리다 — 손으로 끊는 쪽을 고르면
        타이밍으로 조작할 수 있다고 읽히기 때문이다. 버튼 라벨에는 못 적으니 이 줄에 적는다. */
-    const say=document.getElementById("gvSay");
-    if(say) say.textContent="어떻게 세울까요? — 어느 쪽이든 결과는 못 고릅니다";
+    setGameSay("어떻게 세울까요? — 어느 쪽이든 결과는 못 고릅니다");
     setGameFoot(`<div class="row-2"><button class="btn btn-soft" id="gvManual">✋ 내가 멈추기</button>
       <button class="btn btn-brand" id="gvAuto">🤖 알아서 멈추기</button></div>
       <div style="height:8px"></div><button class="btn btn-ghost btn-close" id="gvCancel">그만두기</button>`);
@@ -4185,7 +4215,7 @@ function playWheel(roster, weights){
     if(pin) pin.style.transform = "translateX(-50%) rotate(0deg)";
     // 핀은 12시 고정이고 판이 deg 만큼 돌았으므로, 핀 아래에 온 판의 각도는 -deg 다.
     winner = roster[wheelWinner(slices, ((-deg % 360) + 360) % 360)];
-    const say=document.getElementById("gvSay"); if(say) say.textContent="멈췄어요!";
+    setGameSay("멈췄어요!");
     gtimer(()=>showGameResult(winner), 300);
   }
   function step(now){
@@ -4207,7 +4237,7 @@ function playWheel(roster, weights){
   function stopSpin(){
     if(!spinning || done) return;
     spinning = false; wf = 0;
-    const say=document.getElementById("gvSay"); if(say) say.textContent="멈추는 중…";
+    setGameSay("멈추는 중…");
     const b=document.getElementById("gvStop"); if(b) b.disabled = true;
   }
   if(GS) GS.teardown = ()=>{ done = true; if(GS && GS.raf) cancelAnimationFrame(GS.raf); };
@@ -4225,15 +4255,14 @@ function playWheel(roster, weights){
     if(started || done) return;
     started = true;
     if(lessMotion()){ done = true; settle(); return; }   // 연출을 건너뛰고 결과로 간다
-    const say=document.getElementById("gvSay");
     if(mode==="auto"){
-      if(say) say.textContent="돌고 있어요 — 알아서 멈춰요";
+      setGameSay("돌고 있어요 — 알아서 멈춰요");
       autoFoot();
       // gtimer 에 실어 둔다 — 오버레이를 닫으면 GS.timers 가 통째로 정리되므로 죽은 뒤에 감속이
       // 시작되는 일이 없다. stopSpin() 자체도 done/spinning 을 다시 확인한다(이중 방어).
       gtimer(stopSpin, 1800 + Math.random()*1600);
     } else {
-      if(say) say.textContent="돌고 있어요 — [그만 돌리기]를 누르면 멈춰요";
+      setGameSay("돌고 있어요 — [그만 돌리기]를 누르면 멈춰요");
       runFoot();
     }
     if(GS) GS.raf = requestAnimationFrame(step);
@@ -4364,7 +4393,7 @@ function playFinger(){
     pts.forEach((p,id)=>{ if(id===win){ p.el.classList.add("win"); p.el.style.width="98px"; p.el.style.height="98px"; }
                           else p.el.classList.add("lose"); });
     gvibe([30,70,30]);
-    document.getElementById("gvSay").innerHTML="당첨된 손가락, <b>누구세요?</b>";
+    setGameSay("당첨된 손가락, <b>누구세요?</b>");
     renderWho();
   }
   /* 이름 칩은 시작 시점에 잡아둔 배열이 아니라 그리는 순간의 gamePlayers() 를 읽는다 (R3-7).
@@ -4520,7 +4549,7 @@ function playRace(players, onDone){
   /* 시뮬레이션이 실패할 자리는 사실상 없지만(계측에서 360판 정체 0), 없다고 단정하지 않는다 —
      맵이나 물리를 고치다 한 번이라도 어긋나면 여기로 떨어진다. */
   if(!built || !built.sim){
-    const say=document.getElementById("gvSay"); if(say) say.textContent="코스를 못 만들었어요 — 다시 해주세요";
+    setGameSay("코스를 못 만들었어요 — 다시 해주세요");
     return { raf:0, done:true, started:false, winner:players[0], stop(){}, finish(){ if(typeof onDone==="function") onDone(); }, start(){}, canvas:cv };
   }
   const map = built.map, sim = built.sim, END = sim.frames*1000/60;
@@ -4769,7 +4798,7 @@ function playRace(players, onDone){
   ctl.start = ()=>{
     if(ctl.done || ctl.started) return;
     ctl.started = true;
-    const say=document.getElementById("gvSay"); if(say) say.textContent="출발!";
+    setGameSay("출발!");
     if(lessMotion()){ gtimer(()=>ctl.finish(), 10); return; }   // 연출을 건너뛰고 결과로 간다
     last = performance.now();
     ctl.raf = requestAnimationFrame(frame);
