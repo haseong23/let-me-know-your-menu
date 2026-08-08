@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="커피 한 잔">
+  <!-- 16px 에서도 읽혀야 한다 — 김도, 잔 무늬도, 글자도 넣지 않는다. 남는 건 실루엣 셋:
+       잔·손잡이·받침. 색은 앱 팔레트 그대로(--brand 바탕에 --bg 잔).
+       손잡이는 호가 아니라 '고리'다. 얕은 호로 그리면 잔과 손잡이 사이의 구멍이 1px 남짓이라
+       두 덩어리가 한 덩어리로 뭉쳐 보인다 — 구멍이 보여야 손잡이로 읽힌다. -->
+  <rect width="64" height="64" rx="14" fill="#6f4e37"/>
+  <!-- 고리를 잔보다 먼저 그린다. 잔에 가려지는 왼쪽 절반은 잔이 덮어 이음매가 안 보인다. -->
+  <circle cx="44" cy="30" r="8" fill="none" stroke="#f6f1ea" stroke-width="4"/>
+  <path d="M13 19h25v13a12.5 12.5 0 0 1-25 0z" fill="#f6f1ea"/>
+  <rect x="11" y="47" width="36" height="5" rx="2.5" fill="#f6f1ea"/>
+</svg>
