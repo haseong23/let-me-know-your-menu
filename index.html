@@ -173,6 +173,21 @@
   .state-skip { background:var(--accent-ink); color:#fff; border:none; display:flex; align-items:center;
     justify-content:center; gap:9px; padding:16px 14px; font-size:var(--fs-lg); font-weight:800; }
   .state-skip .sk-ck { font-size:20px; line-height:1; }
+  /* 담긴 주문 (사용자 요청) — '안 마심'과 같은 꽉 찬 채움. 다른 점은 정렬뿐이다:
+     저쪽은 문장 하나라 가운데, 이쪽은 메뉴·옵션과 [수정]이 있어 왼쪽에서 시작한다.
+     흰 글자는 --accent-ink 위 5.1:1 이라 AA 를 넘는다. 부제도 같은 흰색을 쓰고 크기·굵기로만
+     층을 가른다 — 살구빛 틴트(#f0e2cc)는 4.0:1 이라 13px 에 못 쓴다(계산해 확인). */
+  .state-order { background:var(--accent-ink); color:#fff; border:none; display:flex;
+    align-items:center; gap:11px; padding:14px; }
+  .state-order .sk-ck { flex:none; font-size:20px; line-height:1; }
+  .state-order .so-tx { flex:1; min-width:0; }
+  .state-order .so-tx b { display:block; font-size:var(--fs-lg); font-weight:800;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .state-order .so-tx small { display:block; font-size:var(--fs-md); margin-top:2px; line-height:1.45; }
+  /* 채운 배경 위의 버튼. 흰 테두리 + 반투명 채움이라 배경색이 비쳐 같은 카드의 일부로 읽힌다. */
+  .so-edit { flex:none; min-height:44px; padding:0 14px; border-radius:10px; cursor:pointer;
+    background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.55); color:#fff;
+    font-family:inherit; font-size:var(--fs-base); font-weight:700; }
   .btn-sm { width: auto; padding: 9px 14px; font-size: var(--fs-base); border-radius: 10px; min-height: 44px; }
   .banner { text-align: center; padding: 26px 18px; } .banner .emoji { font-size: 44px; }
   /* 열린 섬김 머리말 — 높이를 고정한다.
@@ -325,7 +340,12 @@
   /* 종류와 종류 사이는 한 칸 띄운다 — 스티키 머리가 다음 머리를 밀어낼 때 둘이 붙어 보이지 않게. */
   .mcat + .mcat { margin-top: 10px; }
   .mcat-chips { margin: 8px 0 0; }
-  .mcat-chips .tab { padding-left: 10px; padding-right: 10px; }
+  .mcat-chips .tab { position: relative; padding-left: 10px; padding-right: 10px; }
+  /* 칩 사이 옅은 구분선 (사용자 요청). 칩에 테두리를 두르면 모서리 반지름을 따라 휘어
+     칩마다 상자가 하나씩 생긴 것처럼 보인다 — 선은 칩이 아니라 '사이'에 있어야 한다.
+     그래서 칩 바깥(gap 3px 안)에 세로선 하나를 세운다. 위아래를 22% 씩 비워 짧게 긋는다. */
+  .mcat-chips .tab + .tab::before { content:""; position:absolute; left:-2px; top:22%; bottom:22%;
+    width:1px; background:var(--line); }
   .menu-more { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
     background: none; border: 0; font-family: inherit; min-height: 44px; padding: 10px 0 0;
     font-size: var(--fs-base); font-weight: 700; color: var(--sub); text-decoration: underline;
@@ -900,7 +920,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.25";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.26";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -958,7 +978,7 @@ const GIL_MENUS = [
   { id:"redginseng", name:"홍삼진자라떼", emoji:"🫚", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"grainlatte", name:"곡물라떼", emoji:"🌾", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"peanutlatte", name:"우도땅콩라떼", emoji:"🥜", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"steamedmilk", name:"스팀밀크", emoji:"🥛", cat:"tealatte", temps:["HOT"], extras:[] },
+  { id:"steamedmilk", name:"스팀밀크(우유)", emoji:"🥛", cat:"tealatte", temps:["HOT"], extras:[] },
   // 티(차)
   { id:"lemontea", name:"레몬차", emoji:"🍋", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"grapefruittea", name:"자몽차", emoji:"🍊", cat:"tea", temps:["ICE","HOT"], extras:[] },
@@ -1017,7 +1037,7 @@ const GIL_MENUS = [
   { id:"yogurt_granola", name:"떠먹는 그래놀라 요거트", emoji:"🥣", cat:"dessert", temps:[], extras:[] },
 ];
 const GIL_CATEGORIES = [
-  { id:"coffee", label:"커피 · 에스프레소" }, { id:"coldbrew", label:"콜드브루" },
+  { id:"coffee", label:"에스프레소" }, { id:"coldbrew", label:"콜드브루" },
   { id:"latte", label:"라떼" }, { id:"tealatte", label:"티 라떼" }, { id:"tea", label:"티 (차)" },
   { id:"icedtea", label:"아이스티" }, { id:"ade", label:"에이드" }, { id:"fruitlatte", label:"과일 라떼" },
   { id:"blended", label:"블렌디드 (스무디 · 쉐이크)" }, { id:"handdrip", label:"핸드드립" }, { id:"dessert", label:"아이스크림 · 요거트" },
@@ -1053,7 +1073,7 @@ function applyCellGlobals(){ ROOM=CELL.roomId; ROOM_NAME=CELL.name;
   CELL.members = memObjs(CELL.members);   // 문자열 레거시 → {id,name} 정규화(이후 저장도 객체로 일관)
   MEMBERS = CELL.members.map(m=>({id:m.id,name:m.name})).sort((a,b)=>a.name.localeCompare(b.name,"ko")); }
 const CAT_ORDER=["coffee","coldbrew","latte","tealatte","tea","icedtea","ade","fruitlatte","blended","handdrip","dessert","extra"];
-const CAT_LABEL={coffee:"커피 · 에스프레소",coldbrew:"콜드브루",latte:"라떼",tealatte:"티 라떼",tea:"티 (차)",icedtea:"아이스티",ade:"에이드",fruitlatte:"과일 라떼",blended:"블렌디드 (스무디 · 쉐이크)",handdrip:"핸드드립",dessert:"아이스크림 · 요거트",extra:"기타"};
+const CAT_LABEL={coffee:"에스프레소",coldbrew:"콜드브루",latte:"라떼",tealatte:"티 라떼",tea:"티 (차)",icedtea:"아이스티",ade:"에이드",fruitlatte:"과일 라떼",blended:"블렌디드 (스무디 · 쉐이크)",handdrip:"핸드드립",dessert:"아이스크림 · 요거트",extra:"기타"};
 // 메뉴 출처: DB(cafe_menus)에 시드돼 있으면 그걸 source of truth로, 없으면 코드 폴백
 function applyCafeGlobals(){ const c=activeCafe();
   const dbm=(CAFEMENU_CACHE[c.id]||[]);
@@ -1731,12 +1751,16 @@ function renderOpen(){
   if(myOrder && myOrder.type==="skip"){
     myStatus=`<div class="card state-skip"><span class="sk-ck">✓</span><span>안 마시기로 하셨어요</span></div>`;
   } else if(myOrder){
+    /* 담긴 주문도 '안 마심'과 같은 언어로 말한다 (사용자 요청). 둘 다 '정해진 것'인데
+       한쪽만 꽉 찬 채움이고 다른 쪽은 흰 카드라, 주문을 담고도 아직 덜 된 것처럼 읽혔다.
+       세부 옵션·메모까지 같은 블록 안에 넣어 무엇으로 정해졌는지가 한 덩어리로 보이게 한다. */
     const d=orderDisplay(myOrder);
-    myStatus=`<div class="card row-between"><div><div class="muted">내 주문</div>
-      <b style="font-size:16px">${esc(d.emoji+" "+d.name)} ${myOrder.temp?('· '+myOrder.temp):''}</b>
-      ${(myOrder.extras&&myOrder.extras.length)?`<div class="pmenu">${esc(myOrder.extras.join(", "))}</div>`:''}
-      ${myOrder.note?`<div class="pmenu">📝 ${esc(myOrder.note)}</div>`:''}</div>
-      <button class="btn btn-sm btn-soft" id="editMine">수정</button></div>`;
+    const bits=[]; if(myOrder.extras&&myOrder.extras.length) bits.push(esc(myOrder.extras.join(", ")));
+    if(myOrder.note) bits.push("📝 "+esc(myOrder.note));
+    myStatus=`<div class="card state-order"><span class="sk-ck">✅</span>
+      <span class="so-tx"><b>${esc(d.emoji+" "+d.name)}${myOrder.temp?(' · '+myOrder.temp):''}</b>
+        ${bits.length?`<small>${bits.join(" · ")}</small>`:''}</span>
+      <button class="so-edit" id="editMine">수정</button></div>`;
   }
   const isSkip = myOrder && myOrder.type==="skip";
   const showGrid = !myOrder || isSkip || forceGrid;
@@ -2034,15 +2058,12 @@ function openOrderSheet(menuId, existing, prefill){
       <!-- 안내 한 줄. 새로 담을 때는 남은 할 일을 말하고, 수정하러 들어왔을 때는
            "안 고쳐도 된다"를 말한다 — 이 시트에 들어온 이유가 서로 다르다. -->
       ${(optionsHtml||tempHtml)
-        ? `<p class="sheet-hint">${existing?'담아 둔 주문이에요. 고치실 게 없으면 <b>[닫기]</b>를 누르시면 돼요.':(tempHtml?'이제 <b>온도</b>만 고르면 돼요.':'고르실 게 없으면 그대로 <b>[이걸로 주문]</b>을 누르시면 돼요.')}</p>`
+        ? `<p class="sheet-hint">${existing?'담아 둔 주문이에요. 고치실 게 없으면 <b>[닫기]</b>를 누르시면 돼요.':'고르실 게 없으면 그대로 <b>[이걸로 주문]</b>을 누르시면 돼요.'}</p>`
         : ""}
       <div class="order-opts">
         ${tempHtml?`<div class="label">온도</div>${tempHtml}`:""}
         ${optsHtml}
         <div class="label" id="lbl-note">메모 (선택)</div><input autocomplete="off" type="text" id="note" maxlength="200" placeholder="예: 시럽 빼고" value="${esc(note)}" aria-labelledby="lbl-note" />
-        <!-- 메뉴를 바꾸는 길은 본문 맨 아래다 (5a). 푸터는 이 시트를 끝내는 세 동작
-             (닫기 · 주문 수정 · 주문 취소)만 쥔다 — 다른 화면으로 가는 문은 거기 섞지 않는다. -->
-        ${existing?`<button class="sheet-relink" id="relinkMenu">다른 메뉴로 바꾸기</button>`:""}
       </div>
       <div class="sheet-foot">
         <div class="ord-sum" id="ordSum" aria-live="polite">${esc(summaryText())}</div>
