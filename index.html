@@ -143,6 +143,26 @@
   /* gap 은 장식이 아니다 — flex 는 자식 사이의 공백 텍스트를 렌더하지 않으므로,
      마크업의 `이름 <small>· 변경</small>` 사이 띄어쓰기가 사라져 `한사랑· 변경` 이 된다. */
   .me-chip small { color: var(--sub); font-weight: 500; }
+  /* 자리 잡을 사람이 별도 조작 없이 바로 읽는 오늘의 참여 현황. 현재 접속자는 '선택 중',
+     오늘 주문 기록이 있는 사람은 화면을 닫았어도 '선택 완료'로 남긴다. */
+  .presence-slot { margin:-6px 0 14px; }
+  .attendance-panel { padding:12px 14px; border:1px solid var(--line); border-radius:14px; background:var(--brand-soft); }
+  .attendance-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .attendance-title { font-size:var(--fs-base); font-weight:800; color:var(--ink); }
+  .attendance-title strong { color:var(--brand); font-size:1.125rem; font-variant-numeric:tabular-nums; }
+  .attendance-meta { flex:none; font-size:var(--fs-sm); color:var(--sub); }
+  .attendance-groups { display:grid; gap:5px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(111,78,55,.16); }
+  .attendance-group { display:grid; grid-template-columns:76px minmax(0,1fr); gap:8px; align-items:start; font-size:var(--fs-md); }
+  .attendance-state { display:flex; align-items:center; gap:7px; color:var(--sub); white-space:nowrap; }
+  .attendance-names { color:var(--ink); font-weight:650; line-height:1.55; }
+  .attendance-empty { margin:0; color:var(--sub); font-size:var(--fs-md); line-height:1.5; }
+  .live-dot { width:8px; height:8px; flex:none; display:inline-block; border-radius:50%; background:var(--green);
+    box-shadow:0 0 0 3px rgba(63,157,107,.14); }
+  .live-dot.done { background:var(--brand); box-shadow:none; }
+  .live-dot.wait { background:var(--gray); box-shadow:none; }
+  .avatar.has-live { position:relative; }
+  .avatar.has-live::after { content:""; position:absolute; right:-1px; bottom:-1px; width:9px; height:9px;
+    border-radius:50%; background:var(--green); border:2px solid var(--card); }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
   .muted { color: var(--sub); font-size: var(--fs-md); } .center { text-align: center; }
   button { font-family: inherit; cursor: pointer; border: none; }
@@ -592,6 +612,8 @@
     .h-row > :last-child { flex-shrink:0; }
     /* .room-name 17px 은 :root 의 --fs-title 램프가 대신한다 (R13-7) */
     .me-chip { max-width: 42vw; padding: 7px 9px; overflow: hidden; text-overflow: ellipsis; }
+    .presence-slot { margin-top:-8px; }
+    .attendance-panel { padding:11px 12px; }
     .card { padding: 15px; }
     .person { gap: 8px; padding-left: 2px; padding-right: 2px; }
     .avatar { width: 34px; height: 34px; font-size: var(--fs-md); }
@@ -936,7 +958,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.28";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.31";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1225,7 +1247,8 @@ function lastOrder(){
   return null;
 }
 function loadMe(){ ME = localStorage.getItem(meKey()) || null; }
-function setMe(id){ ME = id; try{ if(id) localStorage.setItem(meKey(), id); else localStorage.removeItem(meKey()); }catch(e){} }
+function setMe(id){ ME = id; try{ if(id) localStorage.setItem(meKey(), id); else localStorage.removeItem(meKey()); }catch(e){}
+  if(typeof Presence!=="undefined") Presence.track(); }
 function meName(){ const m=memberById(ME); return m?m.name:null; }
 // 이름 뒤 존칭 '님' — 이미 '님'으로 끝나는 이름(목사님·전도사님·권사님·집사님 등)엔 중복해서 붙이지 않음.
 // hon(): 존칭형 이름 전체("홍길동"→"홍길동님", "김목사님"→"김목사님"). nimSfx(): 하이라이트 뒤에 붙일 접미사("님" 또는 "").
@@ -1372,6 +1395,55 @@ const SupabaseSync = () => {
 };
 
 const Sync = SHARED ? SupabaseSync() : LocalSync();
+
+/* ===================== URL별 현재 접속자 ===================== */
+// Presence는 DB 행을 만들지 않고 Realtime 연결이 살아 있는 동안만 상태를 둔다.
+// topic에 셀 URL의 id를 써서 서로 다른 ?cell= 링크의 접속자가 섞이지 않게 한다.
+const PRESENCE_TAB_ID = (()=>{ try{ let id=sessionStorage.getItem("coffee_presence_tab");
+  if(!id){ id=(crypto.randomUUID?crypto.randomUUID():"p-"+Date.now()+"-"+Math.random().toString(36).slice(2)); sessionStorage.setItem("coffee_presence_tab",id); }
+  return id; }catch(e){ return "p-"+Date.now()+"-"+Math.random().toString(36).slice(2); } })();
+const Presence = (()=>{
+  let channel=null, cellId=null, run=0, status=SHARED?"idle":"off";
+  let lastTrack="";
+  let rawState={};
+  let roster={memberIds:[], anonymousCount:0};
+  const notify=()=>{ if(typeof refreshPresenceUI==="function") refreshPresenceUI(); };
+  async function removeCurrent(){
+    const old=channel; channel=null;
+    if(!old) return;
+    try{ await old.untrack(); }catch(e){}
+    try{ await Sync.client.removeChannel(old); }catch(e){}
+  }
+  async function enter(id){
+    if(!SHARED||!id) return;
+    const mine=++run; cellId=id; lastTrack=""; rawState={}; status="connecting"; roster={memberIds:[],anonymousCount:0}; notify();
+    await removeCurrent(); if(mine!==run||document.hidden) return;
+    const ch=Sync.client.channel("cell-presence:"+id,{config:{presence:{key:PRESENCE_TAB_ID}}}); channel=ch;
+    ch.on("presence",{event:"sync"},()=>{
+      if(mine!==run||channel!==ch) return;
+      rawState=ch.presenceState(); roster=presenceRoster(rawState,MEMBERS,SESSION&&SESSION.seq); status="live"; notify();
+    }).subscribe(async s=>{
+      if(mine!==run||channel!==ch) return;
+      if(s==="SUBSCRIBED"){ status="live"; await track(); notify(); }
+      else if(s==="CHANNEL_ERROR"||s==="TIMED_OUT"){ status="error"; notify(); }
+    });
+  }
+  async function track(){
+    if(!channel||status==="off"||document.hidden) return;
+    const id=ME&&memberById(ME)?ME:null, seq=SESSION&&SESSION.seq!=null?SESSION.seq:null;
+    roster=presenceRoster(rawState,MEMBERS,seq);
+    const signature=(id||"")+"|"+(seq==null?"":seq); if(signature===lastTrack) return;
+    try{ await channel.track({member_id:id, serving_seq:seq, at:new Date().toISOString()}); lastTrack=signature; }
+    catch(e){ status="error"; notify(); }
+  }
+  async function pause(){
+    if(!SHARED) return; run++; lastTrack=""; rawState={}; status="paused"; roster={memberIds:[],anonymousCount:0}; notify(); await removeCurrent();
+  }
+  function resume(){ if(SHARED&&CELL&&!adminMode&&!inPicker) enter(CELL.id); }
+  return { enter, track, pause, resume,
+    snapshot:()=>({status,memberIds:roster.memberIds.slice(),anonymousCount:roster.anonymousCount}),
+    isOnline:id=>roster.memberIds.includes(id) };
+})();
 
 /* ===================== DOM refs ===================== */
 const $app=document.getElementById("app"), $bottom=document.getElementById("bottom");
@@ -1663,10 +1735,38 @@ window.addEventListener("popstate",()=>{
   // main/랜딩/초기 이름선택: 더 빠질 항목 없음 → 브라우저가 그대로 앱 밖으로
 });
 
+function attendanceState(){
+  const p=Presence.snapshot(), a=attendanceRoster(MEMBERS,p.memberIds,ORDERS);
+  return {status:p.status,confirmedIds:a.confirmedIds,selectingIds:a.selectingIds,anonymousCount:p.anonymousCount||0};
+}
+function attendanceNames(ids){ return ids.map(id=>{ const m=memberById(id); return m?esc(m.name):""; }).filter(Boolean).join(" · "); }
+function attendancePanelInner(){
+  const a=attendanceState(), selectingN=a.selectingIds.length+a.anonymousCount;
+  const total=a.confirmedIds.length+selectingN;
+  const checking=(a.status==="connecting"||a.status==="idle");
+  const delayed=a.status==="error";
+  const confirmed=a.confirmedIds.length?`<div class="attendance-group"><span class="attendance-state"><span class="live-dot done"></span>선택 완료</span><span class="attendance-names">${attendanceNames(a.confirmedIds)}</span></div>`:"";
+  const selectingNames=attendanceNames(a.selectingIds);
+  const anonymous=a.anonymousCount?`${selectingNames?" · ":""}이름 선택 중 ${a.anonymousCount}명`:"";
+  const selecting=selectingN?`<div class="attendance-group"><span class="attendance-state"><span class="live-dot"></span>선택 중</span><span class="attendance-names">${selectingNames}${anonymous}</span></div>`:"";
+  const empty=!confirmed&&!selecting?`<p class="attendance-empty">${checking?"참여 인원을 확인하고 있어요.":delayed?"현재 접속 상태 확인이 늦어지고 있어요.":"아직 메뉴를 고르는 분이 없어요."}</p>`:"";
+  return `<section class="attendance-panel" aria-label="현재 섬김 참여 현황" aria-live="polite">
+    <div class="attendance-head"><div class="attendance-title">${SESSION.seq?esc(servingLabel(SESSION.seq))+" 참여":"현재 참여"} <strong>${total}명</strong></div>
+      <div class="attendance-meta">완료 ${a.confirmedIds.length} · 선택 중 ${selectingN}${delayed?' · 접속 확인 지연':''}</div></div>
+    <div class="attendance-groups">${confirmed}${selecting}${empty}</div>
+  </section>`;
+}
+function presenceSlot(){ return SHARED?`<div class="presence-slot">${attendancePanelInner()}</div>`:""; }
+function refreshPresenceUI(){
+  document.querySelectorAll(".presence-slot").forEach(el=>el.innerHTML=attendancePanelInner());
+  document.querySelectorAll(".avatar[data-member-id]").forEach(a=>a.classList.toggle("has-live",Presence.isOnline(a.dataset.memberId)));
+}
+
 /* ===================== 렌더 ===================== */
 function render(){
-  if(!ME || !memberById(ME)){ curView="pick"; renderPickMe(); $bottom.innerHTML=""; document.body.classList.add("no-bottom"); return; }
   projectServing(viewSeq!=null ? viewSeq : activeSeq);   // 현재 볼 섬김으로 투영(활성 or 보고있는 것)
+  Presence.track();   // 이름 선택 전 방문자도 같은 회차의 '선택 중' 인원에 포함
+  if(!ME || !memberById(ME)){ curView="pick"; renderPickMe(); $bottom.innerHTML=""; document.body.classList.add("no-bottom"); return; }
   // 보는 섬김이 바뀌면 탭은 '내 주문'부터 — 남의 섬김을 주문서 탭으로 열고 시작하지 않는다
   if(SESSION.seq!==lastTabSeq){ lastTabSeq=SESSION.seq; openTab="order"; }
   curView="main"; renderHeader();
@@ -1697,6 +1797,7 @@ function renderHeader(){
         <button class="nav-link" id="gear" style="font-size:18px" aria-label="설정">⚙️</button>
       </div>
     </div></header>
+    ${presenceSlot()}
     <div id="view"></div>`;
   document.getElementById("meChip").onclick=renderPickMe;
   document.getElementById("gear").onclick=()=>openSettings();
@@ -1716,7 +1817,7 @@ function renderPickMe(){
     const favParts=[]; if(th&&th.first) favParts.push(`①${esc(th.first.name)}`); if(th&&th.second) favParts.push(`②${esc(th.second.name)}`);
     const fav=favParts.join(" · ");
     return `<div class="person${m.id===pickSel?' picksel':''}" data-id="${esc(m.id)}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===pickSel}" aria-label="${esc(m.name)}">
-      <div class="avatar">${esc(initials(m.name))}</div>
+      <div class="avatar${Presence.isOnline(m.id)?' has-live':''}" data-member-id="${esc(m.id)}">${esc(initials(m.name))}</div>
       <div style="min-width:0"><div class="pname">${esc(m.name)}</div>${fav?`<div class="pmenu">${fav}</div>`:''}</div>${badge}</div>`;
   }).join("");
   const sel = pickSel && memberById(pickSel);
@@ -1724,6 +1825,7 @@ function renderPickMe(){
   $app.innerHTML = `
     <header><div class="room-name" style="padding-top:6px">☕ ${esc(ROOM_NAME)}</div>
     <div class="date">먼저 <b>본인</b>을 선택해 주세요 (ㄱㄴㄷ순)</div></header>
+    ${presenceSlot()}
     <div class="card pick-list" style="padding:8px 10px">${list}</div>
     <div class="label" id="lbl-addMeName">내 이름이 목록에 없나요?</div>
     <div class="inline-form"><input autocomplete="off" type="text" id="addMeName" maxlength="40" placeholder="이름 입력" aria-labelledby="lbl-addMeName"/><button class="btn btn-soft btn-sm" id="addMeBtn" style="flex:none">추가하고 시작</button></div>`;
@@ -2782,6 +2884,31 @@ function openClaimCafeSheet(){
    그러니 DOM 이나 전역 상태(MEMBERS·ORDERS·GS·SESSION·SERVINGS)를 읽는 코드는 블록 밖에 둔다.
    시작 마커는 추출기가 첫 줄을 버리는 방식이라 반드시 한 줄로 유지한다. */
 /* @test-export:start */
+/* Realtime Presence 원본을 화면용 명단으로 정규화한다. 같은 구성원이 여러 탭을 열어도 한 명,
+   아직 이름을 고르지 않은 탭은 각각 한 명으로 센다. 목록에 없는 id는 표시하지 않는다. */
+function presenceRoster(state, members, servingSeq){
+  const valid=new Set((members||[]).map(m=>m.id)), named=new Set(); let anonymousCount=0;
+  Object.keys(state||{}).forEach(key=>{
+    const payloads=Array.isArray(state[key])?state[key]:[];
+    let hasNamed=false, hasAnonymous=false;
+    payloads.forEach(p=>{ const id=p&&p.member_id, ps=p&&p.serving_seq!=null?p.serving_seq:null;
+      if(String(ps==null?"":ps)!==String(servingSeq==null?"":servingSeq)) return;
+      if(id&&valid.has(id)){ named.add(id); hasNamed=true; }
+      else if(!id) hasAnonymous=true;
+    });
+    if(!hasNamed&&hasAnonymous) anonymousCount++;
+  });
+  return {memberIds:(members||[]).filter(m=>named.has(m.id)).map(m=>m.id),anonymousCount};
+}
+/* 현재 보고 있는 한 회차의 주문을 남겼으면 선택 완료다. 그 외 현재 접속자는 선택 중이다.
+   하루 중 다른 회차의 주문은 섞지 않는다. */
+function attendanceRoster(members, onlineIds, orders){
+  const online=new Set(onlineIds||[]), confirmed=new Set(Object.keys(orders||{}));
+  return {
+    confirmedIds:(members||[]).filter(m=>confirmed.has(m.id)).map(m=>m.id),
+    selectingIds:(members||[]).filter(m=>online.has(m.id)&&!confirmed.has(m.id)).map(m=>m.id),
+  };
+}
 /* 가중 추첨의 '가중치가 다를 때'를 검증하는 상수. 앱은 2a 이후 가중치를 전부 1 로만 주므로
    이 값이 화면에 영향을 주지는 않는다 — pickWeighted 가 불균등 입력에서도 비율대로 수렴하는지
    확인하는 테스트의 입력값으로 남아 있다. */
@@ -5169,6 +5296,7 @@ async function enterCell(id){
   if(!c){ toast("셀을 찾을 수 없어요"); renderCellPicker(); return; }
   inPicker=false; adminMode=false; forceGrid=false; CELL=c; applyCellGlobals(); loadMe();
   localStorage.setItem("coffee_last_cell", CELL.id); rememberCell(c);
+  Presence.enter(CELL.id);   // 화면 로딩은 막지 않고, 이 URL의 접속자 방에 합류
   try{ await Sync.resubscribe(); }catch(e){ console.error(e); }
   await loadHist();
   await loadCafeMenus(activeCafeId());
@@ -6111,12 +6239,15 @@ function openMembersSheet(){
 // 스케일 완화: 백그라운드 탭은 실시간 구독 해제, 복귀 시 재구독+새로고침 (동시접속 절감)
 document.addEventListener("visibilitychange", async ()=>{
   if(!SHARED || !CELL || adminMode || inPicker) return;
-  if(document.hidden){ if(Sync.pause) Sync.pause(); }
+  if(document.hidden){ if(Sync.pause) Sync.pause(); Presence.pause(); }
   else { try{ const c=await fetchCell(CELL.id); if(c){ CELL=c; applyCellGlobals(); } }catch(e){}   // 멤버(이름변경/추가) 최신화
+         Presence.resume();
          try{ await Sync.resubscribe(); }catch(e){}
          if(sheetOpen || confirmOpen) return;                    // 입력 중이면 화면 유지
          if(curView==="pick") renderPickMe(); else render(); }   // 이름 선택 중이면 메인으로 튕기지 않음
 });
+window.addEventListener("pagehide",()=>Presence.pause());
+window.addEventListener("pageshow",e=>{ if(e.persisted) Presence.resume(); });
 function onRemote(){ if(inPicker || adminMode) return;
   if(curView==="pick" || sheetOpen || confirmOpen) return;   // 이름 선택/시트/확인창 사용 중엔 폴링이 화면을 갈아엎지 않음(선택 화면이 스스로 닫히던 문제)
   render(); }

@@ -17,6 +17,8 @@ const MARK_END = "/* @test-export:end";
 
 // 이 목록이 곧 프로덕션과의 계약이다. 함수 이름을 바꾸면 여기서 먼저 깨져야 한다.
 const REQUIRED = [
+  "presenceRoster",
+  "attendanceRoster",
   "pickWeighted",
   "rosterFrom",
   "playersFrom",
@@ -123,6 +125,34 @@ test("마커 블록에서 기대 심볼이 모두 나온다", () => {
   for (const kind of ["ladder", "wheel", "finger"]) {
     assert.equal(typeof GAME_MAX[kind], "number", `GAME_MAX.${kind} 가 없다`);
   }
+});
+
+test("접속자 명단은 같은 사람의 여러 탭을 합치고 이름 선택 전 방문자는 따로 센다", () => {
+  const members=[{id:"m1",name:"하성"},{id:"m2",name:"다니엘"}];
+  const state={
+    tab1:[{member_id:"m1",serving_seq:2}],
+    tab2:[{member_id:"m1",serving_seq:2}],
+    tab3:[{member_id:null,serving_seq:2}],
+    tab4:[{member_id:"removed-member",serving_seq:2}],
+    otherRound:[{member_id:"m2",serving_seq:1}],
+  };
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(gameLogic.presenceRoster(state,members,2))),
+    {memberIds:["m1"],anonymousCount:1}
+  );
+});
+
+test("현재 회차 참여자는 접속 중이면 선택 중, 해당 회차 주문을 남겼으면 선택 완료다", () => {
+  const members=[{id:"m1",name:"하성"},{id:"m2",name:"다니엘"},{id:"m3",name:"요셉"}];
+  const result=gameLogic.attendanceRoster(
+    members,
+    ["m1","m2"],
+    {m2:{type:"drink"},m3:{type:"skip"}}
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)),{
+    confirmedIds:["m2","m3"],
+    selectingIds:["m1"],
+  });
 });
 
 test("시작 마커는 (블록마다) 한 줄이어야 한다", () => {
@@ -749,4 +779,3 @@ test("wheelSimulate — 압정을 실제로 지나고, 기록 길이가 프레�
   assert.ok(WHEEL_PEGS >= 12, "압정이 너무 적으면 저항이 눈에 안 보인다");
   assert.ok(ticks > 200 * WHEEL_PEGS * 3, "압정을 지난 횟수가 회전량에 비해 너무 적다");
 });
-
