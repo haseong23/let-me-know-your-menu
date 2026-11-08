@@ -958,7 +958,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.33";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.34";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -1029,17 +1029,17 @@ const GIL_MENUS = [
   { id:"jujubetea", name:"대추차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"omijatea", name:"오미자차", emoji:"🔴", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"plumtea", name:"매실차", emoji:"🍵", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"chamomile", name:"캐모마일", emoji:"🌼", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"rooibos", name:"루이보스", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"earlgrey", name:"얼그레이", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"hibiscus", name:"히비스커스", emoji:"🌺", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"coolmint", name:"쿨민트", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"teapotset", name:"티팟 세트", emoji:"🫖", cat:"tea", temps:["HOT"], extras:[],
     optionGroups:[ { key:"teapot", label:"차 종류", opts:["캐모마일","루이보스","보이차","열대과일블렌드"], def:"캐모마일" } ] },
   { id:"hibiscuslemon", name:"히비스커스 레몬티", emoji:"🌺", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"swordbean", name:"작두콩차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"burdock", name:"우엉차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"bittermelon", name:"여주차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
-  { id:"chamomile", name:"캐모마일", emoji:"🌼", cat:"tea", temps:["ICE","HOT"], extras:[] },
-  { id:"rooibos", name:"루이보스", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
-  { id:"earlgrey", name:"얼그레이", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
-  { id:"hibiscus", name:"히비스커스", emoji:"🌺", cat:"tea", temps:["ICE","HOT"], extras:[] },
-  { id:"coolmint", name:"쿨민트", emoji:"🌿", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"trad_ssanghwa", name:"전통 한방쌍화차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"trad_jujube", name:"전통 한방대추차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   // 아이스티
