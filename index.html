@@ -958,7 +958,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.31";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.32";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -987,45 +987,49 @@ const GIL_MENUS = [
       { key:"water", label:"물", opts:["기본","물 없이","물 1/3","물 1/2","물 가득"], def:"기본" },
       OPT_ICE,
     ] },
+  { id:"cloudamericano", name:"클라우드 아메리카노", emoji:"☁️", cat:"coffee", temps:["ICE","HOT"], extras:[] },
   { id:"espresso", name:"에스프레소", emoji:"☕", cat:"coffee", temps:["HOT"], extras:["샷추가"] },
-  { id:"conpanna", name:"에스프레소 콘파나", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[] },
+  { id:"conpanna", name:"에스프레소 꼰빠냐", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[] },
   // 라떼
   { id:"caffelatte", name:"카페라떼", emoji:"🥛", cat:"latte", temps:["ICE","HOT"], extras:[], popular:true,
     optionGroups:[ OPT_SIZE, OPT_SHOT, OPT_MILKTYPE, OPT_MILK, OPT_ICE ] },
   { id:"cappuccino", name:"카푸치노", emoji:"☕", cat:"latte", temps:["HOT"], extras:["샷추가"] },
-  { id:"vanillabean", name:"바닐라빈라떼", emoji:"🍦", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"] },
   { id:"vanilla", name:"바닐라라떼", emoji:"🍦", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"], popular:true },
+  { id:"lightvanilla", name:"라이트 바닐라라떼", emoji:"🍦", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"] },
   { id:"dolce", name:"돌체라떼", emoji:"🍯", cat:"latte", temps:["ICE","HOT"], extras:["덜달게"], popular:true },
   { id:"caramel", name:"카라멜라떼", emoji:"🍮", cat:"latte", temps:["ICE","HOT"], extras:["덜달게"], popular:true },
   { id:"hazelnut", name:"헤이즐넛라떼", emoji:"🌰", cat:"latte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"mocha", name:"카페모카", emoji:"🍫", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"], popular:true },
-  { id:"chestnutcream", name:"보늬밤 크림 라떼", emoji:"🌰", cat:"latte", temps:["ICE"], extras:[] },
+  { id:"peanutcafelatte", name:"피넛카페라떼", emoji:"🥜", cat:"latte", temps:["ICE","HOT"], extras:["덜달게"] },
   // 콜드브루
   { id:"coldbrew", name:"콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"], popular:true },
   { id:"coldbrewlatte", name:"콜드브루 라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"] },
   { id:"coldbrewdolce", name:"콜드브루 돌체라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["덜달게"] },
-  { id:"vanillacreamcoldbrew", name:"바닐라크림 콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
-  { id:"affogato", name:"아포가토", emoji:"🍨", cat:"coldbrew", temps:["ICE"], extras:[] },
+  { id:"vanillacreamcoldbrew", name:"바닐라 크림 콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
+  { id:"affogato", name:"아포가토 (Haagen-Dazs)", emoji:"🍨", cat:"coldbrew", temps:["ICE"], extras:[] },
   { id:"einspanner", name:"아인슈페너", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
   { id:"coldbrewmilk", name:"콜드브루 밀크 블렌디드", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
   // 티 라떼
   { id:"royalmilktea", name:"로얄밀크티", emoji:"🥛", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
+  { id:"tarobubbletea", name:"타로버블티", emoji:"🧋", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"chocolatte", name:"초코라떼", emoji:"🍫", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"matchalatte", name:"제주말차라떼", emoji:"🍵", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"], popular:true },
   { id:"sweetpotato", name:"고구마라떼", emoji:"🍠", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"redginseng", name:"홍삼진자라떼", emoji:"🫚", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"grainlatte", name:"곡물라떼", emoji:"🌾", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"peanutlatte", name:"우도땅콩라떼", emoji:"🥜", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"steamedmilk", name:"스팀밀크(우유)", emoji:"🥛", cat:"tealatte", temps:["HOT"], extras:[] },
+  { id:"redginseng", name:"홍강진저라떼", emoji:"🫚", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
+  { id:"grainlatte", name:"인절미라떼", emoji:"🌾", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
+  { id:"peanutlatte", name:"피넛라떼", emoji:"🥜", cat:"tealatte", temps:["ICE","HOT"], extras:["덜달게"] },
+  { id:"steamedmilk", name:"스팀밀크", emoji:"🥛", cat:"tealatte", temps:["HOT"], extras:[] },
   // 티(차)
   { id:"lemontea", name:"레몬차", emoji:"🍋", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"grapefruittea", name:"자몽차", emoji:"🍊", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"yujatea", name:"유자차", emoji:"🍊", cat:"tea", temps:["ICE","HOT"], extras:[] },
-  { id:"gingertea", name:"홍삼생강차", emoji:"🫚", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"gingertea", name:"홍강생강차", emoji:"🫚", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"ssanghwa", name:"쌍화차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"jujubetea", name:"대추차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"omijatea", name:"오미자차", emoji:"🔴", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"plumtea", name:"매실차", emoji:"🍵", cat:"tea", temps:["ICE","HOT"], extras:[] },
+  { id:"teapotset", name:"티팟 세트", emoji:"🫖", cat:"tea", temps:["HOT"], extras:[],
+    optionGroups:[ { key:"teapot", label:"차 종류", opts:["캐모마일","루이보스","보이차","열대과일블렌드"], def:"캐모마일" } ] },
   { id:"hibiscuslemon", name:"히비스커스 레몬티", emoji:"🌺", cat:"tea", temps:["ICE","HOT"], extras:[] },
   { id:"swordbean", name:"작두콩차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   { id:"burdock", name:"우엉차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
@@ -1039,21 +1043,18 @@ const GIL_MENUS = [
   { id:"trad_jujube", name:"전통 한방대추차", emoji:"🍵", cat:"tea", temps:["HOT"], extras:[] },
   // 아이스티
   { id:"peachicedtea", name:"복숭아 아이스티", emoji:"🍑", cat:"icedtea", temps:["ICE"], extras:[], popular:true },
-  { id:"ashotchu", name:"아샷추 (아이스티+샷)", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:["샷추가"] },
-  { id:"amangchu", name:"아망추 (아이스티+망고)", emoji:"🥭", cat:"icedtea", temps:["ICE"], extras:[] },
+  { id:"ashotchu", name:"아샷추 (아이스티 샷 추가)", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:["샷추가"] },
+  { id:"amangchu", name:"아망추 (아이스티 망고 추가)", emoji:"🥭", cat:"icedtea", temps:["ICE"], extras:[] },
   { id:"rooibospeach", name:"루이보스 복숭아 아이스티", emoji:"🧊", cat:"icedtea", temps:["ICE"], extras:[] },
   // 에이드
   { id:"lemonade", name:"레몬에이드", emoji:"🍋", cat:"ade", temps:["ICE"], extras:["덜달게"] },
   { id:"grapefruitade", name:"자몽에이드", emoji:"🍊", cat:"ade", temps:["ICE"], extras:["덜달게"], popular:true },
-  { id:"greengrapeade", name:"청포도에이드", emoji:"🍇", cat:"ade", temps:["ICE"], extras:["덜달게"] },
+  { id:"greengrapeade", name:"샤인머스캣에이드", emoji:"🍇", cat:"ade", temps:["ICE"], extras:["덜달게"] },
   { id:"yujaade", name:"유자에이드", emoji:"🍊", cat:"ade", temps:["ICE"], extras:["덜달게"] },
   { id:"omijaade", name:"오미자에이드", emoji:"🔴", cat:"ade", temps:["ICE"], extras:["덜달게"] },
   { id:"plumade", name:"매실에이드", emoji:"🟢", cat:"ade", temps:["ICE"], extras:["덜달게"] },
-  { id:"jaduade", name:"자두에이드", emoji:"🍑", cat:"ade", temps:["ICE"], extras:["덜달게"] },
-  { id:"strawberryade", name:"딸기에이드", emoji:"🍓", cat:"ade", temps:["ICE"], extras:["덜달게"] },
   // 과일 라떼
   { id:"strawberrylatte", name:"딸기라떼", emoji:"🍓", cat:"fruitlatte", temps:["ICE","HOT"], extras:["덜달게"] },
-  { id:"mangolatte", name:"망고라떼", emoji:"🥭", cat:"fruitlatte", temps:["ICE","HOT"], extras:["덜달게"] },
   { id:"bananalatte", name:"바나나라떼", emoji:"🍌", cat:"fruitlatte", temps:["ICE","HOT"], extras:["덜달게"] },
   // 블렌디드 (스무디·쉐이크)
   { id:"smoothie_plain", name:"플레인 요거트스무디", emoji:"🥤", cat:"blended", temps:["ICE"], extras:["덜달게"] },
@@ -1065,12 +1066,14 @@ const GIL_MENUS = [
   { id:"shake_matcha", name:"제주말차 쉐이크", emoji:"🍵", cat:"blended", temps:["ICE"], extras:[] },
   // 핸드드립
   { id:"hd_kenya", name:"아침의 편지 (케냐AA)", emoji:"☕", cat:"handdrip", temps:["HOT"], extras:[] },
-  { id:"hd_ethiopia", name:"향기로운 순간 (게이샤)", emoji:"☕", cat:"handdrip", temps:["HOT"], extras:[] },
+  { id:"hd_ethiopia", name:"향기로운 순간 (에티오피아 아바야 게이샤)", emoji:"☕", cat:"handdrip", temps:["HOT"], extras:[] },
   { id:"hd_brazil", name:"달콤한 오후 (세하두)", emoji:"☕", cat:"handdrip", temps:["HOT"], extras:[] },
   // 아이스크림·요거트 (온도 없음)
-  { id:"haagendaz", name:"하겐다즈 미니컵", emoji:"🍨", cat:"dessert", temps:[], extras:[] },
-  { id:"icecream_vanilla", name:"아이스크림 (바닐라)", emoji:"🍦", cat:"dessert", temps:[], extras:[] },
-  { id:"icecream_choco", name:"아이스크림 (초코)", emoji:"🍫", cat:"dessert", temps:[], extras:[] },
+  { id:"icecream_vanilla", name:"하겐다즈 바닐라", emoji:"🍦", cat:"dessert", temps:[], extras:[] },
+  { id:"icecream_choco", name:"하겐다즈 초코", emoji:"🍫", cat:"dessert", temps:[], extras:[] },
+  { id:"haagen_strawberry", name:"하겐다즈 딸기", emoji:"🍓", cat:"dessert", temps:[], extras:[] },
+  { id:"haagenmacadamia", name:"하겐다즈 마카다미아", emoji:"🍨", cat:"dessert", temps:[], extras:[] },
+  { id:"haagen_cookies", name:"하겐다즈 쿠앤크", emoji:"🍪", cat:"dessert", temps:[], extras:[] },
   { id:"yogurt_blueberry", name:"떠먹는 블루베리 요거트", emoji:"🫐", cat:"dessert", temps:[], extras:[] },
   { id:"yogurt_granola", name:"떠먹는 그래놀라 요거트", emoji:"🥣", cat:"dessert", temps:[], extras:[] },
 ];
@@ -1114,7 +1117,7 @@ const CAT_ORDER=["coffee","coldbrew","latte","tealatte","tea","icedtea","ade","f
 const CAT_LABEL={coffee:"에스프레소",coldbrew:"콜드브루",latte:"라떼",tealatte:"티 라떼",tea:"티 (차)",icedtea:"아이스티",ade:"에이드",fruitlatte:"과일 라떼",blended:"블렌디드 (스무디 · 쉐이크)",handdrip:"핸드드립",dessert:"아이스크림 · 요거트",extra:"기타"};
 // 메뉴 출처: DB(cafe_menus)에 시드돼 있으면 그걸 source of truth로, 없으면 코드 폴백
 function applyCafeGlobals(){ const c=activeCafe();
-  const dbm=(CAFEMENU_CACHE[c.id]||[]);
+  const dbm=(CAFEMENU_CACHE[c.id]||[]).filter(m=>m.active);
   if(dbm.length){
     MENUS = dbm.slice().sort((a,b)=> (a.sort-b.sort) || a.name.localeCompare(b.name,"ko"));
     const ci=x=>{ const i=CAT_ORDER.indexOf(x); return i<0?99:i; };
@@ -1122,6 +1125,8 @@ function applyCafeGlobals(){ const c=activeCafe();
     CATEGORIES = cats.map(id=>({id,label:CAT_LABEL[id]||id}));
   } else { MENUS=c.menus; CATEGORIES=c.categories; }
 }
+function menuActiveOn(from,to,day){ return (!from || String(from).slice(0,10)<=day) && (!to || String(to).slice(0,10)>=day); }
+function prevDayKey(day){ const d=new Date(day+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); }
 // 카페 메뉴 로드 — DB(cafe_menus) 전체. 테이블 없거나 로컬이면 빈 배열(→코드 폴백)
 async function loadCafeMenus(cafeId){
   if(!SHARED) return [];
@@ -1131,6 +1136,7 @@ async function loadCafeMenus(cafeId){
     const codeCafe=CAFES[cafeId], codeById={}; (codeCafe&&codeCafe.menus||[]).forEach(m=>{ codeById[m.id]=m; });
     CAFEMENU_CACHE[cafeId]=(data||[]).map(r=>{ const cm=codeById[r.menu_id]||{};
       return {id:r.menu_id,name:r.name,emoji:r.emoji||"🥤",cat:r.cat||"extra",temps:Array.isArray(r.temps)?r.temps:["ICE","HOT"],extras:Array.isArray(r.extras)?r.extras:[],popular:!!r.popular,sort:r.sort||0,
+        validFrom:r.valid_from||null, validTo:r.valid_to||null, active:menuActiveOn(r.valid_from,r.valid_to,todayKey()),
         optionGroups:cm.optionGroups, decaf:cm.decaf}; });
     return CAFEMENU_CACHE[cafeId];
   }catch(e){ CAFEMENU_CACHE[cafeId]=[]; return []; }
@@ -1145,15 +1151,16 @@ async function loadHist(){
     // room_id를 아는 사람만 읽는 RPC. 실패 시 직접 SELECT로 우회하지 않는다.
     const { data, error } = await Sync.client.rpc("get_room_history",{p_room:ROOM,p_today:todayKey()});
     if(error) throw error;
-    const byId={}, byName={};
+    const byId={}, lastName={};
     (data||[]).forEach(r=>{ const mid=r.member_id; if(!mid) return;
-      if(r.menu_id){ byId[mid]=byId[mid]||{}; byId[mid][r.menu_id]=(byId[mid][r.menu_id]||0)+1; }
-      const nm=r.menu_name||r.menu_id; if(nm){ byName[mid]=byName[mid]||{}; byName[mid][nm]=(byName[mid][nm]||0)+1; }
+      const key=r.menu_id||r.menu_name; if(!key) return;
+      byId[mid]=byId[mid]||{}; byId[mid][key]=(byId[mid][key]||0)+1;
+      if(r.menu_name) lastName[key]=r.menu_name;
     });
     H_byMemberId=byId; H_topName={};
     // 최애 top-2: 빈도 desc 정렬(Array.sort는 stable이라 동률은 기존과 동일하게 먼저 나온 메뉴가 앞섬)
-    Object.keys(byName).forEach(mid=>{ const o=byName[mid];
-      const ranked=Object.keys(o).map(k=>({name:k,count:o[k]})).sort((a,b)=>b.count-a.count);
+    Object.keys(byId).forEach(mid=>{ const o=byId[mid];
+      const ranked=Object.keys(o).map(k=>({id:k,name:lastName[k]||k,count:o[k]})).sort((a,b)=>b.count-a.count);
       H_topName[mid]={first:ranked[0]||null, second:ranked[1]||null}; });
     HIST_ROOM=ROOM;
   }catch(e){ console.warn("hist fail",e); }
@@ -1193,18 +1200,21 @@ function memObjs(arr){ return (arr||[]).map(m => (m && typeof m==="object") ? {i
 function memSig(arr){ return JSON.stringify(memObjs(arr).map(m=>({id:m.id, name:(m.name||"").trim()})).sort((a,b)=> a.id<b.id?-1:a.id>b.id?1:0)); }
 function genMemberId(){ return "m_" + rand36(10); }   // 이름과 무관한 숨은 ID — 이름 바꿔도 링크 유지
 function menuById(id){ return MENUS.find(m=>m.id===id); }
+function knownMenuById(id){ if(!id) return null;
+  return (CAFEMENU_CACHE[activeCafeId()]||[]).find(m=>m.id===id) || (activeCafe().menus||[]).find(m=>m.id===id) || null; }
+function menuNameOf(id, fallback){ const m=knownMenuById(id); return (m&&m.name) || fallback || id || "?"; }
 // 사용자가 추가한 메뉴(주문에 담긴 menuName 기준)를 모아 그리드에 노출
 function customMenusFromOrders(){
   const seen={}, arr=[];
   MEMBERS.forEach(m=>{ const o=ORDERS[m.id];
-    if(o && o.type==="drink" && o.menuName && !menuById(o.menuId) && !seen[o.menuId]){
+    if(o && o.type==="drink" && o.menuName && !knownMenuById(o.menuId) && !seen[o.menuId]){
       seen[o.menuId]=1; arr.push({ id:o.menuId, name:o.menuName, emoji:"🥤", temps:["ICE","HOT"], extras:[], custom:true });
     }});
   return arr;
 }
-function anyMenuById(id){ return menuById(id) || customMenusFromOrders().find(m=>m.id===id); }
+function anyMenuById(id){ return menuById(id) || knownMenuById(id) || customMenusFromOrders().find(m=>m.id===id); }
 function orderDisplay(o){ // {emoji,name}
-  const base=menuById(o.menuId);
+  const base=menuById(o.menuId) || knownMenuById(o.menuId);
   if(base) return { emoji:base.emoji, name:base.name };
   return { emoji:"🥤", name:o.menuName||"?" };
 }
@@ -1814,7 +1824,7 @@ function renderPickMe(){
     if(m.id===pickSel) badge='<span class="pill" style="background:var(--brand);color:#fff">✓ 선택됨</span>';
     else if(m.id===ME && !badge) badge='<span class="pill ordered">나</span>';
     const th=H_topName[m.id];
-    const favParts=[]; if(th&&th.first) favParts.push(`①${esc(th.first.name)}`); if(th&&th.second) favParts.push(`②${esc(th.second.name)}`);
+    const favParts=[]; if(th&&th.first) favParts.push(`①${esc(menuNameOf(th.first.id,th.first.name))}`); if(th&&th.second) favParts.push(`②${esc(menuNameOf(th.second.id,th.second.name))}`);
     const fav=favParts.join(" · ");
     return `<div class="person${m.id===pickSel?' picksel':''}" data-id="${esc(m.id)}" style="cursor:pointer" role="button" tabindex="0" aria-pressed="${m.id===pickSel}" aria-label="${esc(m.name)}">
       <div class="avatar${Presence.isOnline(m.id)?' has-live':''}" data-member-id="${esc(m.id)}">${esc(initials(m.name))}</div>
@@ -5606,9 +5616,9 @@ function peopleListHtml(c, key){
 }
 // ④ 많이 마신 메뉴 — 가로 막대 Top 8. 나머지는 묶어서 개수를 밝힌다(조용히 자르지 않는다).
 function menuTopHtml(c, key){
-  const agg={};
-  (c.members||[]).forEach(m=>(m.menus||[]).forEach(x=>{ agg[x.name]=(agg[x.name]||0)+(x.count||0); }));
-  const list=Object.keys(agg).map(k=>({name:k,n:agg[k]})).sort((a,b)=> b.n-a.n || a.name.localeCompare(b.name,"ko"));
+  const agg={}, nameOf={};
+  (c.members||[]).forEach(m=>(m.menus||[]).forEach(x=>{ const k=x.menu_id||x.name; agg[k]=(agg[k]||0)+(x.count||0); if(!nameOf[k]) nameOf[k]=x.name||k; }));
+  const list=Object.keys(agg).map(k=>({name:nameOf[k],n:agg[k]})).sort((a,b)=> b.n-a.n || a.name.localeCompare(b.name,"ko"));
   if(!list.length) return "";
   const top=list.slice(0,8), rest=list.slice(8);
   const max=Math.max(1,...top.map(x=>x.n));
@@ -6121,30 +6131,37 @@ function renderLogEntry(l){
 }
 function fmtLogTime(iso){ try{ const p=new Intl.DateTimeFormat("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Seoul"}).formatToParts(new Date(iso)); const g=t=>(p.find(x=>x.type===t)||{}).value||""; return `${g("month")}/${g("day")} ${g("hour")}:${g("minute")}`; }catch(e){ return iso||""; } }
 
-// 카페 메뉴 관리 (관리자) — DB(cafe_menus) CRUD + 코드 76개 시드
+// 카페 메뉴 관리 (관리자) — DB(cafe_menus) CRUD + 코드 기본 메뉴 시드
 async function openCafeMenuAdmin(cafeId){
   if(!SHARED){ toast("Supabase 연결 필요"); return; }
   if(curView!=="adminmenu") pushSub();
   curView="adminmenu";
-  delete CAFEMENU_CACHE[cafeId]; const menus=await loadCafeMenus(cafeId);
+  delete CAFEMENU_CACHE[cafeId]; const allMenus=await loadCafeMenus(cafeId);
+  const menus=allMenus.filter(m=>m.active), ended=allMenus.filter(m=>!m.active);
   const sorted=menus.slice().sort((a,b)=>(a.sort-b.sort)||a.name.localeCompare(b.name,"ko"));
   const rows=sorted.map(m=>`<div class="person" data-id="${esc(m.id)}">
       <div style="font-size:20px;width:26px;text-align:center">${esc(m.emoji||"🥤")}</div>
       <div style="flex:1;min-width:0"><div class="pname">${esc(m.name)}</div><div class="pmenu">${esc(CAT_LABEL[m.cat]||m.cat||"기타")} · ${esc((m.temps||[]).join("/")||"-")}</div></div>
       <button class="btn btn-sm ${m.popular?'btn-brand':'btn-soft'} mpop" data-id="${esc(m.id)}" style="flex:none">${m.popular?'⭐인기':'인기'}</button>
-      <button class="mdel2" data-id="${esc(m.id)}" aria-label="메뉴 삭제" style="background:none;border:none;color:var(--red);font-size:18px;flex:none;cursor:pointer;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button>
+      <button class="mdel2" data-id="${esc(m.id)}" aria-label="메뉴 판매 종료" style="background:none;border:none;color:var(--red);font-size:18px;flex:none;cursor:pointer;padding:12px 10px;margin:-12px -10px -12px 0;line-height:1">✕</button>
     </div>`).join("") || '<p class="muted">메뉴가 없어요. 아래 "기본 메뉴 불러오기"로 시작하세요.</p>';
+  const endedRows=ended.slice().sort((a,b)=>String(b.validTo||"").localeCompare(String(a.validTo||""))||a.name.localeCompare(b.name,"ko")).map(m=>`<div class="person" data-id="${esc(m.id)}">
+      <div style="font-size:20px;width:26px;text-align:center;opacity:.5">${esc(m.emoji||"🥤")}</div>
+      <div style="flex:1;min-width:0"><div class="pname muted">${esc(m.name)}</div><div class="pmenu">${m.validTo?`${esc(String(m.validTo).slice(0,10))}까지 판매`:"판매 전"}</div></div>
+      <button class="btn btn-sm btn-soft mrestore" data-id="${esc(m.id)}" style="flex:none">복원</button>
+    </div>`).join("");
   $app.innerHTML=`
     <header><div class="h-row"><div><div class="room-name">🍽️ 카페길 메뉴</div><div class="date">${menus.length}개 · 관리자</div></div>
       <button class="nav-link" id="mback" style="font-size:14px">← 관리자</button></div></header>
-    ${menus.length?'':'<button class="btn btn-brand" id="seed">📥 기본 메뉴 76개 불러오기(시드)</button><div style="height:10px"></div>'}
+    ${allMenus.length?'':`<button class="btn btn-brand" id="seed">📥 기본 메뉴 ${GIL_MENUS.length}개 불러오기(시드)</button><div style="height:10px"></div>`}
     <button class="btn btn-soft" id="addMenu">➕ 메뉴 추가</button>
-    ${menus.length?'<div style="height:6px"></div><button class="btn btn-ghost" id="reseed" style="font-size:13px">기본 메뉴 다시 덮어쓰기</button>':''}
+    ${allMenus.length?'<div style="height:6px"></div><button class="btn btn-ghost" id="reseed" style="font-size:13px">기본 메뉴 다시 덮어쓰기</button>':''}
     <div style="height:12px"></div>
-    <div class="card" style="padding:6px 16px">${rows}</div>`;
+    <div class="card" style="padding:6px 16px">${rows}</div>
+    ${ended.length?`<div class="label" style="margin-top:16px">판매 종료 ${ended.length}개 · 지난 통계는 그대로 남아요</div><div class="card" style="padding:6px 16px">${endedRows}</div>`:''}`;
   document.getElementById("mback").onclick=()=>{ if(subActive) history.back(); else renderAdminDash(); };
   const seedBtn=document.getElementById("seed")||document.getElementById("reseed");
-  if(seedBtn) seedBtn.onclick=async()=>{ if(seedBtn.id==="reseed"&&!(await askConfirm("코드 기본 76개 메뉴로 덮어쓸까요?\n(같은 메뉴는 갱신됩니다)",{ok:"덮어쓰기",danger:true}))) return;
+  if(seedBtn) seedBtn.onclick=async()=>{ if(seedBtn.id==="reseed"&&!(await askConfirm(`코드 기본 ${GIL_MENUS.length}개 메뉴로 덮어쓸까요?\n(같은 메뉴는 갱신되고, 판매 종료한 메뉴는 그대로 둡니다)`,{ok:"덮어쓰기",danger:true}))) return;
     const payload=GIL_MENUS.map((m,i)=>({cafe_id:cafeId,menu_id:m.id,name:m.name,emoji:m.emoji,cat:m.cat,temps:m.temps,extras:m.extras,popular:!!m.popular,sort:i}));
     const {error}=await Sync.client.from("cafe_menus").upsert(payload,{onConflict:"cafe_id,menu_id"});
     if(error){ toast("시드 실패: "+(error.message||"")); return; } delete CAFEMENU_CACHE[cafeId]; toast("기본 메뉴 등록됨"); openCafeMenuAdmin(cafeId); };
@@ -6152,9 +6169,13 @@ async function openCafeMenuAdmin(cafeId){
   $app.querySelectorAll(".mpop").forEach(b=> b.onclick=async()=>{ const m=menus.find(x=>x.id===b.dataset.id);
     const {error}=await Sync.client.from("cafe_menus").update({popular:!m.popular}).eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
     if(error){ toast("실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; openCafeMenuAdmin(cafeId); });
-  $app.querySelectorAll(".mdel2").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 메뉴를 삭제할까요?",{ok:"삭제",danger:true}))) return;
-    const {error}=await Sync.client.from("cafe_menus").delete().eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
-    if(error){ toast("삭제 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; toast("삭제됨"); openCafeMenuAdmin(cafeId); });
+  $app.querySelectorAll(".mdel2").forEach(b=> b.onclick=async()=>{ if(!(await askConfirm("이 메뉴를 판매 종료할까요?\n주문 목록에서 빠지고, 지난 통계는 그대로 남아요.",{ok:"판매 종료",danger:true}))) return;
+    const {error}=await Sync.client.from("cafe_menus").update({valid_to:prevDayKey(todayKey())}).eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
+    if(error){ toast("판매 종료 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; toast("판매 종료됨"); openCafeMenuAdmin(cafeId); });
+  $app.querySelectorAll(".mrestore").forEach(b=> b.onclick=async()=>{ const m=ended.find(x=>x.id===b.dataset.id); const patch={valid_to:"9999-12-31"};
+    if(m && m.validFrom && String(m.validFrom).slice(0,10)>todayKey()) patch.valid_from=todayKey();
+    const {error}=await Sync.client.from("cafe_menus").update(patch).eq("cafe_id",cafeId).eq("menu_id",b.dataset.id);
+    if(error){ toast("복원 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; toast("복원됨"); openCafeMenuAdmin(cafeId); });
 }
 function openMenuEditSheet(cafeId, existing){
   let temps = existing? [...(existing.temps||["ICE","HOT"])] : ["ICE","HOT"];
@@ -6176,7 +6197,7 @@ function openMenuEditSheet(cafeId, existing){
     const name=document.getElementById("mname").value.trim().slice(0,40); if(!name){ toast("이름을 입력해주세요"); return; }
     const emoji=document.getElementById("memoji").value.trim().slice(0,4)||"🥤"; cat=document.getElementById("mcat").value;
     const id=existing?existing.id:("m:"+name);
-    const {error}=await Sync.client.from("cafe_menus").upsert({cafe_id:cafeId,menu_id:id,name,emoji,cat,temps,extras:existing?existing.extras:[],popular:existing?!!existing.popular:false},{onConflict:"cafe_id,menu_id"});
+    const {error}=await Sync.client.from("cafe_menus").upsert({cafe_id:cafeId,menu_id:id,name,emoji,cat,temps,extras:existing?existing.extras:[],popular:existing?!!existing.popular:false,valid_to:"9999-12-31"},{onConflict:"cafe_id,menu_id"});
     if(error){ toast("저장 실패: "+error.message); return; } delete CAFEMENU_CACHE[cafeId]; closeSheet(); toast("저장됨"); openCafeMenuAdmin(cafeId); };
 }
 

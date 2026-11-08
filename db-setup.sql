@@ -53,6 +53,8 @@ create table if not exists public.cafe_menus (
   popular boolean default false,
   sort int default 0,
   created_at timestamptz not null default now(),
+  valid_from date not null default ((now() at time zone 'Asia/Seoul')::date),
+  valid_to date not null default date '9999-12-31',
   primary key (cafe_id, menu_id)
 );
 
