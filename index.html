@@ -958,7 +958,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.32";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.33";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -977,6 +977,7 @@ const OPT_SIZE     = { key:"size",     label:"사이즈",   opts:["R","L"], def:
 const OPT_SHOT     = { key:"shot",     label:"샷",       opts:["기본","1/4샷","1/2샷","1샷","2샷","1샷 추가","2샷 추가"], def:"기본" };
 const OPT_MILKTYPE = { key:"milktype", label:"우유 종류", opts:["기본","오트밀크"], def:"기본" };
 const OPT_MILK     = { key:"milk",     label:"우유",     opts:["기본","우유 1/3","우유 1/2","우유 많이"], def:"기본" };
+const OPT_ZERO     = { key:"zero",     label:"ZERO",     opts:["일반","제로"], def:"일반" };
 const OPT_ICE      = { key:"ice",      label:"얼음",     opts:["기본","얼음 없이","얼음 1/3","얼음 1/2","얼음 가득"], def:"기본", tempOnly:"ICE" };
 // CAFE GIL 전체 메뉴 (가격 제외). popular=기본 그리드에 노출. temps=[] 는 온도선택 없음(디저트)
 const GIL_MENUS = [
@@ -2163,7 +2164,7 @@ function openOrderSheet(menuId, existing, prefill){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
     // 구조화 옵션(단일선택 그룹): 명시 optionGroups 또는 커피샷/우유 자동 판별. 있으면 그룹+토글, 없으면 기존 flat extras.
-    const allGroups = m.optionGroups || deriveOptionGroups(m) || [];
+    const allGroups = (m.optionGroups || deriveOptionGroups(m) || []).concat(m.cat==="icedtea" ? [OPT_ZERO] : []);
     const groups = allGroups.filter(g=> !g.tempOnly || g.tempOnly===temp);
     const hasGroups = groups.length>0;
     const flatToggles = hasGroups ? menuFlatToggles(m) : [];   // 디카페인/덜달게(다중선택)
