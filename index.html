@@ -958,7 +958,7 @@
  * 비워두면 '이 기기 전용(단독)' 모드로 동작합니다.
  * (앱 안 ⚙️ 설정에서도 입력 가능 — 이 기기에만 저장됨)
  * ================================================== */
-const APP_VERSION = "v10.34";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
+const APP_VERSION = "v10.35";  // 배포 확인용 — 푸터/콘솔에 표시. 배포마다 반드시 올린다(안 올리면 캐시인지 아닌지 구분 불가)
 // publishable(anon) 키는 공개해도 안전 — 보안은 엄격 RLS(직접 SELECT 차단·RPC 한정·signup off)가 담당.
 // 절대 secret/service_role 키는 넣지 말 것. (SECURITY.md 참고)
 const CONFIG = {
@@ -988,9 +988,9 @@ const GIL_MENUS = [
       { key:"water", label:"물", opts:["기본","물 없이","물 1/3","물 1/2","물 가득"], def:"기본" },
       OPT_ICE,
     ] },
-  { id:"cloudamericano", name:"클라우드 아메리카노", emoji:"☁️", cat:"coffee", temps:["ICE","HOT"], extras:[] },
-  { id:"espresso", name:"에스프레소", emoji:"☕", cat:"coffee", temps:["HOT"], extras:["샷추가"] },
-  { id:"conpanna", name:"에스프레소 꼰빠냐", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[] },
+  { id:"cloudamericano", name:"클라우드 아메리카노", emoji:"☁️", cat:"coffee", temps:["ICE","HOT"], extras:[], sizes:["L"] },
+  { id:"espresso", name:"에스프레소", emoji:"☕", cat:"coffee", temps:["HOT"], extras:["샷추가"], sizes:["R"] },
+  { id:"conpanna", name:"에스프레소 꼰빠냐", emoji:"☕", cat:"coffee", temps:["HOT"], extras:[], sizes:["R"] },
   // 라떼
   { id:"caffelatte", name:"카페라떼", emoji:"🥛", cat:"latte", temps:["ICE","HOT"], extras:[], popular:true,
     optionGroups:[ OPT_SIZE, OPT_SHOT, OPT_MILKTYPE, OPT_MILK, OPT_ICE ] },
@@ -1003,9 +1003,9 @@ const GIL_MENUS = [
   { id:"mocha", name:"카페모카", emoji:"🍫", cat:"latte", temps:["ICE","HOT"], extras:["덜달게","샷추가"], popular:true },
   { id:"peanutcafelatte", name:"피넛카페라떼", emoji:"🥜", cat:"latte", temps:["ICE","HOT"], extras:["덜달게"] },
   // 콜드브루
-  { id:"coldbrew", name:"콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"], popular:true },
-  { id:"coldbrewlatte", name:"콜드브루 라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"] },
-  { id:"coldbrewdolce", name:"콜드브루 돌체라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["덜달게"] },
+  { id:"coldbrew", name:"콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"], popular:true, sizes:["R","L"] },
+  { id:"coldbrewlatte", name:"콜드브루 라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["연하게"], sizes:["R","L"] },
+  { id:"coldbrewdolce", name:"콜드브루 돌체라떼", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:["덜달게"], sizes:["R","L"] },
   { id:"vanillacreamcoldbrew", name:"바닐라 크림 콜드브루", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
   { id:"affogato", name:"아포가토 (Haagen-Dazs)", emoji:"🍨", cat:"coldbrew", temps:["ICE"], extras:[] },
   { id:"einspanner", name:"아인슈페너", emoji:"🧊", cat:"coldbrew", temps:["ICE"], extras:[] },
@@ -1138,7 +1138,7 @@ async function loadCafeMenus(cafeId){
     CAFEMENU_CACHE[cafeId]=(data||[]).map(r=>{ const cm=codeById[r.menu_id]||{};
       return {id:r.menu_id,name:r.name,emoji:r.emoji||"🥤",cat:r.cat||"extra",temps:Array.isArray(r.temps)?r.temps:["ICE","HOT"],extras:Array.isArray(r.extras)?r.extras:[],popular:!!r.popular,sort:r.sort||0,
         validFrom:r.valid_from||null, validTo:r.valid_to||null, active:menuActiveOn(r.valid_from,r.valid_to,todayKey()),
-        optionGroups:cm.optionGroups, decaf:cm.decaf}; });
+        optionGroups:cm.optionGroups, decaf:cm.decaf, sizes:cm.sizes}; });
     return CAFEMENU_CACHE[cafeId];
   }catch(e){ CAFEMENU_CACHE[cafeId]=[]; return []; }
 }
@@ -2140,9 +2140,25 @@ function deriveOptionGroups(m){                           // 명시 그룹 없�
   if(canIce) g.push(OPT_ICE);
   return g.length ? g : null;
 }
+function menuSizes(m){
+  if(Array.isArray(m.sizes)) return m.sizes;
+  return (m.cat==="coffee" || m.cat==="latte") ? ["R","L"] : [];
+}
+function sizeGroupFor(m){
+  const sz=menuSizes(m);
+  if(sz.length>1) return { ...OPT_SIZE, opts:sz.slice(), def:sz.includes(OPT_SIZE.def)?OPT_SIZE.def:sz[0] };
+  if(sz.length===1 && sz[0]!==OPT_SIZE.def) return { ...OPT_SIZE, label:"사이즈 ("+sz[0]+"만 있어요)", opts:sz.slice(), def:sz[0] };
+  return null;
+}
+function withMenuSizes(m, groups){
+  const rest=(groups||[]).filter(g=>g.key!=="size");
+  const sg=sizeGroupFor(m);
+  return sg ? [sg].concat(rest) : rest;
+}
 function menuFlatToggles(m){                              // 그룹에 안 담기는 토글(디카페인/덜달게) — 다중선택 유지
   const t=[];
   if(menuTakesDecaf(m)) t.push("디카페인");
+  if(!menuHasShot(m) && (m.extras||[]).includes("연하게")) t.push("연하게");
   if((m.extras||[]).includes("덜달게")) t.push("덜달게");
   return t;
 }
@@ -2164,7 +2180,7 @@ function openOrderSheet(menuId, existing, prefill){
     const m = anyMenuById(menuId) || { id:menuId, name:(existing&&existing.menuName)||"?", emoji:"🥤", temps:["ICE","HOT"], extras:[] };
     if(m.temps.length){ if(!temp || !m.temps.includes(temp)) temp = m.temps[0]; } else { temp = null; }
     // 구조화 옵션(단일선택 그룹): 명시 optionGroups 또는 커피샷/우유 자동 판별. 있으면 그룹+토글, 없으면 기존 flat extras.
-    const allGroups = (m.optionGroups || deriveOptionGroups(m) || []).concat(m.cat==="icedtea" ? [OPT_ZERO] : []);
+    const allGroups = withMenuSizes(m, m.optionGroups || deriveOptionGroups(m) || []).concat(m.cat==="icedtea" ? [OPT_ZERO] : []);
     const groups = allGroups.filter(g=> !g.tempOnly || g.tempOnly===temp);
     const hasGroups = groups.length>0;
     const flatToggles = hasGroups ? menuFlatToggles(m) : [];   // 디카페인/덜달게(다중선택)
